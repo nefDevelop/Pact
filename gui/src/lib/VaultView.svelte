@@ -1,0 +1,449 @@
+<script>
+  import { ShieldCheck, LogOut, Search, Plus, Folder, Settings, Bell, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  
+  import Sidebar from './vault/Sidebar.svelte';
+  import AccountCard from './vault/AccountCard.svelte';
+  import { globalState } from './state.svelte.js';
+  import { api } from './api.js';
+  import { decryptE2E } from './crypto_utils.js';
+  import brandWhitelist from './brand_whitelist.json';
+
+  let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onDatabaseChange, showManager = $bindable() } = $props();
+  
+  // Mapa de iconos para renderizado dinámico
+  const iconMap = {
+    'folder': Folder,
+    'shield': Shield,
+    'lock': Folder, // Fallback
+    'ghost': Ghost,
+    'gamepad2': Gamepad2,
+    'tv': Tv,
+    'music': Music,
+    'coffee': Coffee,
+    'heart': Heart,
+    'star': Star,
+    'shopping-bag': ShoppingBag,
+    'luggage': Luggage,
+    'wallet': Wallet,
+    'umbrella': Umbrella,
+    'trash-2': Trash2
+  };
+  
+  let items = $state([]);
+  let isLoading = $state(true);
+  let activeFilter = $state('all'); 
+  let loadedIcons = $state({});
+  let isInboxOpen = $state(false);
+
+  // --- LÓGICA DE NOTIFICACIONES ---
+  let totalNotifications = $derived(() => {
+    let count = globalState.pendingCount;
+    if (globalState.trashCount > 10) count += 1;
+    const isSyncStale = Date.now() - globalState.lastSyncSuccess > 30 * 60 * 1000;
+    if (globalState.syncError || isSyncStale) count += 1;
+    return count;
+  });
+
+  // --- LÓGICA DE CARGA ---
+
+  export async function loadAccounts() {
+    globalState.isSyncing = true;
+    try {
+      if (!globalState.masterKey) return;
+
+      const includeDeleted = activeFilter === 'trash';
+      let url = `/vault/accounts?include_deleted=${includeDeleted}`;
+      
+      if (activeFilter === 'favorites') {
+        url += `&is_favorite=true`;
+      } else if (activeFilter.startsWith('folder-')) {
+        const folderId = activeFilter.split('-')[1];
+        url += `&folder_id=${folderId}`;
+      }
+
+      const data = await api.get(url);
+      
+      const decryptedItems = await Promise.all(data.map(async (acc) => {
+        const folder = folders.find(f => f.id === acc.folder_id);
+        const dTitle = await decryptE2E(acc.title, globalState.masterKey);
+        const dUrl = acc.url ? await decryptE2E(acc.url, globalState.masterKey) : '';
+        const dUser = acc.username_site ? await decryptE2E(acc.username_site, globalState.masterKey) : '';
+        const dPass = await decryptE2E(acc.encrypted_pass, globalState.masterKey);
+
+        return {
+          id: acc.id,
+          title: dTitle || 'Contenido Cifrado', 
+          username: dUser || 'Sin usuario',
+          password: dPass || '••••••••',
+          website: dUrl || '',
+          strength: 'Segura',
+          icon: (dTitle || '??').substring(0, 2).toUpperCase(),
+          color: '#6750A4',
+          folder_id: acc.folder_id,
+          folder_icon: folder ? folder.icon : 'folder',
+          is_favorite: acc.is_favorite,
+          is_deleted: !!acc.deleted_at,
+          icon_data: acc.icon_data,
+          has_totp: acc.has_totp,
+          totp: null 
+        };
+      }));
+
+      items = decryptedItems;
+      updateAllTOTP();
+
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+    } finally {
+      isLoading = false;
+      globalState.isSyncing = false;
+    }
+  }
+
+  async function toggleFavorite(id) {
+    try {
+      const data = await api.patch(`/vault/accounts/${id}/favorite`);
+      items = items.map(item => item.id === id ? {...item, is_favorite: data.is_favorite} : item);
+      globalState.notify('Favoritos', data.is_favorite ? 'Añadido' : 'Eliminado', 'success', 2000);
+      onDatabaseChange?.();
+    } catch (e) {}
+  }
+
+  async function restoreAccount(id) {
+    try {
+      await api.post(`/vault/accounts/${id}/restore`);
+      globalState.notify('Papelera', 'Cuenta restaurada', 'success');
+      loadAccounts();
+      onDatabaseChange?.();
+    } catch (e) {}
+  }
+
+  async function handleEmptyTrash() {
+    if (!confirm('¿Seguro que quieres vaciar la papelera?')) return;
+    try {
+      const data = await api.delete('/vault/accounts/trash/empty');
+      globalState.notify('Papelera', `Se han borrado ${data.deleted_count} cuentas.`, 'success');
+      loadAccounts();
+      onDatabaseChange?.();
+    } catch (e) {}
+  }
+
+  // --- LÓGICA TOTP ---
+  let totpProgress = $state(100);
+  let totpSeconds = $state(30);
+
+  async function fetchTOTP(accountId) {
+    try {
+      const data = await api.get(`/vault/totp/${accountId}`, { silent: true });
+      items = items.map(item => item.id === accountId ? {...item, totp: data.code} : item);
+    } catch (e) {}
+  }
+
+  async function updateAllTOTP() {
+    const accountsWithTOTP = items.filter(i => i.has_totp);
+    for (const acc of accountsWithTOTP) {
+      await fetchTOTP(acc.id);
+    }
+  }
+
+  function startTOTPTimer() {
+    setInterval(() => {
+      if (totpSeconds > 0) {
+        totpSeconds--;
+        totpProgress = (totpSeconds / 30) * 100;
+      } else {
+        totpSeconds = 30;
+        totpProgress = 100;
+        updateAllTOTP();
+      }
+    }, 1000);
+  }
+
+  // --- ICONOS ---
+  const brandSet = new Set(brandWhitelist);
+
+  function getIconUrl(item, attempt = 0) {
+    if (!item || item.website === 'none') return null;
+    let domain = '';
+    const website = (item.website || '').trim();
+    const title = (item.title || '').trim();
+
+    if (website && website.length > 2) {
+      try {
+        const urlStr = website.startsWith('http') ? website : `https://${website}`;
+        const url = new URL(urlStr);
+        domain = url.hostname.replace('www.', '').toLowerCase();
+      } catch (e) { domain = website.replace('www.', '').split('/')[0].toLowerCase(); }
+    } else {
+      if (!title || title.includes(' ') || title.length > 25 || title.length < 2) return null;
+      const titleClean = title.toLowerCase();
+      const possibleDomains = [`${titleClean}.com`, `${titleClean}.org`, `${titleClean}.io`, titleClean];
+      domain = possibleDomains.find(d => brandSet.has(d));
+      if (!domain) return null;
+    }
+
+    if (!domain || domain.length < 4 || !domain.includes('.') || domain.includes(' ')) return null;
+    if (attempt === 0) return `https://unavatar.io/${domain}?fallback=false`;
+    if (attempt === 1) return `https://logo.hunter.io/${domain}`;
+    if (attempt === 2) return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+    return null;
+  }
+
+  async function saveIconToDB(id, url) {
+    try {
+      const data = await api.get(`/vault/proxy-icon?url=${encodeURIComponent(url)}`, { silent: true });
+      if (!data.base64) return;
+      await api.patch(`/vault/accounts/${id}/icon`, { icon_data: data.base64 });
+      items = items.map(it => it.id === id ? {...it, icon_data: data.base64} : it);
+    } catch (e) {}
+  }
+
+  function handleIconLoad(id, url, e) {
+    e.target.classList.remove('opacity-0');
+    loadedIcons[id] = true;
+    const item = items.find(it => it.id === id);
+    if (item && !item.icon_data && url.startsWith('http')) {
+      saveIconToDB(id, url);
+    }
+  }
+
+  let iconAttempts = $state({});
+  function handleIconError(item, e) {
+    const currentAttempt = (iconAttempts[item.id] !== undefined) ? iconAttempts[item.id] : 0;
+    if (currentAttempt < 2) {
+      iconAttempts[item.id] = currentAttempt + 1;
+      const nextUrl = getIconUrl(item, currentAttempt + 1);
+      if (nextUrl) { e.currentTarget.src = nextUrl; return; }
+    }
+    e.currentTarget.style.display = 'none';
+    loadedIcons[item.id] = false;
+  }
+
+  // --- INTERFAZ ---
+  let expandedCardId = $state(null);
+  let searchQuery = $state('');
+  let visiblePasswords = $state(new Set());
+
+  let filteredItems = $derived(
+    items.filter(item => {
+      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.username.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!matchesSearch) return false;
+      if (activeFilter === 'favorites') return item.is_favorite;
+      if (activeFilter === 'trash') return item.is_deleted;
+      if (activeFilter.startsWith('folder-')) {
+        const fId = parseInt(activeFilter.split('-')[1]);
+        return item.folder_id === fId;
+      }
+      return !item.is_deleted;
+    })
+  );
+
+  function togglePassword(id) {
+    if (visiblePasswords.has(id)) visiblePasswords.delete(id);
+    else visiblePasswords.add(id);
+    visiblePasswords = new Set(visiblePasswords);
+  }
+
+  onMount(() => {
+    loadAccounts();
+    globalState.refreshTrashCount();
+    startTOTPTimer();
+  });
+</script>
+
+<div class="w-full max-w-7xl mx-auto h-[85vh] transition-all duration-500 ease-in-out relative group/vault">
+  
+  {#if !showManager}
+    <!-- VISTA 1: ACCESO RÁPIDO -->
+    <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
+      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-black/[0.1] dark:border-white/[0.15] mb-8 w-full max-w-2xl">
+        <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
+          <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-black/5 dark:bg-white/[0.1]" />
+        </div>
+        <div class="ml-4 flex flex-col flex-1 min-w-0 pr-4">
+          <span class="text-sm font-bold truncate text-[var(--md-on-background)]">{user.name}</span>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+            <span class="text-[9px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">Sesión Activa</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 mr-2">
+          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity" style="color: {user.color}; hover:bg-black/5" title="Agregar Credencial"><Plus size={18}/></button>
+          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear"><LogOut size={18}/></button>
+        </div>
+      </div>
+
+      <div class="w-full max-w-2xl relative mb-12">
+        <Search class="absolute left-6 top-1/2 -translate-y-1/2 opacity-20 text-[var(--md-on-background)]" size={24} />
+        <input 
+          type="text" 
+          bind:value={searchQuery} 
+          placeholder="¿Qué necesitas buscar ahora?" 
+          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-black/[0.1] dark:border-white/[0.15] outline-none text-[var(--md-on-background)] transition-all" 
+        />
+        {#if searchQuery.length > 0}
+          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
+        {/if}
+      </div>
+
+      <div class="w-full max-w-2xl flex-1 overflow-y-auto pb-32 space-y-4 custom-scrollbar px-4">
+        {#if activeFilter !== 'all' && searchQuery.length === 0}
+          <div class="flex items-center justify-between mb-6 px-4">
+            <div class="flex items-center gap-3">
+              <div class="w-1.5 h-1.5 rounded-full bg-[var(--md-primary)]"></div>
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Mostrando: {activeFilter}</span>
+            </div>
+            <button onclick={() => activeFilter = 'all'} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#6750A4]">Ver todo</button>
+          </div>
+        {/if}
+
+        <div class="flex flex-col gap-4 items-center w-full">
+          {#each filteredItems as item (item.id)}
+            <AccountCard 
+              {item} 
+              userColor={user.color} 
+              expanded={expandedCardId === item.id}
+              onToggleExpanded={() => expandedCardId = expandedCardId === item.id ? null : item.id}
+              isFavorite={item.is_favorite}
+              isDeleted={item.is_deleted}
+              {totpProgress}
+              {totpSeconds}
+              onToggleFavorite={toggleFavorite}
+              onTogglePassword={togglePassword}
+              onRestore={restoreAccount}
+              isVisible={visiblePasswords.has(item.id)}
+              {iconMap}
+              {loadedIcons}
+              onIconLoad={handleIconLoad}
+              onIconError={handleIconError}
+              {getIconUrl}
+            />
+          {/each}
+        </div>
+      </div>
+
+      <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+        <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
+        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}">
+          <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
+        </button>
+      </div>
+    </div>
+  {:else}
+    <!-- VISTA 2: GESTOR COMPLETO -->
+    <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.15] flex flex-col overflow-hidden transition-all duration-500">
+      
+      <header class="w-full h-24 px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-4">
+          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2"><ArrowLeft size={20} /></button>
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
+              <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-black/5 dark:bg-white/[0.1]" />
+            </div>
+            <div class="flex flex-col">
+              <h2 class="text-base font-bold leading-none text-[var(--md-on-background)]">{user.name}</h2>
+              <span class="text-[8px] font-black uppercase tracking-widest opacity-20 mt-1.5 text-[var(--md-on-background)]">Gestor de Bóveda</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button onclick={() => isInboxOpen = true} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications() > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative">
+            <Bell size={20} strokeWidth={1.5} />
+            {#if totalNotifications() > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications()}</span>{/if}
+          </button>
+          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity"><Settings size={20} strokeWidth={1.5} /></button>
+        </div>
+      </header>
+
+      <div class="flex-1 flex overflow-hidden">
+        <Sidebar 
+          {folders} 
+          bind:activeFilter 
+          userColor={user.color} 
+          {onOpenNewEntry} 
+          {onOpenNewFolder} 
+          onEmptyTrash={handleEmptyTrash}
+          {iconMap}
+        />
+
+        <section class="flex-1 border-r border-black/[0.05] dark:border-white/[0.15] flex flex-col bg-[var(--md-surface)]">
+          <div class="p-6 border-b border-black/[0.05] dark:border-white/[0.15]">
+            <div class="relative">
+              <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-20" size={16} />
+              <input 
+                type="text" 
+                bind:value={searchQuery} 
+                placeholder="Filtrar credenciales..." 
+                class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-black/5" 
+              />
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+            {#each filteredItems as item (item.id)}
+              <div 
+                role="button"
+                tabindex="0"
+                onclick={() => expandedCardId = item.id} 
+                onkeydown={(e) => e.key === 'Enter' && (expandedCardId = item.id)}
+                class="w-full p-4 flex items-center gap-4 text-left group hover:bg-black/[0.02] cursor-pointer transition-all rounded-[24px]"
+                style={expandedCardId === item.id ? `background-color: ${user.color}0d; border: 1px solid ${user.color}1a;` : ''}
+              >
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs text-white shrink-0 relative overflow-hidden" style="background-color: {item.icon_data || loadedIcons[item.id] ? 'transparent' : item.color}">
+                  {#if item.icon_data}
+                    <img src={item.icon_data} alt="" class="absolute inset-0 w-full h-full object-cover" />
+                  {:else}
+                    <img 
+                      src={getIconUrl(item)} 
+                      alt="" 
+                      class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity"
+                      onload={(e) => handleIconLoad(item.id, getIconUrl(item), e)}
+                      onerror={(e) => handleIconError(item, e)}
+                    />
+                  {/if}
+                  <span class="relative z-10" class:opacity-0={item.icon_data || loadedIcons[item.id]}>{item.icon}</span>
+                </div>
+                <div class="flex flex-col flex-1 min-w-0">
+                  <span class="text-xs font-bold truncate text-[var(--md-on-background)]">{item.title}</span>
+                  <span class="text-[10px] opacity-30 truncate text-[var(--md-on-background)]">{item.username}</span>
+                </div>
+                {#if item.is_favorite}
+                  <Star size={12} fill="currentColor" class="text-yellow-500 shrink-0" />
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </section>
+
+        <!-- DETALLE DERECHA -->
+        {#if expandedCardId}
+          {@const sel = items.find(i => i.id === expandedCardId)}
+          {#if sel}
+            <aside class="hidden xl:flex w-96 flex-col bg-[var(--md-surface)] p-8 overflow-y-auto custom-scrollbar animate-in slide-in-from-right duration-500">
+               <AccountCard 
+                  item={sel} 
+                  userColor={user.color} 
+                  expanded={true}
+                  onToggleExpanded={() => expandedCardId = null}
+                  isFavorite={sel.is_favorite}
+                  isDeleted={sel.is_deleted}
+                  {totpProgress}
+                  {totpSeconds}
+                  onToggleFavorite={toggleFavorite}
+                  onTogglePassword={togglePassword}
+                  onRestore={restoreAccount}
+                  isVisible={visiblePasswords.has(sel.id)}
+                  {iconMap}
+                  {loadedIcons}
+                  onIconLoad={handleIconLoad}
+                  onIconError={handleIconError}
+                  {getIconUrl}
+               />
+            </aside>
+          {/if}
+        {/if}
+      </div>
+    </div>
+  {/if}
+</div>

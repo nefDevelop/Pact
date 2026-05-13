@@ -1,0 +1,44 @@
+# --- RUST ---
+target/
+**/*.rs.bk
+Cargo.lock
+
+# --- NODE / JS ---
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.svelte-kit/
+**/ .svelte-kit/
+.vercel/
+**/ .vercel/
+.npm/
+.eslintcache
+
+# --- OS / IDEs ---
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.env
+.env.*
+! .env.example
+
+# --- PACT SPECIFIC ---
+*.db
+*.db-journal
+*.db-wal
+*.pcty
+storage/*.pcty
+storage/*.zip
+build/
+**/build/
+
+# --- TEMP / LOGS ---
+*.log
+.tmp/
+__pycache__/
+*.pyc

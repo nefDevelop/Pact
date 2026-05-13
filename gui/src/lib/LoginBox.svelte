@@ -1,0 +1,181 @@
+<script>
+  import { Lock } from 'lucide-svelte';
+  import { globalState } from './state.svelte.js';
+  import { deriveKeys } from './crypto_utils.js';
+  let { user, onUnlock } = $props();
+  let password = $state('');
+  let isLoading = $state(false);
+
+  $effect(() => {
+    const username = user.username || user.name;
+    if (user && username) {
+      if (!globalState.selectedUser || globalState.selectedUser.username !== username) {
+        globalState.selectedUser = { ...user, username };
+        globalState.userColor = user.color;
+        globalState.startPendingPolling();
+      }
+    }
+    return () => globalState.stopPendingPolling();
+  });
+
+  async function handleLogin() {
+    if (!password) return;
+    isLoading = true;
+    
+    try {
+      const username = user.username || user.name;
+      
+      // 1. Obtener Salt del servidor
+      const saltResp = await fetch(`/auth/salt/${username}`);
+      if (!saltResp.ok) {
+        alert("No se pudo obtener el salt del servidor.");
+        isLoading = false;
+        return;
+      }
+      const { salt } = await saltResp.json();
+
+      // 2. Derivar llaves localmente
+      const { masterKey, authKey } = await deriveKeys(password, salt);
+
+      // 3. Login con la AuthKey
+      const response = await fetch('/auth/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username,
+          master_password: authKey // Enviamos el hash derivado
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(`Error al desbloquear: ${errorData.error || 'Clave incorrecta'}`);
+        isLoading = false;
+        return;
+      }
+
+      const data = await response.json();
+      
+      // 4. Guardar MasterKey en RAM y Token en GlobalState
+      globalState.masterKey = masterKey;
+      globalState.authToken = data.token;
+      globalState.dbMode = data.source;
+      globalState.userColor = user.color;
+      
+      // --- SINCRONIZACIÓN INMEDIATA POST-LOGIN ---
+      if (data.source === 'hybrid' || data.source === 'remote') {
+        console.log(`[🔑 LOGIN E2E] Modo ${data.source} detectado. Iniciando sincronización...`);
+        globalState.performSync(false);
+      }
+
+      onUnlock?.();
+    } catch (error) {
+      console.error('Error de red:', error);
+      alert('No se pudo conectar con el servidor de Pact. Por favor, verifica la conexión.');
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function handleAvatarError(e) {
+    const img = e.currentTarget;
+    img.style.display = 'none';
+    const next = img.nextElementSibling;
+    if (next) {
+      next.style.display = 'flex';
+    }
+  }
+</script>
+
+<div class="rounded-[48px] p-12 border border-black/[0.05] dark:border-white/[0.05] shadow-2xl transition-all duration-500 ease-in-out w-full max-w-[440px] relative z-10"
+     style="background-color: var(--md-surface); color: var(--md-on-surface); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);">
+  
+  <div class="flex items-center gap-6 mb-10">
+    <!-- Contenedor del avatar -->
+    <div class="w-20 h-20 rounded-full p-1 flex items-center justify-center shrink-0 relative">
+      
+      <!-- Anillo SVG para líneas perfectamente equidistantes -->
+      <svg class="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100" style="--duration: {globalState.pendingCount > 0 ? '6s' : '60s'};">
+        <circle 
+          cx="50" cy="50" r="48" 
+          fill="none" 
+          stroke={user.color} 
+          stroke-width="2" 
+          pathLength="100"
+          stroke-dasharray="4 2.25" 
+          class="opacity-40"
+        />
+      </svg>
+
+      <!-- Imagen (Avatar) -->
+      <img 
+        src={user.avatar} 
+        alt="avatar" 
+        class="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover bg-[var(--md-primary-container)] relative z-10" 
+        onerror={handleAvatarError}
+      />
+      <!-- Iniciales -->
+      <div 
+        class="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full items-center justify-center font-bold hidden relative z-10"
+        style="background-color: var(--md-primary); color: var(--md-on-primary);"
+      >
+        {user.name.substring(0, 1).toUpperCase()}
+      </div>
+    </div>
+
+    <div class="flex flex-col">
+      <h2 class="text-3xl font-display font-black tracking-tight leading-none" style="color: var(--md-on-surface)">{user.name}</h2>
+      <div class="flex items-center gap-3 mt-2">
+        <div class="flex items-center gap-2">
+          <Lock size={12} class="opacity-40" style="color: {user.color}" />
+          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60" style="color: var(--md-on-surface)">Protegida</span>
+        </div>
+        
+        {#if globalState.pendingCount > 0}
+          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 animate-pulse shadow-lg shadow-amber-500/10">
+            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></div>
+            <span class="text-[9px] font-ui font-medium text-[var(--md-primary)] uppercase tracking-tighter">{globalState.pendingCount} pendientes</span>
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+
+  <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-8">
+    <div class="space-y-4">
+      <label for="pass" class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60 px-2" style="color: var(--md-on-surface)">Llave de Seguridad</label>
+      <input 
+        id="pass"
+        type="password" 
+        bind:value={password}
+        required
+        class="w-full h-16 bg-[var(--md-surface-variant)] rounded-2xl px-6 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/10 text-sm font-body font-bold"
+        style="color: var(--md-on-surface)"
+        placeholder="Introduce tu clave..."
+      />
+    </div>
+
+    <button 
+      type="submit"
+      disabled={isLoading}
+      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-50 overflow-hidden relative group shadow-lg"
+      style="background-color: var(--md-primary); color: var(--md-on-primary);"
+    >
+      <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+      <span class="relative">
+        {isLoading ? 'Procesando...' : 'Desbloquear Bóveda'}
+      </span>
+    </button>
+  </form>
+</div>
+
+<style>
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow var(--duration, 60s) linear infinite;
+  }
+</style>
