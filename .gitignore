@@ -1,5 +1,7 @@
 # --- RUST ---
 target/
+target-container/
+**/target-container/
 **/*.rs.bk
 Cargo.lock
 
