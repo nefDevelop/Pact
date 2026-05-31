@@ -119,6 +119,33 @@ Terminate the current session.
 List all users registered in the local instance.
 - **Response**: `200 OK` with `UsersResponse`.
 
+### Update User
+`POST /auth/update`
+
+Update current user's profile (username and color).
+- **Request Body**: `UserUpdate` (JSON)
+```json
+{
+  "old_name": "alice",
+  "new_name": "alice_new",
+  "new_color": "#00ff00"
+}
+```
+- **Response**: `200 OK`.
+
+### Delete User
+`DELETE /auth/:username`
+
+Permanently delete a user account and its data. Requires master password verification.
+- **Request Body**: `UserDelete` (JSON)
+```json
+{
+  "username": "alice",
+  "master_password": "hashed_password"
+}
+```
+- **Response**: `200 OK` or `401 Unauthorized`.
+
 ---
 
 ## Vault Management
@@ -147,6 +174,19 @@ Create a new folder in the vault.
 ```
 - **Response**: `201 Created` with the new folder `ID`.
 
+### Update Folder
+`PUT /vault/folders/:id`
+
+Update an existing folder's metadata.
+- **Request Body**: `FolderCreate` (JSON)
+- **Response**: `200 OK`.
+
+### Delete Folder
+`DELETE /vault/folders/:id`
+
+Delete a folder. Note: Accounts in this folder will have their `folder_id` set to null (soft orphan), they are not deleted.
+- **Response**: `200 OK`.
+
 ### Get Accounts
 `GET /vault/accounts`
 
@@ -172,6 +212,44 @@ Create a new credential entry.
 }
 ```
 - **Response**: `201 Created` with the new account `ID`.
+
+### Update Account
+`PUT /vault/accounts/:id`
+
+Update a credential entry.
+- **Request Body**: `AccountCreate` (JSON)
+- **Response**: `200 OK`.
+
+### Toggle Favorite
+`PATCH /vault/accounts/:id/favorite`
+
+Toggle the favorite status of an account.
+- **Response**: `200 OK` with `{ "is_favorite": boolean }`.
+
+### Soft Delete Account
+`DELETE /vault/accounts/:id`
+
+Move an account to the trash (soft delete).
+- **Response**: `200 OK`.
+
+### Restore Account
+`POST /vault/accounts/:id/restore`
+
+Restore a soft-deleted account from the trash.
+- **Response**: `200 OK`.
+
+### Empty Trash
+`DELETE /vault/accounts/trash/empty`
+
+Permanently delete all accounts in the trash for the authenticated user.
+- **Response**: `200 OK` with `{ "deleted_count": number }`.
+
+### Export Vault
+`POST /vault/export`
+
+Export all user data (folders and accounts) in JSON format. Requires master password verification.
+- **Request Body**: `UserDelete` (JSON)
+- **Response**: `200 OK` with `VaultExport` (JSON).
 
 ### Get Vault Path
 `GET /vault/config/path`

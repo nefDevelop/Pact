@@ -218,7 +218,26 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ path })
         });
-        if (resp.ok) { globalState.vaultPath = path; globalState.notify('Bóveda', 'Éxito.', 'success'); }
+        if (resp.ok) { 
+          globalState.vaultPath = path; 
+          globalState.notify('Bóveda', 'Éxito.', 'success'); 
+          window.dispatchEvent(new CustomEvent('pact:refresh-users'));
+        }
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  async function unlinkVaultPath() {
+    try {
+      const resp = await fetch('/vault/config/path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: null })
+      });
+      if (resp.ok) {
+        globalState.vaultPath = '';
+        globalState.notify('Bóveda', 'Desvinculado correctamente.', 'info');
+        window.dispatchEvent(new CustomEvent('pact:refresh-users'));
       }
     } catch (e) { console.error(e); }
   }
@@ -418,7 +437,14 @@
               {#if isLocalEnabled}
                 <div class="p-8 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4">
                   <span class="text-[9px] font-black uppercase opacity-30 flex justify-between items-center mb-1">Ruta .pcty</span>
-                  <div class="flex gap-2"><input readonly value={globalState.vaultPath || 'Sin vincular'} class="flex-1 h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs font-mono opacity-60" aria-label="Ruta actual de la bóveda" /><button onclick={() => selectVaultFile('open')} class="h-11 px-4 rounded-xl bg-black/5 text-[10px] font-black uppercase tracking-widest">Elegir</button></div>
+                  <div class="flex gap-2">
+                    <input readonly value={globalState.vaultPath || 'Sin vincular'} class="flex-1 h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs font-mono opacity-60" aria-label="Ruta actual de la bóveda" />
+                    {#if globalState.vaultPath}
+                      <button onclick={unlinkVaultPath} class="h-11 px-4 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">Desvincular</button>
+                    {:else}
+                      <button onclick={() => selectVaultFile('open')} class="h-11 px-4 rounded-xl bg-black/5 text-[10px] font-black uppercase tracking-widest">Elegir</button>
+                    {/if}
+                  </div>
                 </div>
               {/if}
               {#if isRemoteEnabled}

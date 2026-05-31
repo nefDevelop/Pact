@@ -14,6 +14,19 @@ pub struct UserLogin {
     pub master_password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserUpdate {
+    pub old_name: String,
+    pub new_name: String,
+    pub new_color: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UserDelete {
+    pub username: String,
+    pub master_password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AuthResponse {
     pub status: String,
@@ -56,6 +69,13 @@ pub struct ErrorResponse {
     pub error: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct VaultExport {
+    pub username: String,
+    pub folders: Vec<crate::models::Folder>,
+    pub accounts: Vec<crate::models::Account>,
+}
+
 // --- FOLDERS ---
 
 #[derive(Debug, Deserialize)]
@@ -69,7 +89,7 @@ pub struct FolderCreate {
 
 #[derive(Debug, Deserialize)]
 pub struct AccountCreate {
-    pub folder_id: i32,
+    pub folder_id: Option<i32>,
     pub title: String,
     pub url: Option<String>,
     pub username_site: Option<String>,

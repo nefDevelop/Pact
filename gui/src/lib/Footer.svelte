@@ -21,6 +21,7 @@
   $effect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', globalState.isDark);
+      globalState.updateTonalPalette();
     }
   });
 

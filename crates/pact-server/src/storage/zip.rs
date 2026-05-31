@@ -150,8 +150,14 @@ impl StorageManager {
         
         for i in 0..zip.len() {
             let file = zip.by_index(i)?;
-            if file.name().to_lowercase().ends_with(".db") {
-                users.push(file.name().replace(".db", ""));
+            let name = file.name();
+            
+            // Validación de seguridad: 
+            // 1. Debe terminar en .db
+            // 2. No debe contener caracteres de ruta (evitar Zip Slip o listados maliciosos)
+            // 3. Debe ser un nombre de archivo simple
+            if name.to_lowercase().ends_with(".db") && !name.contains('/') && !name.contains('\\') {
+                users.push(name.replace(".db", ""));
             }
         }
         

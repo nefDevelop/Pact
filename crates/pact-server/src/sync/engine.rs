@@ -126,18 +126,24 @@ impl<'a> SyncEngine<'a> {
         // 3. Pull accounts (Remote -> Local)
         for uid in &plan.to_pull_accounts {
             if let Some(remote_a) = self.remote_db.get_account_by_uid(self.user_id, uid).await? {
-                // Re-map folder_id to local context
-                if let Some(remote_f) = self.remote_db.get_folders_by_user(self.user_id).await?.into_iter().find(|f| f.id == remote_a.folder_id) {
-                    if let Some(local_f) = self.local_db.get_folder_by_uid(self.user_id, &remote_f.uid).await? {
-                        let mut create_a: crate::models::CreateAccount = remote_a.clone().into();
-                        create_a.folder_id = local_f.id;
-                        
-                        if let Some(local_a) = self.local_db.get_account_by_uid(self.user_id, uid).await? {
-                            self.local_db.update_account(local_a.id, &create_a, remote_a.version).await?;
-                        } else {
-                            self.local_db.create_account(&create_a).await?;
+                let mut create_a: crate::models::CreateAccount = remote_a.clone().into();
+                
+                // Re-map folder_id to local context if it exists
+                if let Some(fid) = remote_a.folder_id {
+                    let remote_folders = self.remote_db.get_folders_by_user(self.user_id).await?;
+                    if let Some(remote_f) = remote_folders.into_iter().find(|f| f.id == fid) {
+                        if let Some(local_f) = self.local_db.get_folder_by_uid(self.user_id, &remote_f.uid).await? {
+                            create_a.folder_id = Some(local_f.id);
                         }
                     }
+                } else {
+                    create_a.folder_id = None;
+                }
+
+                if let Some(local_a) = self.local_db.get_account_by_uid(self.user_id, uid).await? {
+                    self.local_db.update_account(local_a.id, &create_a, remote_a.version).await?;
+                } else {
+                    self.local_db.create_account(&create_a).await?;
                 }
             }
         }
@@ -145,18 +151,24 @@ impl<'a> SyncEngine<'a> {
         // 4. Push accounts (Local -> Remote)
         for uid in &plan.to_push_accounts {
             if let Some(local_a) = self.local_db.get_account_by_uid(self.user_id, uid).await? {
-                // Re-map folder_id to remote context
-                if let Some(local_f) = self.local_db.get_folders_by_user(self.user_id).await?.into_iter().find(|f| f.id == local_a.folder_id) {
-                    if let Some(remote_f) = self.remote_db.get_folder_by_uid(self.user_id, &local_f.uid).await? {
-                        let mut create_a: crate::models::CreateAccount = local_a.clone().into();
-                        create_a.folder_id = remote_f.id;
- 
-                        if let Some(remote_a) = self.remote_db.get_account_by_uid(self.user_id, uid).await? {
-                            self.remote_db.update_account(remote_a.id, &create_a, local_a.version).await?;
-                        } else {
-                            self.remote_db.create_account(&create_a).await?;
+                let mut create_a: crate::models::CreateAccount = local_a.clone().into();
+                
+                // Re-map folder_id to remote context if it exists
+                if let Some(fid) = local_a.folder_id {
+                    let local_folders = self.local_db.get_folders_by_user(self.user_id).await?;
+                    if let Some(local_f) = local_folders.into_iter().find(|f| f.id == fid) {
+                        if let Some(remote_f) = self.remote_db.get_folder_by_uid(self.user_id, &local_f.uid).await? {
+                            create_a.folder_id = Some(remote_f.id);
                         }
                     }
+                } else {
+                    create_a.folder_id = None;
+                }
+
+                if let Some(remote_a) = self.remote_db.get_account_by_uid(self.user_id, uid).await? {
+                    self.remote_db.update_account(remote_a.id, &create_a, local_a.version).await?;
+                } else {
+                    self.remote_db.create_account(&create_a).await?;
                 }
             }
         }

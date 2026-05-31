@@ -7,7 +7,7 @@ pub struct Account {
     pub id: i32,
     pub uid: String,
     pub user_id: i32,
-    pub folder_id: i32,
+    pub folder_id: Option<i32>,
     pub is_favorite: bool,
     pub title: String,
     pub url: Option<String>,
@@ -31,7 +31,7 @@ pub struct TOTPSetting {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CreateAccount {
     pub user_id: i32,
-    pub folder_id: i32,
+    pub folder_id: Option<i32>,
     pub title: String,
     pub url: Option<String>,
     pub username_site: Option<String>,

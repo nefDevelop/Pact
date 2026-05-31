@@ -43,14 +43,48 @@ dev-tauri: ## Lanza Pact en modo Escritorio Nativo (Tauri + Svelte)
 
 # --- MODOS DE PRODUCCIÓN / BUILD ---
 
+build: build-server build-desktop ## Genera todas las versiones de producción (Servidor y Desktop)
+
 build-gui: ## Compila la interfaz para producción
+	@echo "Construyendo GUI..."
 	cd $(GUI_DIR) && $(NPM) run build
 
-build-tauri: build-gui ## Compila el binario e instaladores nativos (AppImage, deb, exe)
-	@echo "Construyendo binarios nativos con Tauri..."
-	cd crates/pact-desktop && $(TAURI) build
+build-server: build-gui ## Genera el binario del servidor independiente (Standalone Server)
+	@echo "Construyendo Pact Server (Release)..."
+	$(CARGO) build -p pact-server --release
+	@mkdir -p build/server
+	@cp target/release/pact-server build/server/
+	@echo "✓ Binario del servidor generado en build/server/pact-server"
 
-run-server: build-gui ## Lanza el servidor de producción (Backend sirve la GUI)
+build-desktop: build-gui ## Genera la aplicación de escritorio nativa (DEB y Binario)
+	@echo "Construyendo Pact Desktop (Tauri)..."
+	# Desactivamos AppImage para evitar problemas de FUSE/linuxdeploy
+	cd crates/pact-desktop && $(TAURI) build --verbose --bundles deb
+	@mkdir -p build/desktop
+	@echo "Copiando binario nativo y paquete DEB..."
+	@cp target-container/release/pact-desktop build/desktop/pact-desktop-raw || cp target/release/pact-desktop build/desktop/pact-desktop-raw
+	@find target-container/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \; || \
+	 find target/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \;
+	@echo "✓ Versiones generadas en build/desktop/ (DEB y pact-desktop-raw)"
+
+# --- PODMAN BUILD ---
+
+CONTAINER_ENGINE = podman
+IMAGE_NAME = pact-builder
+
+build-container-image: ## Crea la imagen de podman para compilación
+	@echo "Construyendo imagen de compilación: $(IMAGE_NAME)..."
+	$(CONTAINER_ENGINE) build -t $(IMAGE_NAME) -f build.Containerfile .
+
+build-in-container: build-container-image ## Ejecuta la compilación completa dentro de Podman
+	@echo "Iniciando compilación dentro de Podman..."
+	$(CONTAINER_ENGINE) run --rm \
+		-v "$(CURDIR)":/app:Z \
+		-v $(HOME)/.cargo/registry:/root/.cargo/registry:Z \
+		-e CARGO_TARGET_DIR=target-container \
+		$(IMAGE_NAME)
+
+run-server: ## Lanza el servidor de producción (Backend sirve la GUI)
 	@echo "Lanzando Pact Server (Modo Producción)..."
 	@echo "Bóveda accesible en: http://localhost:$(API_PORT)"
 	$(CARGO) run -p pact-server --release

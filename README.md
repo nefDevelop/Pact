@@ -8,7 +8,7 @@ La aplicación ha sido migrada de un prototipo en Python a una arquitectura nati
 
 ### 1. Núcleo Criptográfico (Rust Core)
 El motor de seguridad reside en `crates/pact-core`, implementado en Rust para máxima velocidad y seguridad de memoria.
-- **Derivación de Claves (KDF):** Utiliza **PBKDF2-SHA256** (100,000 iteraciones) en el cliente para derivar la `MasterKey` y la `AuthKey`.
+- **Derivación de Claves (KDF):** Utiliza **Argon2id** en el cliente para derivar la `MasterKey` y la `AuthKey`, garantizando resistencia contra ataques de GPU y ASICs.
 - **Cifrado E2E:** Implementa **AES-256-GCM** autenticado. Los datos se cifran en el navegador/app antes de ser enviados.
 - **Hardware Fingerprinting:** Protección adicional para la configuración local del dispositivo.
 

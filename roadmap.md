@@ -10,7 +10,7 @@
 - [x] Implementar registro e login con hashing de contraseña (Argon2)
 - [x] Sistema de sesiones basado en tokens (DashMap en memoria)
 - [x] Middleware de autenticación para proteger rutas de bóveda
-- [x] Cifrado/Descifrado (Esquema definido, pendiente refinamiento)
+- [x] Cifrado/Descifrado (Implementado con Argon2id + AES-256-GCM) ✅
 
 ### Fase 3: Motor de Sincronización (Backend) ✅
 - [x] Diseñar el esquema de versionado (Incremental v1)
@@ -34,5 +34,4 @@
 ### Fase 6: Consolidación y Despliegue 🔵
 - [x] Auditoría de seguridad del cifrado E2E ✅
 - [x] Eliminar dependencias de Python del entorno de usuario final ✅
-- [ ] Empaquetado multiplataforma (AppImage, .deb, .exe) nativo con Tauri
-- [ ] Documentación técnica final y manual de usuario
+

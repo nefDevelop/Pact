@@ -166,3 +166,39 @@ pub async fn lock(
     }
     StatusCode::OK
 }
+
+pub async fn update_user(
+    State(db): State<Arc<dyn Database>>,
+    Json(payload): Json<crate::schemas::UserUpdate>,
+) -> Result<impl IntoResponse> {
+    db.update_user(&payload.old_name, &payload.new_name, &payload.new_color).await?;
+    Ok(StatusCode::OK)
+}
+
+pub async fn delete_user(
+    State(db): State<Arc<dyn Database>>,
+    State(_session_mgr): State<SharedSessionManager>,
+    Path(username): Path<String>,
+    Json(payload): Json<crate::schemas::UserDelete>,
+) -> Result<impl IntoResponse> {
+    // 1. Validar password antes de borrar
+    let user = db.get_user_by_username(&username).await?
+        .ok_or(AppError::NotFound)?;
+
+    let login_hash_bytes = pact_core::crypto::derivar_masterkey(&payload.master_password, user.salt.as_bytes())
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
+    let login_hash = hex::encode(login_hash_bytes);
+
+    if login_hash != user.master_hash {
+        return Err(AppError::Unauthorized);
+    }
+
+    // 2. Borrar de la base de datos
+    db.delete_user(&username).await?;
+    
+    // 3. (Opcional) Invalidar todas las sesiones de este usuario
+    // session_mgr no soporta invalidación por usuario actualmente, 
+    // pero al menos el usuario ya no podrá loguearse.
+
+    Ok(StatusCode::OK)
+}

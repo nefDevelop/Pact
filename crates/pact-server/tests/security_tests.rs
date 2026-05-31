@@ -46,14 +46,32 @@ async fn test_login_user_enumeration_prevention() {
 }
 
 #[tokio::test]
-async fn test_secure_password_generation() {
-    let p1 = pact_core::crypto::generar_password_segura(32);
-    let p2 = pact_core::crypto::generar_password_segura(32);
+async fn test_vault_path_security() {
+    use pact_server::storage::StorageManager;
+    use std::path::PathBuf;
     
-    assert_eq!(p1.len(), 32);
-    assert_ne!(p1, p2);
+    let storage = StorageManager::new(None);
     
-    // Verificar que contiene caracteres variados
-    let has_special = p1.chars().any(|c| "!@#$%^&*()".contains(c));
-    assert!(has_special || true); // No garantizado pero probable
+    // 1. Validar que no acepta cualquier archivo como boveda
+    let root_file = PathBuf::from("/etc/passwd"); // Existe en linux pero no es zip
+    if root_file.exists() {
+        let is_valid = storage.validate_vault(&root_file).unwrap_or(false);
+        assert!(!is_valid, "No debería validar un archivo del sistema como bóveda");
+    }
+
+    // 2. Validar que un directorio no es una bóveda válida
+    let dir = tempfile::tempdir().unwrap();
+    let is_valid = storage.validate_vault(dir.path()).unwrap_or(false);
+    assert!(!is_valid, "Un directorio no debe ser una bóveda válida");
+}
+
+#[tokio::test]
+async fn test_auth_token_tampering() {
+    let mgr = SessionManager::new();
+    let token = mgr.create_session("alice".to_string());
+    
+    // Intentar modificar el token (suponiendo que fuera un JWT o similar, 
+    // pero aquí es un UUID aleatorio, así que cualquier cambio lo invalida)
+    let fake_token = format!("{}modified", token);
+    assert!(mgr.get_session(&fake_token).is_none());
 }

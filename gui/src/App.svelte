@@ -207,14 +207,6 @@
   {#if !isUnlocked || (isUnlocked && !showManager)}
     <div class="fixed top-8 right-8 flex gap-3 z-50">
       <button 
-        onclick={() => globalState.isDark = !globalState.isDark}
-        class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
-        title="Cambiar Tema"
-      >
-        {#if globalState.isDark} <Sun size={20} /> {:else} <Moon size={20} /> {/if}
-      </button>
-
-      <button 
         onclick={() => isSettingsOpen = true}
         class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
         title="Configuración"

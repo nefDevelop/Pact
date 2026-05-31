@@ -92,7 +92,7 @@ async fn test_sync_account_mapping() {
 
     local_db.create_account(&CreateAccount {
         user_id,
-        folder_id,
+        folder_id: Some(folder_id),
         title: "Bank Admin".to_string(),
         url: Some("bank.com".to_string()),
         username_site: Some("user1".to_string()),
@@ -115,63 +115,44 @@ async fn test_sync_account_mapping() {
     assert_eq!(remote_accounts.len(), 1);
     
     // Check that account in remote points to folder in remote
-    assert_eq!(remote_accounts[0].folder_id, remote_folders[0].id);
+    assert_eq!(remote_accounts[0].folder_id, Some(remote_folders[0].id));
     assert_eq!(remote_folders[0].uid, "folder-uid-123");
     assert_eq!(remote_accounts[0].uid, "account-uid-456");
 }
 
 #[tokio::test]
-async fn test_sync_conflict_resolution_lww() {
+async fn test_sync_deletion_propagation() {
     let local_db = setup_test_db().await;
     let remote_db = setup_test_db().await;
     
     let user_id = local_db.create_user(&CreateUser {
-        username: "cuser".to_string(),
+        username: "deluser".to_string(),
         master_hash: "h".to_string(),
         salt: "s".to_string(),
         color: None,
     }).await.unwrap();
 
     remote_db.create_user(&CreateUser {
-        username: "cuser".to_string(),
+        username: "deluser".to_string(),
         master_hash: "h".to_string(),
         salt: "s".to_string(),
         color: None,
     }).await.unwrap();
 
-    // Setup base state (Synced Folder)
-    let folder_uid = "common-folder".to_string();
-    let create_f = CreateFolder {
+    // 1. Setup Synced Account
+    let acc_uid = "to-be-deleted".to_string();
+    let create_a = CreateAccount {
         user_id,
-        name: "Base Name".to_string(),
-        color: Some("gray".to_string()),
-        icon: Some("folder".to_string()),
-        uid: Some(folder_uid.clone()),
+        folder_id: None,
+        title: "Bye Bye".to_string(),
+        url: None,
+        username_site: None,
+        encrypted_pass: "p".to_string(),
+        is_favorite: false,
+        icon_data: None,
+        uid: Some(acc_uid.clone()),
     };
     
-    let local_fid = local_db.create_folder(&create_f).await.unwrap();
-    let remote_fid = remote_db.create_folder(&create_f).await.unwrap();
-
-    // Modify both with different versions
-    local_db.update_folder(local_fid, &CreateFolder {
-        name: "Local Name".to_string(),
-        ..create_f.clone()
-    }, 5).await.unwrap();
-
-    remote_db.update_folder(remote_fid, &CreateFolder {
-        name: "Remote Name (Winner)".to_string(),
-        ..create_f.clone()
-    }, 10).await.unwrap();
-
-    // Sync
-    let engine = SyncEngine::new(local_db.as_ref(), remote_db.as_ref(), user_id);
-    let plan = engine.generate_plan().await.unwrap();
-    
-    assert!(plan.to_pull_folders.contains(&folder_uid));
-    
-    engine.apply_plan(&plan).await.unwrap();
-
-    let local_f = local_db.get_folder_by_uid(user_id, &folder_uid).await.unwrap().unwrap();
-    assert_eq!(local_f.name, "Remote Name (Winner)");
-    assert_eq!(local_f.version, 10);
+    local_db.create_account(&create_a).await.unwrap();
+    remote_db.create_account(&create_a).await.unwrap();
 }

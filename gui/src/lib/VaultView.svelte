@@ -1,5 +1,5 @@
 <script>
-  import { ShieldCheck, LogOut, Search, Plus, Folder, Settings, Bell, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
+  import { LogOut, Search, Plus, Folder, Settings, Bell, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
   import { onMount } from 'svelte';
   
   import Sidebar from './vault/Sidebar.svelte';
@@ -270,7 +270,7 @@
           </div>
         </div>
         <div class="flex items-center gap-1 mr-2">
-          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity" style="color: {user.color}; hover:bg-black/5" title="Agregar Credencial"><Plus size={18}/></button>
+          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title="Agregar Credencial"><Plus size={18}/></button>
           <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear"><LogOut size={18}/></button>
         </div>
       </div>

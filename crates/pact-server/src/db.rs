@@ -9,18 +9,24 @@ pub trait Database: Send + Sync {
     async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error>;
     async fn get_all_users(&self) -> Result<Vec<User>, Error>;
     async fn create_user(&self, user: &CreateUser) -> Result<i32, Error>;
+    async fn update_user(&self, username: &str, new_name: &str, color: &str) -> Result<(), Error>;
+    async fn delete_user(&self, username: &str) -> Result<(), Error>;
     
     // Carpetas
     async fn get_folders_by_user(&self, user_id: i32) -> Result<Vec<Folder>, Error>;
     async fn get_folder_by_uid(&self, user_id: i32, uid: &str) -> Result<Option<Folder>, Error>;
     async fn create_folder(&self, folder: &CreateFolder) -> Result<i32, Error>;
     async fn update_folder(&self, id: i32, folder: &CreateFolder, version: i32) -> Result<(), Error>;
+    async fn delete_folder(&self, id: i32) -> Result<(), Error>;
     
     // Cuentas
     async fn get_accounts_by_user(&self, user_id: i32) -> Result<Vec<Account>, Error>;
     async fn get_account_by_uid(&self, user_id: i32, uid: &str) -> Result<Option<Account>, Error>;
     async fn create_account(&self, account: &CreateAccount) -> Result<i32, Error>;
     async fn update_account(&self, id: i32, account: &CreateAccount, version: i32) -> Result<(), Error>;
+    async fn delete_account(&self, id: i32) -> Result<(), Error>;
+    async fn restore_account(&self, id: i32) -> Result<(), Error>;
+    async fn empty_trash(&self, user_id: i32) -> Result<i32, Error>;
 
     // Configuración
     async fn get_sync_config(&self, user_id: i32) -> Result<Option<SyncConfigModel>, Error>;
@@ -75,6 +81,24 @@ impl Database for SqliteDatabase {
         Ok(res.last_insert_rowid() as i32)
     }
 
+    async fn update_user(&self, username: &str, new_name: &str, color: &str) -> Result<(), Error> {
+        sqlx::query("UPDATE users SET username = ?, color = ? WHERE username = ?")
+            .bind(new_name)
+            .bind(color)
+            .bind(username)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_user(&self, username: &str) -> Result<(), Error> {
+        sqlx::query("DELETE FROM users WHERE username = ?")
+            .bind(username)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     async fn get_folders_by_user(&self, user_id: i32) -> Result<Vec<Folder>, Error> {
         sqlx::query_as::<_, Folder>("SELECT * FROM folders WHERE user_id = ?")
             .bind(user_id)
@@ -109,6 +133,14 @@ impl Database for SqliteDatabase {
             .bind(&folder.color)
             .bind(&folder.icon)
             .bind(version)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_folder(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("DELETE FROM folders WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -161,6 +193,30 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    async fn delete_account(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("UPDATE accounts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn restore_account(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("UPDATE accounts SET deleted_at = NULL WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn empty_trash(&self, user_id: i32) -> Result<i32, Error> {
+        let res = sqlx::query("DELETE FROM accounts WHERE user_id = ? AND deleted_at IS NOT NULL")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() as i32)
     }
 
     async fn get_sync_config(&self, user_id: i32) -> Result<Option<SyncConfigModel>, Error> {
@@ -254,6 +310,24 @@ impl Database for MysqlDatabase {
         Ok(res.last_insert_id() as i32)
     }
 
+    async fn update_user(&self, username: &str, new_name: &str, color: &str) -> Result<(), Error> {
+        sqlx::query("UPDATE users SET username = ?, color = ? WHERE username = ?")
+            .bind(new_name)
+            .bind(color)
+            .bind(username)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_user(&self, username: &str) -> Result<(), Error> {
+        sqlx::query("DELETE FROM users WHERE username = ?")
+            .bind(username)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     async fn get_folders_by_user(&self, user_id: i32) -> Result<Vec<Folder>, Error> {
         sqlx::query_as::<_, Folder>("SELECT * FROM folders WHERE user_id = ?")
             .bind(user_id)
@@ -288,6 +362,14 @@ impl Database for MysqlDatabase {
             .bind(&folder.color)
             .bind(&folder.icon)
             .bind(version)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn delete_folder(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("DELETE FROM folders WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -340,6 +422,30 @@ impl Database for MysqlDatabase {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    async fn delete_account(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("UPDATE accounts SET deleted_at = NOW() WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn restore_account(&self, id: i32) -> Result<(), Error> {
+        sqlx::query("UPDATE accounts SET deleted_at = NULL WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn empty_trash(&self, user_id: i32) -> Result<i32, Error> {
+        let res = sqlx::query("DELETE FROM accounts WHERE user_id = ? AND deleted_at IS NOT NULL")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(res.rows_affected() as i32)
     }
 
     async fn get_sync_config(&self, user_id: i32) -> Result<Option<SyncConfigModel>, Error> {
