@@ -7,12 +7,14 @@ async fn browse_file(app: tauri::AppHandle, mode: String) -> Result<Option<Strin
 
     if mode == "save" {
         let result = builder
+            .set_title("Crear Nueva Bóveda")
             .set_file_name("mi_boveda.pcty")
             .add_filter("Bóveda Pact", &["pcty"])
             .blocking_save_file();
         Ok(result.map(|path| path.to_string()))
     } else {
         let result = builder
+            .set_title("Seleccionar Bóveda Existente")
             .add_filter("Bóveda Pact", &["pcty"])
             .blocking_pick_file();
         Ok(result.map(|path| path.to_string()))

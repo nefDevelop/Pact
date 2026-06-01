@@ -21,26 +21,41 @@ pub async fn get_vault_path(
 }
 
 pub async fn set_vault_path(
+    State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
     user_opt: Option<AuthenticatedUser>,
     Json(payload): Json<VaultPath>,
 ) -> Result<StatusCode> {
     let path = payload.path.map(std::path::PathBuf::from);
-    tracing::info!("Recibida petición para cambiar boveda a: {:?}", path);
+    let force_init = payload.force_init.unwrap_or(false);
+    tracing::info!("Recibida petición para cambiar boveda a: {:?} (force_init: {})", path, force_init);
     
     let mut is_new = false;
 
     if let Some(p) = &path {
-        if !p.exists() {
-            tracing::info!("El archivo no existe, inicializando boveda en {:?}", p);
+        if !p.exists() || force_init {
+            tracing::info!("Inicializando boveda en {:?} (nuevo o forzado)", p);
             storage.init_vault(p).map_err(|e| AppError::BadRequest(format!("No se pudo inicializar la bóveda: {}", e)))?;
             is_new = true;
+            // Si es nueva o forzada, reseteamos la DB local para empezar de cero
+            db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
         } else {
             tracing::info!("El archivo ya existe, validando integridad...");
             if !storage.validate_vault(p).map_err(|e| AppError::Internal(anyhow::anyhow!("Error al validar: {}", e)))? {
                 return Err(AppError::BadRequest("El archivo seleccionado no es una bóveda de Pact válida".to_string()));
             }
-            tracing::info!("Bóveda validada correctamente.");
+            tracing::info!("Bóveda validada correctamente. Reseteando DB local y recuperando usuarios...");
+            
+            // Reseteamos primero para asegurar limpieza
+            db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
+            
+            // Intentamos recuperar la lista de usuarios del primer archivo .db que encontremos
+            if let Ok(users) = storage.list_users() {
+                if let Some(first_user) = users.first() {
+                    tracing::info!("Recuperando metadatos desde la base de datos de '{}'", first_user);
+                    let _ = storage.extract_db(first_user, std::path::Path::new("pact.db"));
+                }
+            }
         }
     }
     

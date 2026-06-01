@@ -36,6 +36,9 @@ pub trait Database: Send + Sync {
     async fn get_pending_accounts(&self, username: &str) -> Result<Vec<PendingAccountModel>, Error>;
     async fn delete_pending_account(&self, id: i32) -> Result<(), Error>;
     async fn get_pending_count(&self, username: &str) -> Result<i32, Error>;
+
+    // Sistema
+    async fn reset(&self) -> Result<(), Error>;
 }
 
 pub struct SqliteDatabase {
@@ -56,6 +59,14 @@ impl SqliteDatabase {
 
 #[async_trait]
 impl Database for SqliteDatabase {
+    async fn reset(&self) -> Result<(), Error> {
+        sqlx::query("DELETE FROM accounts").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM folders").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM sync_configs").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM pending_accounts").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM users").execute(&self.pool).await?;
+        Ok(())
+    }
     async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error> {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
             .bind(username)
@@ -285,6 +296,14 @@ impl MysqlDatabase {
 
 #[async_trait]
 impl Database for MysqlDatabase {
+    async fn reset(&self) -> Result<(), Error> {
+        sqlx::query("DELETE FROM accounts").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM folders").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM sync_configs").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM pending_accounts").execute(&self.pool).await?;
+        sqlx::query("DELETE FROM users").execute(&self.pool).await?;
+        Ok(())
+    }
     async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error> {
         sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
             .bind(username)

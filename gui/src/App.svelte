@@ -84,7 +84,9 @@
         selectedUser = null;
         globalState.selectedUser = null;
       }
-    } catch (e) { console.error(e); } finally {
+    } catch (e) { 
+        if (e.message !== "Unauthorized") console.error(e); 
+    } finally {
       isLoading = false;
       globalState.isSyncing = false;
     }
@@ -96,7 +98,7 @@
         const invoker = await invoke();
         const path = await invoker('browse_file', { mode });
         if (path) {
-          await api.post('/vault/config/path', { path });
+          await api.post('/vault/config/path', { path, force_init: mode === 'save' });
           globalState.vaultPath = path;
           loadUsers(true);
         }
@@ -124,7 +126,7 @@
 
   async function handleNewUserClick() {
     if (!globalState.vaultPath) {
-      promptForVaultPath('save');
+      promptForVaultPath('open');
       return;
     }
     isModalOpen = true;
@@ -265,13 +267,25 @@
               <p class="text-xl lg:text-2xl font-bold tracking-tight">Crea tu primer usuario para empezar.</p>
             </div>
             
-            <button onclick={handleNewUserClick} class="flex items-center gap-4 p-4 pr-8 transition-all duration-300 border border-dashed border-black/20 dark:border-white/20 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group">
-              <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform"><Plus size={24} /></div>
-              <div class="flex flex-col text-left">
-                <span class="text-[10px] font-black uppercase tracking-[0.2em]">Sincronizar Bóveda</span>
-                <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Vincular archivo .pcty</span>
-              </div>
-            </button>
+            <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-black/20 dark:border-white/20 rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
+              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform"><File size={24} /></div>
+                <div class="flex flex-col text-left">
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Abrir Bóveda</span>
+                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Seleccionar archivo .pcty</span>
+                </div>
+              </button>
+
+              <div class="h-px w-12 bg-black/10 dark:bg-white/10 mx-auto"></div>
+
+              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[#6750A4]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+                <div class="flex flex-col text-left">
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Crear Nueva</span>
+                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Empezar desde cero</span>
+                </div>
+              </button>
+            </div>
           </div>
         {/if}
       </div>

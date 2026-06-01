@@ -2,6 +2,7 @@
   import { X, Palette, Lock, Eye, EyeOff, ShieldCheck, Check, Circle, AlertTriangle, Dice5, RefreshCw } from 'lucide-svelte';
   import bip39 from './bip39_es.json';
   import { globalState } from './state.svelte.js';
+  import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
   
   let { isOpen, onSave, onClose, users = [] } = $props();
@@ -143,49 +144,30 @@
   const strengthText = ['Vulnerabilidad Crítica', 'Muy Corta', 'Débil', 'Media', 'Seguridad Alta'];
   const strengthColors = ['bg-red-600', 'bg-orange-600', 'bg-orange-400', 'bg-yellow-500', 'bg-blue-500'];
 
-
-  // ... (mismo código intermedio) ...
-
   async function handleSave() {
     if (!name || passwordStrength < 4 || isCriticallyWeak) return;
     
     try {
       console.log(`[UI E2E] Iniciando registro para: ${name}`);
       
-      // 1. Generar Salt aleatorio (16 bytes hex)
       const saltBytes = crypto.getRandomValues(new Uint8Array(16));
       const saltHex = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // 2. Derivar llaves localmente
       const { masterKey, authKey } = await deriveKeys(password, saltHex);
 
-      // 3. Registrar en el servidor
-      const response = await fetch('/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: name,
-          master_password: authKey, // Enviamos el hash derivado
-          salt: saltHex,            // Enviamos el salt para que el servidor lo guarde
-          color: color
-        }),
+      await api.post('/auth/register', {
+        username: name,
+        master_password: authKey,
+        salt: saltHex,
+        color: color
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        alert(`Error al crear la identidad: ${errorData.error || 'Error desconocido'}`);
-        return;
-      }
-
       console.log(`[UI E2E] Registro exitoso para: ${name}`);
-      
-      // 4. Tras registro exitoso, podemos opcionalmente loguear o pedir login
-      // Guardamos la masterKey en RAM por si el onSave la necesita
       globalState.masterKey = masterKey;
 
       onSave({
         name,
-        password: '', // Ya no guardamos la password en plano en el objeto de retorno
+        password: '',
         color,
         avatar: `https://api.dicebear.com/9.x/notionists/svg?seed=${seed}`,
         status: 'Protegida'
@@ -194,8 +176,7 @@
       resetForm();
       onClose();
     } catch (error) {
-      console.error('Error de red en registro:', error);
-      alert('No se pudo conectar con el servidor de Pact.');
+      console.error('Error de registro:', error);
     }
   }
 

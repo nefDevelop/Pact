@@ -1,6 +1,7 @@
 <script>
   import { Lock } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
+  import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
   let { user, onUnlock } = $props();
   let password = $state('');
@@ -25,44 +26,20 @@
     try {
       const username = user.username || user.name;
       
-      // 1. Obtener Salt del servidor
-      const saltResp = await fetch(`/auth/salt/${username}`);
-      if (!saltResp.ok) {
-        alert("No se pudo obtener el salt del servidor.");
-        isLoading = false;
-        return;
-      }
-      const { salt } = await saltResp.json();
+      const { salt } = await api.get(`/auth/salt/${username}`);
 
-      // 2. Derivar llaves localmente
       const { masterKey, authKey } = await deriveKeys(password, salt);
 
-      // 3. Login con la AuthKey
-      const response = await fetch('/auth/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: username,
-          master_password: authKey // Enviamos el hash derivado
-        }),
+      const data = await api.post('/auth/unlock', {
+        username: username,
+        master_password: authKey 
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        alert(`Error al desbloquear: ${errorData.error || 'Clave incorrecta'}`);
-        isLoading = false;
-        return;
-      }
-
-      const data = await response.json();
-      
-      // 4. Guardar MasterKey en RAM y Token en GlobalState
       globalState.masterKey = masterKey;
       globalState.authToken = data.token;
       globalState.dbMode = data.source;
       globalState.userColor = user.color;
       
-      // --- SINCRONIZACIÓN INMEDIATA POST-LOGIN ---
       if (data.source === 'hybrid' || data.source === 'remote') {
         console.log(`[🔑 LOGIN E2E] Modo ${data.source} detectado. Iniciando sincronización...`);
         globalState.performSync(false);
@@ -70,8 +47,7 @@
 
       onUnlock?.();
     } catch (error) {
-      console.error('Error de red:', error);
-      alert('No se pudo conectar con el servidor de Pact. Por favor, verifica la conexión.');
+      console.error('Error de login:', error);
     } finally {
       isLoading = false;
     }
@@ -91,10 +67,8 @@
      style="background-color: var(--md-surface); color: var(--md-on-surface); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);">
   
   <div class="flex items-center gap-6 mb-10">
-    <!-- Contenedor del avatar -->
     <div class="w-20 h-20 rounded-full p-1 flex items-center justify-center shrink-0 relative">
       
-      <!-- Anillo SVG para líneas perfectamente equidistantes -->
       <svg class="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100" style="--duration: {globalState.pendingCount > 0 ? '6s' : '60s'};">
         <circle 
           cx="50" cy="50" r="48" 
@@ -107,14 +81,12 @@
         />
       </svg>
 
-      <!-- Imagen (Avatar) -->
       <img 
         src={user.avatar} 
         alt="avatar" 
         class="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover bg-[var(--md-primary-container)] relative z-10" 
         onerror={handleAvatarError}
       />
-      <!-- Iniciales -->
       <div 
         class="w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full items-center justify-center font-bold hidden relative z-10"
         style="background-color: var(--md-primary); color: var(--md-on-primary);"

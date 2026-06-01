@@ -28,7 +28,9 @@ class ApiClient {
             const response = await fetch(endpoint, config);
             
             if (response.status === 401) {
-                globalState.forceLock("Sesión expirada o no autorizada.");
+                if (globalState.authToken) {
+                    globalState.forceLock("Sesión expirada o no autorizada.");
+                }
                 throw new Error("Unauthorized");
             }
 
@@ -47,7 +49,14 @@ class ApiClient {
             // Si es 204 No Content, no intentamos parsear JSON
             if (response.status === 204) return null;
             
-            return await response.json();
+            const text = await response.text();
+            if (!text) return null;
+
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                return text;
+            }
         } catch (error) {
             if (error.message !== "Unauthorized") {
                 console.error(`[API] Error in ${endpoint}:`, error);
@@ -76,8 +85,12 @@ class ApiClient {
         });
     }
 
-    delete(endpoint, options = {}) {
-        return this.request(endpoint, { ...options, method: 'DELETE' });
+    delete(endpoint, body, options = {}) {
+        return this.request(endpoint, { 
+            ...options, 
+            method: 'DELETE',
+            body: body instanceof FormData ? body : (body ? JSON.stringify(body) : undefined)
+        });
     }
 }
 

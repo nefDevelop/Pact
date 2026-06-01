@@ -62,6 +62,7 @@ pub struct PendingAccount {
 #[derive(Debug, Deserialize)]
 pub struct VaultPath {
     pub path: Option<String>,
+    pub force_init: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]

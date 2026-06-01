@@ -1,6 +1,7 @@
 <script>
   import { X, User, Shield, Bell, Languages, Clock, Save, Trash2, Database, Download, Server, HardDrive, Settings, Lock, ShieldAlert, Edit2, RefreshCw, Check, Search, Folder, Globe, ChevronRight, Type, Ghost, Gamepad2, Tv, Music, Coffee, Heart, Star, ShoppingBag, Luggage, Wallet, Umbrella, ArrowRightLeft, Plus, Loader2 } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
+  import { api } from './api.js';
   import { encryptWithHardware, safeStorage } from './crypto_utils.js';
   import { untrack, tick } from 'svelte';
   import { fade, fly } from 'svelte/transition';
@@ -45,19 +46,19 @@
   async function saveFolderEdit() {
     if (!editFolderName) return;
     try {
-      const response = await fetch(`/vault/folders/${editingFolderId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editFolderName, color: editFolderColor })
-      });
-      if (response.ok) { editingFolderId = null; onRefreshFolders?.(); globalState.performSync(true); }
+      await api.put(`/vault/folders/${editingFolderId}`, { name: editFolderName, color: editFolderColor });
+      editingFolderId = null; 
+      onRefreshFolders?.(); 
+      globalState.performSync(true);
     } catch (error) { console.error('Error editando carpeta:', error); }
   }
 
   async function deleteFolder(id) {
     if (!confirm('¿Seguro que quieres eliminar esta categoría? Las cuentas no se borrarán.')) return;
     try {
-      const response = await fetch(`/vault/folders/${id}`, { method: 'DELETE' });
-      if (response.ok) { onRefreshFolders?.(); globalState.performSync(true); }
+      await api.delete(`/vault/folders/${id}`);
+      onRefreshFolders?.(); 
+      globalState.performSync(true);
     } catch (error) { console.error('Error borrando carpeta:', error); }
   }
 
@@ -75,19 +76,14 @@
     if (!editUserName) return;
     try {
       const oldUser = users.find(u => u.id === editingUserId);
-      const response = await fetch(`/auth/update`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ old_name: oldUser.name, new_name: editUserName, new_color: editUserColor })
-      });
-      if (response.ok) {
-        users = users.map(u => u.id === editingUserId ? { ...u, name: editUserName, color: editUserColor } : u);
-        if (globalState.selectedUser && globalState.selectedUser.name === oldUser.name) {
-          globalState.userColor = editUserColor;
-          globalState.selectedUser.name = editUserName;
-        }
-        editingUserId = null;
-        globalState.notify('Usuario', 'Cambios guardados correctamente.', 'success');
+      await api.post(`/auth/update`, { old_name: oldUser.name, new_name: editUserName, new_color: editUserColor });
+      users = users.map(u => u.id === editingUserId ? { ...u, name: editUserName, color: editUserColor } : u);
+      if (globalState.selectedUser && globalState.selectedUser.name === oldUser.name) {
+        globalState.userColor = editUserColor;
+        globalState.selectedUser.name = editUserName;
       }
+      editingUserId = null;
+      globalState.notify('Usuario', 'Cambios guardados correctamente.', 'success');
     } catch (error) { console.error('Error actualizando usuario:', error); }
   }
 
@@ -112,21 +108,18 @@
   async function startIconWizard() {
     globalState.isSyncing = true;
     try {
-      const resp = await fetch('/vault/accounts?include_deleted=false');
-      if (resp.ok) {
-        const allAccs = await resp.json();
-        accountsForWizard = allAccs.filter(acc => {
-          if (!acc.url) return true;
-          const domain = acc.url.toLowerCase().trim().replace('https://', '').replace('http://', '').split('/')[0];
-          return !brandSet.has(domain);
-        });
-        if (accountsForWizard.length > 0) {
-          wizardIndex = 0;
-          wizardUrl = accountsForWizard[0].url || '';
-          isWizardActive = true;
-        } else {
-          globalState.notify('Identidad', 'Todas tus cuentas ya tienen identidades visuales optimizadas.', 'success');
-        }
+      const allAccs = await api.get('/vault/accounts?include_deleted=false');
+      accountsForWizard = allAccs.filter(acc => {
+        if (!acc.url) return true;
+        const domain = acc.url.toLowerCase().trim().replace('https://', '').replace('http://', '').split('/')[0];
+        return !brandSet.has(domain);
+      });
+      if (accountsForWizard.length > 0) {
+        wizardIndex = 0;
+        wizardUrl = accountsForWizard[0].url || '';
+        isWizardActive = true;
+      } else {
+        globalState.notify('Identidad', 'Todas tus cuentas ya tienen identidades visuales optimizadas.', 'success');
       }
     } catch (error) { console.error('Error cargando cuentas para asistente:', error); }
     finally { globalState.isSyncing = false; }
@@ -137,19 +130,14 @@
     globalState.isSyncing = true;
     try {
       const finalUrl = useLogo ? (wizardUrl || acc.title).toLowerCase().trim() : 'none';
-      const response = await fetch(`/vault/accounts/${acc.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: finalUrl })
-      });
-      if (response.ok) {
-        isWizardIconLoaded = false;
-        if (wizardIndex < accountsForWizard.length - 1) {
-          wizardIndex++;
-          wizardUrl = accountsForWizard[wizardIndex].url === 'none' ? '' : (accountsForWizard[wizardIndex].url || '');
-        } else {
-          isWizardActive = false;
-          globalState.notify('Éxito', '¡Revisión de identidad completada!', 'success');
-        }
+      await api.put(`/vault/accounts/${acc.id}`, { url: finalUrl });
+      isWizardIconLoaded = false;
+      if (wizardIndex < accountsForWizard.length - 1) {
+        wizardIndex++;
+        wizardUrl = accountsForWizard[wizardIndex].url === 'none' ? '' : (accountsForWizard[wizardIndex].url || '');
+      } else {
+        isWizardActive = false;
+        globalState.notify('Éxito', '¡Revisión de identidad completada!', 'success');
       }
     } catch (error) { console.error('Error en asistente:', error); }
     finally { globalState.isSyncing = false; }
@@ -176,21 +164,16 @@
     if (isInitialLoading) return;
     isInitialLoading = true;
     try {
-      const pathResp = await fetch('/vault/config/path');
-      if (pathResp.ok) {
-        const pathData = await pathResp.json();
-        if (pathData.path) globalState.vaultPath = pathData.path;
-      }
-      const response = await fetch('/sync/config');
-      if (response.ok) {
-        const data = await response.json();
-        syncConfig = { ...syncConfig, ...data };
-        if (!hasLoadedInitialConfig) {
-          if (syncConfig.preferred_mode === 'remote') { isRemoteEnabled = true; isLocalEnabled = false; }
-          else if (syncConfig.preferred_mode === 'hybrid') { isLocalEnabled = true; isRemoteEnabled = true; }
-          else if (syncConfig.preferred_mode === 'local' || globalState.vaultPath) { isLocalEnabled = true; isRemoteEnabled = !!syncConfig.host; }
-          hasLoadedInitialConfig = true;
-        }
+      const pathData = await api.get('/vault/config/path', { silent: true });
+      if (pathData.path) globalState.vaultPath = pathData.path;
+
+      const data = await api.get('/sync/config', { silent: true });
+      syncConfig = { ...syncConfig, ...data };
+      if (!hasLoadedInitialConfig) {
+        if (syncConfig.preferred_mode === 'remote') { isRemoteEnabled = true; isLocalEnabled = false; }
+        else if (syncConfig.preferred_mode === 'hybrid') { isLocalEnabled = true; isRemoteEnabled = true; }
+        else if (syncConfig.preferred_mode === 'local' || globalState.vaultPath) { isLocalEnabled = true; isRemoteEnabled = !!syncConfig.host; }
+        hasLoadedInitialConfig = true;
       }
     } catch (error) { console.error('[⚙️ SETTINGS] Error crítico:', error); }
     finally { isInitialLoading = false; }
@@ -214,64 +197,39 @@
       }
 
       if (path) {
-        const resp = await fetch('/vault/config/path', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path })
-        });
-        if (resp.ok) { 
-          globalState.vaultPath = path; 
-          globalState.notify('Bóveda', 'Éxito.', 'success'); 
-          window.dispatchEvent(new CustomEvent('pact:refresh-users'));
-        }
+        await api.post('/vault/config/path', { path });
+        globalState.vaultPath = path; 
+        globalState.notify('Bóveda', 'Éxito.', 'success'); 
+        window.dispatchEvent(new CustomEvent('pact:refresh-users'));
       }
     } catch (e) { console.error(e); }
   }
 
   async function unlinkVaultPath() {
     try {
-      const resp = await fetch('/vault/config/path', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: null })
-      });
-      if (resp.ok) {
-        globalState.vaultPath = '';
-        globalState.notify('Bóveda', 'Desvinculado correctamente.', 'info');
-        window.dispatchEvent(new CustomEvent('pact:refresh-users'));
-      }
+      await api.post('/vault/config/path', { path: null });
+      globalState.vaultPath = '';
+      globalState.notify('Bóveda', 'Desvinculado correctamente.', 'info');
+      window.dispatchEvent(new CustomEvent('pact:refresh-users'));
     } catch (e) { console.error(e); }
   }
 
 
   async function unlinkAll(confirmAction = true) {
-    if (confirmAction && !window.confirm('¿Limpiar toda la configuración?')) return;
+    if (confirmAction && !confirm('¿Limpiar toda la configuración?')) return;
     try {
       // 1. Limpiamos configuración en el backend
       console.log("[⚙️ SETTINGS] Desvinculando ruta actual y limpiando config remota...");
-      const resp = await fetch('/vault/config/path', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ path: null }) 
-      });
+      await api.post('/vault/config/path', { path: null });
 
       const empty = { preferred_mode: 'none', host: '', user: '', password: '', db_name: '' };
-      await fetch('/sync/config', { 
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${globalState.authToken}`
-        }, 
-        body: JSON.stringify(empty) 
-      });
+      await api.post('/sync/config', empty);
 
       // 2. Limpieza TOTAL del cliente
       console.log("[⚙️ SETTINGS] Realizando limpieza de almacenamiento local...");
       localStorage.clear();
       sessionStorage.clear();
-      if (typeof window !== 'undefined' && window.indexedDB) {
-        // Opcionalmente limpiar IndexedDB si se usara en el futuro
-      }
-
+      
       globalState.resetSessionState();
       globalState.vaultPath = '';
       syncConfig = empty;
@@ -300,16 +258,15 @@
     if (!syncConfig.host || !syncConfig.user || !syncConfig.db_name) return;
     isTestingConnection = true;
     try {
-      const response = await fetch('/sync/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(syncConfig) });
-      isConnectionVerified = response.ok;
-      if (response.ok && manual) globalState.notify('Conexión', '¡Éxito!', 'success');
+      await api.post('/sync/test', syncConfig);
+      isConnectionVerified = true;
+      if (manual) globalState.notify('Conexión', '¡Éxito!', 'success');
     } catch (error) { isConnectionVerified = false; }
     finally { isTestingConnection = false; }
   }
 
   $effect(() => {
     if (hasLoadedInitialConfig) {
-      const { host, user, password, db_name } = syncConfig;
       untrack(() => { isConnectionVerified = false; });
     }
   });
@@ -326,20 +283,18 @@
     else if (isRemoteEnabled) mode = 'remote';
 
     if (!isLocalEnabled && globalState.vaultPath) {
-      await fetch('/vault/config/path', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: null }) });
+      await api.post('/vault/config/path', { path: null });
       globalState.vaultPath = '';
     }
 
     const payload = { ...syncConfig, preferred_mode: mode };
     try {
-      const response = await fetch('/sync/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (response.ok) {
-        globalState.notify('Bóveda', 'Guardado correctamente.', 'success');
-        globalState.dbMode = mode;
-        if (mode === 'hybrid' || mode === 'remote') globalState.performSync(false);
-        window.dispatchEvent(new CustomEvent('pact:refresh-users'));
-        isOpen = false;
-      }
+      await api.post('/sync/config', payload);
+      globalState.notify('Bóveda', 'Guardado correctamente.', 'success');
+      globalState.dbMode = mode;
+      if (mode === 'hybrid' || mode === 'remote') globalState.performSync(false);
+      window.dispatchEvent(new CustomEvent('pact:refresh-users'));
+      isOpen = false;
     } catch (error) { console.error(error); }
   }
 
@@ -348,15 +303,20 @@
     globalState.isSyncing = true;
     try {
       if (secureActionType === 'delete') {
-        const response = await fetch(`/auth/${targetUser.name}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: targetUser.name, master_password: masterPasswordConfirm }) });
-        if (response.ok) {
-          globalState.notify('Eliminado', 'Usuario borrado.', 'success');
-          users = users.filter(u => u.name !== targetUser.name);
-          isSecureModalOpen = false;
-          if (globalState.selectedUser?.name === targetUser.name) { globalState.resetSessionState(); window.dispatchEvent(new CustomEvent('pact:force-lock')); }
-        }
+        await api.delete(`/auth/${targetUser.name}`, { master_password: masterPasswordConfirm });
+        globalState.notify('Eliminado', 'Usuario borrado.', 'success');
+        users = users.filter(u => u.name !== targetUser.name);
+        isSecureModalOpen = false;
+        if (globalState.selectedUser?.name === targetUser.name) { globalState.resetSessionState(); window.dispatchEvent(new CustomEvent('pact:force-lock')); }
       } else {
-        const response = await fetch('/vault/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: targetUser.name, master_password: masterPasswordConfirm }) });
+        const response = await fetch('/vault/export', { 
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${globalState.authToken}`
+            }, 
+            body: JSON.stringify({ username: targetUser.name, master_password: masterPasswordConfirm }) 
+        });
         if (response.ok) {
           const blob = await response.blob();
           const url = window.URL.createObjectURL(blob);
@@ -464,7 +424,7 @@
         <!-- Botones de Acción Fijos Abajo (Solo en Tab Database) -->
         {#if activeTab === 'database'}
           <div class="absolute bottom-0 left-0 right-0 pt-8 pb-8 px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20">
-            <div class="flex justify-between items-center bg-[var(--md-surface-variant)]/50 backdrop-blur-md p-4 rounded-[32px] border border-[var(--md-outline-variant)]/20 shadow-xl">
+            <div class="flex justify-between items-center bg-[var(--md-surface-variant)]/50 backdrop-blur-md p-4 rounded-[32px] border border(--md-outline-variant)]/20 shadow-xl">
               <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95">Desvincular Todo</button>
               <button onclick={saveDatabaseSettings} class="px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all" style="background-color: {globalState.userColor};">Guardar Cambios</button>
             </div>
