@@ -100,7 +100,7 @@
       <div class="flex items-center gap-3 mt-2">
         <div class="flex items-center gap-2">
           <Lock size={12} class="opacity-40" style="color: {user.color}" />
-          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
+      <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
         </div>
         
         {#if globalState.pendingCount > 0}
@@ -130,7 +130,7 @@
     <button 
       type="submit"
       disabled={isLoading}
-      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-80 overflow-hidden relative group shadow-lg"
+      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-50 overflow-hidden relative group shadow-lg"
       style="background-color: var(--md-primary); color: var(--md-on-primary);"
     >
       <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
