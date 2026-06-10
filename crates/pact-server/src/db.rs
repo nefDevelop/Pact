@@ -68,16 +68,22 @@ impl Database for SqliteDatabase {
         Ok(())
     }
     async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error> {
-        sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
+        let t0 = std::time::Instant::now();
+        let res = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
-            .await
+            .await;
+        println!("[🏎️ PERFORMANCE] SQL get_user_by_username ({}) completado en {:?}", username, t0.elapsed());
+        res
     }
 
     async fn get_all_users(&self) -> Result<Vec<User>, Error> {
-        sqlx::query_as::<_, User>("SELECT * FROM users")
+        let t0 = std::time::Instant::now();
+        let res = sqlx::query_as::<_, User>("SELECT * FROM users")
             .fetch_all(&self.pool)
-            .await
+            .await;
+        println!("[🏎️ PERFORMANCE] SQL get_all_users completado en {:?}", t0.elapsed());
+        res
     }
 
     async fn create_user(&self, user: &CreateUser) -> Result<i32, Error> {
@@ -305,16 +311,22 @@ impl Database for MysqlDatabase {
         Ok(())
     }
     async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, Error> {
-        sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
+        let t0 = std::time::Instant::now();
+        let res = sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(&self.pool)
-            .await
+            .await;
+        println!("[🏎️ PERFORMANCE] SQL get_user_by_username ({}) completado en {:?}", username, t0.elapsed());
+        res
     }
 
     async fn get_all_users(&self) -> Result<Vec<User>, Error> {
-        sqlx::query_as::<_, User>("SELECT * FROM users")
+        let t0 = std::time::Instant::now();
+        let res = sqlx::query_as::<_, User>("SELECT * FROM users")
             .fetch_all(&self.pool)
-            .await
+            .await;
+        println!("[🏎️ PERFORMANCE] SQL get_all_users completado en {:?}", t0.elapsed());
+        res
     }
 
     async fn create_user(&self, user: &CreateUser) -> Result<i32, Error> {

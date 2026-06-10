@@ -219,20 +219,30 @@
     if (confirmAction && !confirm('¿Limpiar toda la configuración?')) return;
     try {
       // 1. Limpiamos configuración en el backend
-      console.log("[⚙️ SETTINGS] Desvinculando ruta actual y limpiando config remota...");
+      console.log("[⚙️ SETTINGS] Desvinculando ruta actual...");
+      
+      // set_vault_path (path: null) funciona sin token
       await api.post('/vault/config/path', { path: null });
 
-      const empty = { preferred_mode: 'none', host: '', user: '', password: '', db_name: '' };
-      await api.post('/sync/config', empty);
+      // Solo intentamos limpiar config remota si tenemos token, para evitar el 401
+      if (globalState.authToken) {
+        console.log("[⚙️ SETTINGS] Limpiando configuración remota...");
+        const empty = { preferred_mode: 'none', host: '', user: '', password: '', db_name: '' };
+        try {
+          await api.post('/sync/config', empty);
+        } catch (e) {
+          console.warn("[⚙️ SETTINGS] No se pudo limpiar la config remota (posiblemente sesión expirada):", e);
+        }
+      }
 
-      // 2. Limpieza TOTAL del cliente
+      // 2. Limpieza TOTAL del cliente (esto debe ocurrir siempre)
       console.log("[⚙️ SETTINGS] Realizando limpieza de almacenamiento local...");
       localStorage.clear();
       sessionStorage.clear();
       
       globalState.resetSessionState();
       globalState.vaultPath = '';
-      syncConfig = empty;
+      syncConfig = { preferred_mode: 'none', host: '', user: '', password: '', db_name: '' };
       isLocalEnabled = true; 
       isRemoteEnabled = false; 
       isConnectionVerified = false;
@@ -248,9 +258,10 @@
       console.log("[⚙️ SETTINGS] Refrescando lista de usuarios (debería estar vacía)...");
       window.dispatchEvent(new CustomEvent('pact:refresh-users'));
       
-      globalState.notify('Bóveda Reset', 'Se ha eliminado toda la configuración local y remota.', 'success');
+      globalState.notify('Bóveda Reset', 'Se ha eliminado toda la configuración local.', 'success');
     } catch (e) { 
       console.error("[⚙️ SETTINGS] Error crítico en reset:", e); 
+      globalState.notify('Error Reset', 'No se pudo completar la limpieza total.', 'error');
     }
   }
 

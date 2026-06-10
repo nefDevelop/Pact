@@ -68,6 +68,7 @@ impl StorageManager {
 
     /// Guarda la base de datos de un usuario en el contenedor .pcty
     pub fn save_db(&self, username: &str, db_path: &Path) -> io::Result<()> {
+        let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock().unwrap();
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
@@ -102,11 +103,13 @@ impl StorageManager {
         // Reemplazar el original con el temporal
         temp_pcty.persist(pcty_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         
+        println!("[🏎️ PERFORMANCE] save_db (Zip I/O) completado en {:?}", t_total.elapsed());
         Ok(())
     }
 
     /// Extrae la base de datos de un usuario del contenedor .pcty
     pub fn extract_db(&self, username: &str, dest_path: &Path) -> io::Result<bool> {
+        let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock().unwrap();
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
@@ -130,6 +133,7 @@ impl StorageManager {
             let mut file = zip.by_name(&name)?;
             let mut dest = File::create(dest_path)?;
             io::copy(&mut file, &mut dest)?;
+            println!("[🏎️ PERFORMANCE] extract_db (Zip I/O) completado en {:?}", t_total.elapsed());
             Ok(true)
         } else {
             Ok(false)
@@ -148,16 +152,20 @@ impl StorageManager {
         let mut zip = ZipArchive::new(File::open(pcty_path.unwrap())?)?;
         let mut users = Vec::new();
         
+        tracing::debug!("[STORAGE] list_users: Analizando {} archivos en el .pcty", zip.len());
         for i in 0..zip.len() {
             let file = zip.by_index(i)?;
             let name = file.name();
+            tracing::debug!("[STORAGE] list_users: Encontrado archivo '{}'", name);
             
             // Validación de seguridad: 
             // 1. Debe terminar en .db
             // 2. No debe contener caracteres de ruta (evitar Zip Slip o listados maliciosos)
             // 3. Debe ser un nombre de archivo simple
             if name.to_lowercase().ends_with(".db") && !name.contains('/') && !name.contains('\\') {
-                users.push(name.replace(".db", ""));
+                // Quitamos los últimos 3 caracteres (".db") de forma segura
+                let user_name = &name[..name.len() - 3];
+                users.push(user_name.to_string());
             }
         }
         

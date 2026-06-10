@@ -28,48 +28,54 @@ pub async fn set_vault_path(
 ) -> Result<StatusCode> {
     let path = payload.path.map(std::path::PathBuf::from);
     let force_init = payload.force_init.unwrap_or(false);
-    tracing::info!("Recibida petición para cambiar boveda a: {:?} (force_init: {})", path, force_init);
+    tracing::info!("[VAULT] Petición de cambio de bóveda: {:?} (force_init: {})", path, force_init);
     
     let mut is_new = false;
 
     if let Some(p) = &path {
         if !p.exists() || force_init {
-            tracing::info!("Inicializando boveda en {:?} (nuevo o forzado)", p);
+            tracing::info!("[VAULT] Creando nueva bóveda en: {:?}", p);
             storage.init_vault(p).map_err(|e| AppError::BadRequest(format!("No se pudo inicializar la bóveda: {}", e)))?;
             is_new = true;
-            // Si es nueva o forzada, reseteamos la DB local para empezar de cero
-            db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
         } else {
-            tracing::info!("El archivo ya existe, validando integridad...");
+            tracing::info!("[VAULT] Validando bóveda existente en: {:?}", p);
             if !storage.validate_vault(p).map_err(|e| AppError::Internal(anyhow::anyhow!("Error al validar: {}", e)))? {
+                tracing::error!("[VAULT] Firma de bóveda no válida en: {:?}", p);
                 return Err(AppError::BadRequest("El archivo seleccionado no es una bóveda de Pact válida".to_string()));
             }
-            tracing::info!("Bóveda validada correctamente. Reseteando DB local y recuperando usuarios...");
-            
-            // Reseteamos primero para asegurar limpieza
-            db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
-            
-            // Intentamos recuperar la lista de usuarios del primer archivo .db que encontremos
-            if let Ok(users) = storage.list_users() {
-                if let Some(first_user) = users.first() {
-                    tracing::info!("Recuperando metadatos desde la base de datos de '{}'", first_user);
-                    let _ = storage.extract_db(first_user, std::path::Path::new("pact.db"));
-                }
-            }
+            tracing::info!("[VAULT] Bóveda validada correctamente.");
         }
     }
     
     storage.set_path(path.clone());
 
-    if let Some(AuthenticatedUser(session)) = user_opt {
-        if let Some(_) = path {
-            if is_new {
-                tracing::info!("Bóveda nueva: Guardando base de datos actual de '{}' en la bóveda", session.username);
-                let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
-            } else {
-                tracing::info!("Bóveda existente: Intentando extraer base de datos de '{}'", session.username);
-                let _ = storage.extract_db(&session.username, std::path::Path::new("pact.db"));
+    if let Some(p) = path {
+        tracing::info!("[VAULT] Aplicando cambios en DB local para la ruta: {:?}", p);
+        db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
+
+        if !is_new {
+            if let Ok(users) = storage.list_users() {
+                tracing::info!("[VAULT] Usuarios detectados en bóveda: {:?}", users);
+                if let Some(first_user) = users.first() {
+                    tracing::info!("[VAULT] Extrayendo base de datos inicial del usuario: {}", first_user);
+                    let _ = storage.extract_db(first_user, std::path::Path::new("pact.db"));
+                } else {
+                    tracing::warn!("[VAULT] Bóveda vacía, no hay usuarios que cargar.");
+                }
             }
+        }
+    } else {
+        tracing::warn!("[VAULT] Se ha desvinculado la bóveda actual.");
+    }
+
+    if let Some(AuthenticatedUser(session)) = user_opt {
+        tracing::info!("[VAULT] Usuario autenticado '{}' detectado durante el cambio.", session.username);
+        if is_new {
+            tracing::info!("[VAULT] Persistiendo DB actual de '{}' en la nueva bóveda.", session.username);
+            let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+        } else {
+            tracing::info!("[VAULT] Intentando recuperar DB de '{}' de la bóveda cargada.", session.username);
+            let _ = storage.extract_db(&session.username, std::path::Path::new("pact.db"));
         }
     }
 

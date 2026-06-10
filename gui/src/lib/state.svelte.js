@@ -241,28 +241,32 @@ export const globalState = $state({
       const midData = await api.get('/system/machine-id', { silent: true });
       this.machineId = midData.machine_id;
 
-      // 2. MariaDB Config
-      const { decryptWithHardware } = await import('./crypto_utils.js');
-      const encryptedConfig = safeStorage.getItem('pact_remote_v1');
-      const savedConfig = await decryptWithHardware(encryptedConfig);
+      // 2. Solo intentamos cargar/enviar config de sync si tenemos token
+      if (this.authToken) {
+        const { decryptWithHardware } = await import('./crypto_utils.js');
+        const encryptedConfig = safeStorage.getItem('pact_remote_v1');
+        const savedConfig = await decryptWithHardware(encryptedConfig);
 
-      if (savedConfig?.host) {
-        this.dbMode = savedConfig.preferred_mode || 'remote';
-        await api.post('/sync/config', {
-          preferred_mode: savedConfig.preferred_mode || 'remote',
-          host: savedConfig.host,
-          user: savedConfig.user,
-          password: savedConfig.password,
-          db_name: savedConfig.db_name || 'pact_db'
-        });
+        if (savedConfig?.host) {
+          this.dbMode = savedConfig.preferred_mode || 'remote';
+          await api.post('/sync/config', {
+            preferred_mode: savedConfig.preferred_mode || 'remote',
+            host: savedConfig.host,
+            user: savedConfig.user,
+            password: savedConfig.password,
+            db_name: savedConfig.db_name || 'pact_db'
+          });
+        }
+
+        // 3. Sync Config
+        const data = await api.get('/sync/config', { silent: true });
+        if (data.preferred_mode) this.dbMode = data.preferred_mode;
       }
 
-      // 3. Sync Config
-      const data = await api.get('/sync/config', { silent: true });
-      if (data.preferred_mode) this.dbMode = data.preferred_mode;
-
     } catch (e) {
-      console.error("Error inicializando estado global:", e);
+      if (e.message !== "Unauthorized") {
+        console.error("Error inicializando estado global:", e);
+      }
     }
   }
 });

@@ -144,9 +144,12 @@
   const strengthText = ['Vulnerabilidad Crítica', 'Muy Corta', 'Débil', 'Media', 'Seguridad Alta'];
   const strengthColors = ['bg-red-600', 'bg-orange-600', 'bg-orange-400', 'bg-yellow-500', 'bg-blue-500'];
 
+  let isRegistering = $state(false);
+
   async function handleSave() {
     if (!name || passwordStrength < 4 || isCriticallyWeak) return;
     
+    isRegistering = true;
     try {
       console.log(`[UI E2E] Iniciando registro para: ${name}`);
       
@@ -177,6 +180,9 @@
       onClose();
     } catch (error) {
       console.error('Error de registro:', error);
+      globalState.notify('Error', 'No se pudo crear el usuario.', 'error');
+    } finally {
+      isRegistering = false;
     }
   }
 
@@ -365,21 +371,31 @@
 
     <!-- Actions -->
     <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center">
-      <button 
-        onclick={onClose}
-        class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all"
-      >
-        Cancelar
-      </button>
-      <button 
-        onclick={handleSave}
-        disabled={!name || passwordStrength < 4 || isCriticallyWeak}
-        class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/10"
-        style="background-color: {color}"
-      >
-        <ShieldCheck size={18} />
-        Crear Identidad
-      </button>
+      {#if isRegistering}
+        <div class="flex items-center gap-4 pr-4 animate-in fade-in slide-in-from-right-4">
+          <div class="flex flex-col items-end">
+            <span class="text-[10px] font-black uppercase tracking-widest text-[#6750A4]">Cifrado de Grado Militar</span>
+            <span class="text-[9px] opacity-40 font-bold uppercase">Procesando Argon2id...</span>
+          </div>
+          <div class="w-10 h-10 rounded-full border-4 border-[#6750A4]/10 border-t-[#6750A4] animate-spin"></div>
+        </div>
+      {:else}
+        <button 
+          onclick={onClose}
+          class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all"
+        >
+          Cancelar
+        </button>
+        <button 
+          onclick={handleSave}
+          disabled={!name || passwordStrength < 4 || isCriticallyWeak}
+          class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/10"
+          style="background-color: {color}"
+        >
+          <ShieldCheck size={18} />
+          Crear Identidad
+        </button>
+      {/if}
     </div>
   </div>
 </div>

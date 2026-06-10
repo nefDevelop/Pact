@@ -29,9 +29,14 @@ struct DerivedKeys {
 
 #[tauri::command]
 async fn derive_keys(password: String, salt_hex: String) -> Result<DerivedKeys, String> {
+    let t0 = std::time::Instant::now();
     let salt = hex::decode(salt_hex).map_err(|e| e.to_string())?;
+    
     let (m, a) = pact_core::crypto::derivar_claves_dual(&password, &salt)
         .map_err(|e| format!("{:?}", e))?;
+    
+    let duration = t0.elapsed();
+    log::info!("[🏎️ PERFORMANCE] derive_keys (Rust/Argon2id) completado en {:?}", duration);
     
     Ok(DerivedKeys {
         master_key: hex::encode(m),

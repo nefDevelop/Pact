@@ -36,8 +36,14 @@ export const safeStorage = {
  * 2. authKey: Para autenticarse con el servidor (Hash derivado).
  */
 export async function deriveKeys(password, saltHex) {
+  const t0 = performance.now();
+  console.log("[🏎️ PERFORMANCE] Iniciando deriveKeys (JS -> Rust bridge)...");
+  
   // Llamamos al comando de Rust para realizar el pesado Argon2id
   const keys = await invoke('derive_keys', { password, saltHex });
+
+  const t1 = performance.now();
+  console.log(`[🏎️ PERFORMANCE] deriveKeys (Rust Bridge) retornado en ${(t1 - t0).toFixed(2)}ms`);
 
   const authKey = keys.auth_key;
 
@@ -51,6 +57,9 @@ export async function deriveKeys(password, saltHex) {
     false,
     ['encrypt', 'decrypt']
   );
+
+  const t2 = performance.now();
+  console.log(`[🏎️ PERFORMANCE] Importación masterKey (WebCrypto) completada en ${(t2 - t1).toFixed(2)}ms. Total: ${(t2 - t0).toFixed(2)}ms`);
 
   return { masterKey, authKey };
 }

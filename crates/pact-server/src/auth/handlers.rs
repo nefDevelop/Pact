@@ -21,6 +21,7 @@ pub async fn get_users(
         .map(|p| p.to_string_lossy().to_string());
 
     if path.is_none() {
+        tracing::debug!("[AUTH] get_users: No hay bóveda vinculada.");
         return Ok(Json(UsersResponse {
             users: vec![],
             source: "local".to_string(),
@@ -29,7 +30,10 @@ pub async fn get_users(
         }));
     }
 
-    let users_list = db.get_all_users().await?.into_iter().map(|u| UserListItem {
+    let users = db.get_all_users().await?;
+    tracing::debug!("[AUTH] get_users: {} usuarios encontrados en DB local.", users.len());
+
+    let users_list = users.into_iter().map(|u| UserListItem {
         id: u.id,
         username: u.username.clone(),
         status: "active".to_string(),
@@ -58,6 +62,8 @@ pub async fn register(
     State(db): State<Arc<dyn Database>>,
     Json(payload): Json<UserRegister>,
 ) -> Result<impl IntoResponse> {
+    let t_total = std::time::Instant::now();
+    
     // 1. Verificar si el usuario ya existe
     if db.get_user_by_username(&payload.username).await?.is_some() {
         return Err(AppError::BadRequest("El usuario ya existe".to_string()));
@@ -75,11 +81,14 @@ pub async fn register(
 
     // 3. El servidor recibe la 'authKey' del cliente en el campo 'master_password'
     // Aplicamos Argon2id de nuevo para proteger la base de datos
+    let t_kdf = std::time::Instant::now();
     let master_hash_bytes = pact_core::crypto::derivar_masterkey(&payload.master_password, salt_hex.as_bytes())
         .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
     let master_hash = hex::encode(master_hash_bytes);
+    println!("[🏎️ PERFORMANCE] Argon2id servidor completado en {:?}", t_kdf.elapsed());
 
     // 4. Guardar en DB
+    let t_db = std::time::Instant::now();
     let new_user = CreateUser {
         username: payload.username.clone(),
         master_hash,
@@ -88,6 +97,8 @@ pub async fn register(
     };
 
     db.create_user(&new_user).await?;
+    println!("[🏎️ PERFORMANCE] Escritura en DB completada en {:?}", t_db.elapsed());
+    println!("[🏎️ PERFORMANCE] Registro total completado en {:?}", t_total.elapsed());
 
     Ok((
         StatusCode::CREATED, 
@@ -106,20 +117,24 @@ pub async fn login(
     State(session_mgr): State<SharedSessionManager>,
     Json(payload): Json<UserLogin>,
 ) -> Result<impl IntoResponse> {
+    let t_total = std::time::Instant::now();
+    
     // 1. Buscar usuario
+    let t_fetch = std::time::Instant::now();
     let user_opt = db.get_user_by_username(&payload.username).await?;
+    tracing::debug!("[🏎️ PERFORMANCE] Búsqueda de usuario en DB: {:?}", t_fetch.elapsed());
     
     // Usamos un flag para indicar si el usuario existe, pero seguimos procesando para evitar timing attacks básicos
-    // Aunque Argon2 ya toma su tiempo, es buena práctica.
     let (authorized, user) = match user_opt {
         Some(u) => {
+            let t_kdf = std::time::Instant::now();
             let login_hash_bytes = pact_core::crypto::derivar_masterkey(&payload.master_password, u.salt.as_bytes())
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
             let login_hash = hex::encode(login_hash_bytes);
+            println!("[🏎️ PERFORMANCE] Argon2id login en servidor: {:?}", t_kdf.elapsed());
             (login_hash == u.master_hash, Some(u))
         },
         None => {
-            // Ejecutamos una derivación ficticia para que el tiempo de respuesta sea similar
             let _ = pact_core::crypto::derivar_masterkey(&payload.master_password, b"dummy-salt-16bytes")
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
             (false, None)
@@ -127,7 +142,6 @@ pub async fn login(
     };
 
     if !authorized {
-        // Retraso artificial para mitigar ataques de fuerza bruta
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         return Err(AppError::Unauthorized);
     }
@@ -136,6 +150,7 @@ pub async fn login(
 
     // 2. Crear sesión
     let token = session_mgr.create_session(user.username.clone());
+    println!("[🏎️ PERFORMANCE] Login total completado en {:?}", t_total.elapsed());
 
     Ok(Json(AuthResponse {
         status: "Login exitoso".to_string(),

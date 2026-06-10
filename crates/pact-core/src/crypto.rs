@@ -11,7 +11,7 @@ use std::string::FromUtf8Error;
 use serde::{Serialize, Deserialize};
 use zeroize::Zeroize;
 
-// Parámetros que deben coincidir con la implementación de Python
+// Parámetros de alta seguridad (Standard Argon2id)
 pub const ARGON2_TIME: u32 = 3;
 pub const ARGON2_MEMORY: u32 = 65536; // 64MB
 pub const ARGON2_PARALLELISM: u32 = 4;

@@ -13,6 +13,10 @@ authors = ["Pact Team"]
 edition = "2021"
 license = "MIT"
 
+# Perfil de desarrollo optimizado para criptografía
+[profile.dev.package."*"]
+opt-level = 3
+
 [workspace.dependencies]
 # Crypto
 argon2 = "0.5.3"

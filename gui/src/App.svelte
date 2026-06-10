@@ -10,6 +10,7 @@
   import VaultModal from './lib/VaultModal.svelte';
   import NotificationProvider from './lib/NotificationProvider.svelte';
   import { onMount } from 'svelte';
+  import { fly, fade } from 'svelte/transition';
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
@@ -52,22 +53,27 @@
   }
 
   async function loadUsers(showToast = false) {
+    console.log("[DEBUG] Iniciando loadUsers...");
     globalState.isSyncing = true;
     users = [];
     await loadVaultPath();
+    console.log("[DEBUG] Vault Path tras loadVaultPath:", globalState.vaultPath);
     try {
       const data = await api.get('/auth/users');
+      console.log("[DEBUG] Respuesta /auth/users:", data);
       const userList = data.users || [];
       if (data.source) globalState.dbMode = data.source;
       globalState.vaultPath = data.vault_path || '';
 
       users = userList.map(u => ({
-        id: u.id || u.username,
-        name: u.username,
+        id: u.id,
+        name: u.username, // El alias elegido por el usuario
+        username: u.username,
         status: u.status,
         color: u.color || '#6750A4',
         avatar: `https://api.dicebear.com/9.x/notionists/svg?seed=${u.username}`
       }));
+      console.log("[DEBUG] Usuarios mapeados:", users.length);
 
       if (showToast && globalState.vaultPath) {
         globalState.notify('Bóveda', `Cargados ${users.length} usuarios.`, 'success', 3000);
@@ -80,12 +86,20 @@
           globalState.userColor = selectedUser.color;
         }
         isModalOpen = false;
+        console.log("[DEBUG] Usuario seleccionado automáticamente:", selectedUser.name);
       } else {
         selectedUser = null;
         globalState.selectedUser = null;
+        console.log("[DEBUG] No se encontraron usuarios.");
+        
+        // Si hay boveda vinculada pero 0 usuarios, lanzamos el modal
+        if (globalState.vaultPath) {
+          console.log("[DEBUG] Bóveda vacía, abriendo creador de usuarios.");
+          isModalOpen = true;
+        }
       }
     } catch (e) { 
-        if (e.message !== "Unauthorized") console.error(e); 
+        if (e.message !== "Unauthorized") console.error("[DEBUG] Error en loadUsers:", e); 
     } finally {
       isLoading = false;
       globalState.isSyncing = false;
@@ -206,6 +220,17 @@
 
   <NotificationProvider />
   
+  {#if isDropdownOpen && !isUnlocked}
+    <!-- Dropdown Click-Outside Backdrop moved to TOP level -->
+    <div 
+      class="fixed inset-0 z-[60] bg-black/10 lg:hidden cursor-default"
+      onclick={() => { console.log("[DEBUG] Backdrop click -> closing dropdown"); isDropdownOpen = false; }}
+      onkeydown={(e) => e.key === 'Escape' && (isDropdownOpen = false)}
+      role="button"
+      tabindex="-1"
+    ></div>
+  {/if}
+  
   {#if !isUnlocked || (isUnlocked && !showManager)}
     <div class="fixed top-8 right-8 flex gap-3 z-50">
       <button 
@@ -227,21 +252,37 @@
 
       <div class="flex flex-col items-center justify-center h-full w-full z-10 transition-all duration-700 ease-in-out">
         {#if selectedUser && !isUnlocked}
-          <!-- Mobile Dropdown Placeholder -->
-          <div class="w-full max-w-[400px] mb-8 relative z-20 flex lg:hidden items-center bg-white dark:bg-[#16151a] h-20 rounded-full border border-black/[0.08] dark:border-white/[0.08] group/pill">
-            <button 
-              onclick={() => isDropdownOpen = !isDropdownOpen}
-              class="flex-1 h-full px-3 flex items-center rounded-l-full active:scale-[0.98] transition-all min-w-0"
-            >
-              <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-black/5 p-0.5 border-2 ml-1" style="border-color: {selectedUser.color}66">
-                <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full" />
+          
+          <!-- Mobile User Profile Pill -->
+          <div class="w-full max-w-[400px] mb-8 relative z-[70] flex lg:hidden flex-col gap-2">
+            <div class="w-full flex items-center bg-white dark:bg-[#16151a] h-20 rounded-full border border-black/[0.08] dark:border-white/[0.08] group/pill">
+              <button 
+                onclick={() => { 
+                  console.log("[DEBUG] Toggle dropdown click. Current state:", isDropdownOpen);
+                  isDropdownOpen = !isDropdownOpen; 
+                }}
+                class="flex-1 h-full px-3 flex items-center rounded-l-full active:scale-[0.98] transition-all min-w-0 cursor-pointer"
+              >
+                <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-black/5 p-0.5 border-2 ml-1" style="border-color: {selectedUser.color}66">
+                  <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full" />
+                </div>
+                <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
+                  <span class="text-sm font-bold truncate">{selectedUser.name}</span>
+                  <span class="text-[10px] font-black uppercase tracking-widest opacity-30">
+                    {isDropdownOpen ? 'Cerrar' : 'Cambiar / Nuevo'}
+                  </span>
+                </div>
+                <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
+              </button>
+            </div>
+
+            <!-- Actual Dropdown Content -->
+            {#if isDropdownOpen}
+              <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }} 
+                   class="absolute top-full left-0 right-0 mt-2 p-4 bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl z-[80] max-h-[300px] overflow-y-auto custom-scrollbar">
+                <UserList onSelect={(u) => { console.log("[DEBUG] User selected from dropdown:", u.name); handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
               </div>
-              <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
-                <span class="text-sm font-bold truncate">{selectedUser.name}</span>
-                <span class="text-[10px] font-black uppercase tracking-widest opacity-30">Cambiar</span>
-              </div>
-              <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
-            </button>
+            {/if}
           </div>
           
           <div class="w-full max-w-[400px] relative z-10 rounded-[32px] animate-in fade-in zoom-in duration-500 border border-black/[0.05] dark:border-white/[0.05]">
@@ -264,7 +305,12 @@
           <!-- PANTALLA DE INICIO SUBTIL -->
           <div class="flex flex-col items-center text-center opacity-50 gap-8 animate-in fade-in zoom-in duration-700">
             <div class="flex flex-col gap-2">
-              <p class="text-xl lg:text-2xl font-bold tracking-tight">Crea tu primer usuario para empezar.</p>
+              {#if globalState.vaultPath}
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">Bóveda vacía: {globalState.vaultPath.split('/').pop()}</p>
+                <p class="text-sm opacity-60">Crea tu primer usuario en esta bóveda para continuar.</p>
+              {:else}
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">Crea tu primer usuario para empezar.</p>
+              {/if}
             </div>
             
             <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-black/20 dark:border-white/20 rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">

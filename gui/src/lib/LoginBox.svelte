@@ -100,7 +100,7 @@
       <div class="flex items-center gap-3 mt-2">
         <div class="flex items-center gap-2">
           <Lock size={12} class="opacity-40" style="color: {user.color}" />
-          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60" style="color: var(--md-on-surface)">Protegida</span>
+          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
         </div>
         
         {#if globalState.pendingCount > 0}
@@ -115,7 +115,7 @@
 
   <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-8">
     <div class="space-y-4">
-      <label for="pass" class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60 px-2" style="color: var(--md-on-surface)">Llave de Seguridad</label>
+      <label for="pass" class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60 px-2" style="color: var(--md-on-surface)">Contraseña Maestra</label>
       <input 
         id="pass"
         type="password" 
@@ -123,20 +123,28 @@
         required
         class="w-full h-16 bg-[var(--md-surface-variant)] rounded-2xl px-6 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/10 text-sm font-body font-bold"
         style="color: var(--md-on-surface)"
-        placeholder="Introduce tu clave..."
+        placeholder="Introduce tu clave para entrar"
       />
     </div>
 
     <button 
       type="submit"
       disabled={isLoading}
-      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-50 overflow-hidden relative group shadow-lg"
+      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-80 overflow-hidden relative group shadow-lg"
       style="background-color: var(--md-primary); color: var(--md-on-primary);"
     >
       <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      <span class="relative">
-        {isLoading ? 'Procesando...' : 'Desbloquear Bóveda'}
-      </span>
+      <div class="relative flex items-center justify-center gap-3">
+        {#if isLoading}
+          <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+          <div class="flex flex-col items-start leading-none">
+            <span class="text-[10px] font-black tracking-widest">Verificando...</span>
+            <span class="text-[8px] opacity-60 font-bold">Argon2id Security</span>
+          </div>
+        {:else}
+          <span>Desbloquear Bóveda</span>
+        {/if}
+      </div>
     </button>
   </form>
 </div>
