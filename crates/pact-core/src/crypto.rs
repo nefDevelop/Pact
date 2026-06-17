@@ -13,7 +13,7 @@ use zeroize::Zeroize;
 
 // Parámetros de alta seguridad (Standard Argon2id)
 pub const ARGON2_TIME: u32 = 3;
-pub const ARGON2_MEMORY: u32 = 65536; // 64MB
+pub const ARGON2_MEMORY: u32 = 32768; // 32MB
 pub const ARGON2_PARALLELISM: u32 = 4;
 pub const KEY_LEN: usize = 32;
 
@@ -146,8 +146,10 @@ pub fn hash_integridad(datos: &[u8]) -> String {
 }
 
 /// Generación de password segura (CSPRNG) sin sesgos.
+/// Excluye caracteres visualmente ambiguos (0/O, 1/l/I, 5/S, 8/B, 6/G).
+/// Incluye mayúsculas, minúsculas, dígitos y símbolos comunes.
 pub fn generar_password_segura(longitud: usize) -> String {
-    let alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*()";
+    let alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ234579!@#$%^&*()_-+=~?";
     let alphabet_bytes = alphabet.as_bytes();
     let mut rng = OsRng;
     

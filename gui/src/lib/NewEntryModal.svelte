@@ -1,5 +1,5 @@
 <script>
-  import { X, User, Lock, Save, Dice5, Eye, EyeOff, Folder, Palette, ChevronDown, ChevronUp, KeyRound, ClipboardPaste, Globe, Plus, AlertTriangle, Check, Circle, ShieldCheck } from 'lucide-svelte';
+  import { X, User, Lock, Save, Dice5, Eye, EyeOff, Folder, Palette, ChevronDown, ChevronUp, KeyRound, ClipboardPaste, Globe, Plus, AlertTriangle, Check, Circle, ShieldCheck, Loader2 } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
   import { encryptE2E } from './crypto_utils.js';
   import bip39 from './bip39_es.json';
@@ -16,6 +16,7 @@
   let color = $state('#6750A4');
   let clipboardError = $state(false);
   let folderId = $state(null);
+  let isSaving = $state(false);
 
   const colors = [
     '#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4',
@@ -74,11 +75,13 @@
   const strengthColors = ['bg-red-600', 'bg-orange-600', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500'];
 
   async function handleSave() {
-    if (!title || !username || !password || isCriticallyWeak || !isSeedValid) return;
+    if (!title || !username || !password || isCriticallyWeak || !isSeedValid || isSaving) return;
+    isSaving = true;
     
     // Si no hay llave de cifrado, no podemos guardar de forma segura E2E
     if (!globalState.masterKey) {
       globalState.notify('Error de Seguridad', 'La bóveda está bloqueada. No se puede cifrar el dato.', 'error');
+      isSaving = false;
       return;
     }
 
@@ -109,6 +112,8 @@
     } catch (e) {
       console.error("Error al cifrar para guardar:", e);
       globalState.notify('Error', 'Fallo al cifrar los datos localmente', 'error');
+    } finally {
+      isSaving = false;
     }
   }
 
@@ -280,9 +285,13 @@
 
     <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center shrink-0">
       <button onclick={onClose} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">Cancelar</button>
-      <button onclick={handleSave} disabled={!title || !username || !password || isCriticallyWeak || !isSeedValid} class="px-10 h-14 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/5">
-        <ShieldCheck size={18} /> 
-        {mode === 'quick' ? 'Añadir Ahora' : 'Guardar Entrada'}
+      <button onclick={handleSave} disabled={!title || !username || !password || isCriticallyWeak || !isSeedValid || isSaving} class="px-10 h-14 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/5">
+        {#if isSaving}
+          <Loader2 size={18} class="animate-spin" /> Guardando...
+        {:else}
+          <ShieldCheck size={18} /> 
+          {mode === 'quick' ? 'Añadir Ahora' : 'Guardar Entrada'}
+        {/if}
       </button>
     </div>
   </div>

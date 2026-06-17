@@ -5,7 +5,7 @@
 NPM = npm
 GUI_DIR = gui
 CARGO = cargo
-TAURI = npx @tauri-apps/cli
+TAURI = npx tauri
 
 # Puertos configurables
 API_PORT = 8002
@@ -39,7 +39,8 @@ dev: ## Lanza Pact en modo Desarrollo (Rust API + Vite en navegador)
 
 dev-tauri: ## Lanza Pact en modo Escritorio Nativo (Tauri + Svelte)
 	@echo "Lanzando Pact en TAURI DEV MODE..."
-	(trap 'kill 0' SIGINT; $(CARGO) run -p pact-server & cd $(GUI_DIR) && $(NPM) run dev -- --port $(GUI_PORT) & $(TAURI) dev)
+	-pkill -9 -f "pact-server" 2>/dev/null; sleep 1
+	(trap 'kill 0' SIGINT; $(CARGO) run -p pact-server < /dev/null & cd $(GUI_DIR) && $(NPM) run dev -- --port $(GUI_PORT) < /dev/null & cd crates/pact-desktop && npx --package @tauri-apps/cli tauri dev < /dev/null)
 
 # --- MODOS DE PRODUCCIÓN / BUILD ---
 
@@ -91,9 +92,12 @@ run-server: ## Lanza el servidor de producción (Backend sirve la GUI)
 
 # --- CALIDAD Y LIMPIEZA ---
 
-lint: lint-gui ## Ejecuta los linters en la interfaz
+lint: lint-gui audit ## Ejecuta los linters y auditorías de seguridad
 	cd $(GUI_DIR) && $(NPM) run lint
 	$(CARGO) clippy -- -D warnings
+
+audit: ## Escanea vulnerabilidades en dependencias JS (npm audit)
+	cd $(GUI_DIR) && $(NPM) audit --audit-level=high || true
 
 check: check-rs check-gui ## Verifica errores en Rust y GUI (Svelte)
 

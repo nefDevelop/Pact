@@ -80,5 +80,4 @@ export const applyM3Palette = (hex, isDark) => {
     root.style.setProperty('--md-error-container', `hsl(${errorH}, 100%, ${isDark ? 30 : 90}%)`);
     root.style.setProperty('--md-on-error-container', `hsl(${errorH}, 100%, ${isDark ? 90 : 10}%)`);
 
-    console.log(`[🎨 M3] Theme updated: ${hex} (${isDark ? 'dark' : 'light'})`);
 };

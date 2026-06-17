@@ -41,7 +41,6 @@
       globalState.userColor = user.color;
       
       if (data.source === 'hybrid' || data.source === 'remote') {
-        console.log(`[🔑 LOGIN E2E] Modo ${data.source} detectado. Iniciando sincronización...`);
         globalState.performSync(false);
       }
 

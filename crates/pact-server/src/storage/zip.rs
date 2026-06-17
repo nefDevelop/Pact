@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -8,16 +9,17 @@ use std::sync::Mutex;
 
 pub struct StorageManager {
     pcty_path: Mutex<Option<PathBuf>>,
+    pending_saves: Mutex<HashSet<String>>,
 }
 
 impl StorageManager {
     pub fn new(path: Option<PathBuf>) -> Self {
-        Self { pcty_path: Mutex::new(path) }
+        Self { pcty_path: Mutex::new(path), pending_saves: Mutex::new(HashSet::new()) }
     }
 
     pub fn set_path(&self, path: Option<PathBuf>) {
         if let Ok(mut p) = self.pcty_path.lock() {
-            println!("[📦 STORAGE] Actualizando ruta de bóveda: {:?}", path);
+            tracing::info!("Actualizando ruta de bóveda: {:?}", path);
             *p = path;
         }
     }
@@ -28,7 +30,7 @@ impl StorageManager {
 
     /// Inicializa una nueva bóveda con la firma pact.sig
     pub fn init_vault(&self, path: &Path) -> io::Result<()> {
-        println!("[📦 STORAGE] Inicializando nueva bóveda en {:?}", path);
+        tracing::info!("Inicializando nueva bóveda en {:?}", path);
         let file = File::create(path)?;
         let mut zip = ZipWriter::new(file);
         
@@ -69,11 +71,12 @@ impl StorageManager {
     /// Guarda la base de datos de un usuario en el contenedor .pcty
     pub fn save_db(&self, username: &str, db_path: &Path) -> io::Result<()> {
         let t_total = std::time::Instant::now();
-        let path_lock = self.pcty_path.lock().unwrap();
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
 
-        println!("[📦 STORAGE] Guardando base de datos de {} en {:?}", username, pcty_path);
+        tracing::debug!("Guardando base de datos de {} en {:?}", username, pcty_path);
 
         let db_name = format!("{}.db", username);
         let parent_dir = pcty_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
@@ -103,18 +106,62 @@ impl StorageManager {
         // Reemplazar el original con el temporal
         temp_pcty.persist(pcty_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         
-        println!("[🏎️ PERFORMANCE] save_db (Zip I/O) completado en {:?}", t_total.elapsed());
+        tracing::debug!("save_db (Zip I/O) completado en {:?}", t_total.elapsed());
         Ok(())
+    }
+
+    /// Marca un usuario como pendiente de guardado (debounced write).
+    /// El guardado real ocurre en el próximo ciclo de flush_dirty.
+    pub fn mark_dirty(&self, username: &str) {
+        if let Ok(mut pending) = self.pending_saves.lock() {
+            pending.insert(username.to_string());
+        }
+    }
+
+    /// Ejecuta el guardado diferido para todos los usuarios marcados como dirty.
+    /// Devuelve la cantidad de usuarios guardados.
+    pub fn flush_dirty(&self) -> usize {
+        let dirty_users: Vec<String> = match self.pending_saves.lock() {
+            Ok(mut pending) => pending.drain().collect(),
+            Err(poisoned) => {
+                tracing::error!("Mutex poisoned en pending_saves, datos perdidos");
+                poisoned.into_inner().drain().collect()
+            }
+        };
+
+        if dirty_users.is_empty() {
+            return 0;
+        }
+
+        let mut saved = 0;
+        for username in &dirty_users {
+            match self.save_db(username, std::path::Path::new("pact.db")) {
+                Ok(_) => {
+                    tracing::debug!("Guardado diferido completado para {}", username);
+                    saved += 1;
+                }
+                Err(e) => {
+                    tracing::error!("Error en guardado diferido para {}: {:?}", username, e);
+                }
+            }
+        }
+        saved
+    }
+
+    /// Fuerza el guardado inmediato de todos los cambios pendientes.
+    pub fn flush(&self) {
+        self.flush_dirty();
     }
 
     /// Extrae la base de datos de un usuario del contenedor .pcty
     pub fn extract_db(&self, username: &str, dest_path: &Path) -> io::Result<bool> {
         let t_total = std::time::Instant::now();
-        let path_lock = self.pcty_path.lock().unwrap();
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
 
-        println!("[📦 STORAGE] Extrayendo base de datos de {} desde {:?}", username, pcty_path);
+        tracing::info!("Extrayendo base de datos de {} desde {:?}", username, pcty_path);
 
         let db_name = format!("{}.db", username);
         let mut zip = ZipArchive::new(File::open(pcty_path)?)?;
@@ -133,7 +180,7 @@ impl StorageManager {
             let mut file = zip.by_name(&name)?;
             let mut dest = File::create(dest_path)?;
             io::copy(&mut file, &mut dest)?;
-            println!("[🏎️ PERFORMANCE] extract_db (Zip I/O) completado en {:?}", t_total.elapsed());
+            tracing::debug!("extract_db (Zip I/O) completado en {:?}", t_total.elapsed());
             Ok(true)
         } else {
             Ok(false)
@@ -142,14 +189,18 @@ impl StorageManager {
 
     /// Lista los usuarios disponibles en la bóveda
     pub fn list_users(&self) -> io::Result<Vec<String>> {
-        let path_lock = self.pcty_path.lock().unwrap();
-        let pcty_path = path_lock.as_ref();
-        
-        if pcty_path.is_none() || !pcty_path.unwrap().exists() {
-            return Ok(vec![]);
-        }
+        let pcty_path = {
+            let path_lock = self.pcty_path.lock()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+            path_lock.clone()
+        };
 
-        let mut zip = ZipArchive::new(File::open(pcty_path.unwrap())?)?;
+        let pcty_path = match pcty_path {
+            Some(p) if p.exists() => p,
+            _ => return Ok(vec![]),
+        };
+
+        let mut zip = ZipArchive::new(File::open(&pcty_path)?)?;
         let mut users = Vec::new();
         
         tracing::debug!("[STORAGE] list_users: Analizando {} archivos en el .pcty", zip.len());

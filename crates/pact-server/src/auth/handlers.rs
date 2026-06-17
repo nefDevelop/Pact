@@ -7,6 +7,7 @@ use std::sync::Arc;
 use rand::{RngCore, rngs::OsRng};
 
 use crate::db::Database;
+use crate::auth::ratelimit::SharedRateLimiter;
 use crate::auth::session::SharedSessionManager;
 use crate::storage::StorageManager;
 use crate::schemas::{UserRegister, UserLogin, AuthResponse, UsersResponse, UserListItem};
@@ -60,8 +61,13 @@ pub async fn get_salt(
 
 pub async fn register(
     State(db): State<Arc<dyn Database>>,
+    State(limiter): State<SharedRateLimiter>,
     Json(payload): Json<UserRegister>,
 ) -> Result<impl IntoResponse> {
+    let rate_key = format!("register:{}", payload.username);
+    if !limiter.check(&rate_key) {
+        return Err(AppError::BadRequest("Demasiados intentos. Espera un minuto.".to_string()));
+    }
     let t_total = std::time::Instant::now();
     
     // 1. Verificar si el usuario ya existe
@@ -85,7 +91,7 @@ pub async fn register(
     let master_hash_bytes = pact_core::crypto::derivar_masterkey(&payload.master_password, salt_hex.as_bytes())
         .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
     let master_hash = hex::encode(master_hash_bytes);
-    println!("[🏎️ PERFORMANCE] Argon2id servidor completado en {:?}", t_kdf.elapsed());
+    tracing::debug!("Argon2id servidor completado en {:?}", t_kdf.elapsed());
 
     // 4. Guardar en DB
     let t_db = std::time::Instant::now();
@@ -97,8 +103,8 @@ pub async fn register(
     };
 
     db.create_user(&new_user).await?;
-    println!("[🏎️ PERFORMANCE] Escritura en DB completada en {:?}", t_db.elapsed());
-    println!("[🏎️ PERFORMANCE] Registro total completado en {:?}", t_total.elapsed());
+    tracing::debug!("Escritura en DB completada en {:?}", t_db.elapsed());
+    tracing::debug!("Registro total completado en {:?}", t_total.elapsed());
 
     Ok((
         StatusCode::CREATED, 
@@ -115,8 +121,13 @@ pub async fn register(
 pub async fn login(
     State(db): State<Arc<dyn Database>>,
     State(session_mgr): State<SharedSessionManager>,
+    State(limiter): State<SharedRateLimiter>,
     Json(payload): Json<UserLogin>,
 ) -> Result<impl IntoResponse> {
+    let rate_key = format!("login:{}", payload.username);
+    if !limiter.check(&rate_key) {
+        return Err(AppError::BadRequest("Demasiados intentos. Espera un minuto.".to_string()));
+    }
     let t_total = std::time::Instant::now();
     
     // 1. Buscar usuario
@@ -131,7 +142,7 @@ pub async fn login(
             let login_hash_bytes = pact_core::crypto::derivar_masterkey(&payload.master_password, u.salt.as_bytes())
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("KDF error: {:?}", e)))?;
             let login_hash = hex::encode(login_hash_bytes);
-            println!("[🏎️ PERFORMANCE] Argon2id login en servidor: {:?}", t_kdf.elapsed());
+            tracing::debug!("Argon2id login en servidor: {:?}", t_kdf.elapsed());
             (login_hash == u.master_hash, Some(u))
         },
         None => {
@@ -149,8 +160,9 @@ pub async fn login(
     let user = user.unwrap();
 
     // 2. Crear sesión
-    let token = session_mgr.create_session(user.username.clone());
-    println!("[🏎️ PERFORMANCE] Login total completado en {:?}", t_total.elapsed());
+    let token = session_mgr.create_session(user.username.clone())
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("No se pudo crear sesión (límite alcanzado)")))?;
+    tracing::debug!("Login total completado en {:?}", t_total.elapsed());
 
     Ok(Json(AuthResponse {
         status: "Login exitoso".to_string(),
@@ -164,9 +176,10 @@ pub async fn login(
 pub async fn unlock(
     state_db: State<Arc<dyn Database>>,
     state_session_mgr: State<SharedSessionManager>,
+    state_limiter: State<SharedRateLimiter>,
     json_payload: Json<UserLogin>,
 ) -> Result<impl IntoResponse> {
-    login(state_db, state_session_mgr, json_payload).await
+    login(state_db, state_session_mgr, state_limiter, json_payload).await
 }
 
 pub async fn lock(
@@ -177,9 +190,10 @@ pub async fn lock(
         if let Ok(auth_str) = auth_header.to_str() {
             let token = auth_str.trim_start_matches("Bearer ").trim();
             session_mgr.remove_session(token);
+            return StatusCode::OK;
         }
     }
-    StatusCode::OK
+    StatusCode::BAD_REQUEST
 }
 
 pub async fn update_user(
@@ -192,9 +206,9 @@ pub async fn update_user(
 
 pub async fn delete_user(
     State(db): State<Arc<dyn Database>>,
-    State(_session_mgr): State<SharedSessionManager>,
+    State(session_mgr): State<SharedSessionManager>,
     Path(username): Path<String>,
-    Json(payload): Json<crate::schemas::UserDelete>,
+    Json(payload): Json<crate::schemas::MasterPasswordOnly>,
 ) -> Result<impl IntoResponse> {
     // 1. Validar password antes de borrar
     let user = db.get_user_by_username(&username).await?
@@ -208,12 +222,17 @@ pub async fn delete_user(
         return Err(AppError::Unauthorized);
     }
 
-    // 2. Borrar de la base de datos
+    // 2. Invalidar todas las sesiones de este usuario
+    session_mgr.invalidate_user_sessions(&username);
+
+    // 3. Limpiar pending_accounts de este usuario
+    let pending = db.get_pending_accounts(&username).await?;
+    for p in &pending {
+        let _ = db.delete_pending_account(p.id).await;
+    }
+
+    // 4. Borrar de la base de datos
     db.delete_user(&username).await?;
-    
-    // 3. (Opcional) Invalidar todas las sesiones de este usuario
-    // session_mgr no soporta invalidación por usuario actualmente, 
-    // pero al menos el usuario ya no podrá loguearse.
 
     Ok(StatusCode::OK)
 }

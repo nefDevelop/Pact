@@ -6,8 +6,8 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct User {
     pub id: i32,
-    pub username: String,
     #[zeroize(skip)] // Username is not as sensitive
+    pub username: String,
     pub master_hash: String,
     pub salt: String,
     #[zeroize(skip)]

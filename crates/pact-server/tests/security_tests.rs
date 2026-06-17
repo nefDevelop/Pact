@@ -1,4 +1,5 @@
 use pact_server::auth::session::SessionManager;
+use pact_server::auth::ratelimit::auth_rate_limiter;
 use pact_server::auth::handlers::{login};
 use pact_server::db::{SqliteDatabase, Database};
 use pact_server::schemas::UserLogin;
@@ -17,7 +18,7 @@ async fn setup_test_db() -> Arc<dyn Database> {
 #[tokio::test]
 async fn test_session_expiration() {
     let mgr = SessionManager::new();
-    let token = mgr.create_session("testuser".to_string());
+    let token = mgr.create_session("testuser".to_string()).unwrap();
     
     // Debería ser válida inmediatamente
     assert!(mgr.get_session(&token).is_some());
@@ -38,8 +39,9 @@ async fn test_login_user_enumeration_prevention() {
         username: "nonexistent".to_string(),
         master_password: "password".to_string(),
     });
+    let limiter = auth_rate_limiter();
     
-    let res = login(State(db.clone()), State(session_mgr.clone()), payload).await;
+    let res = login(State(db.clone()), State(session_mgr.clone()), State(limiter), payload).await;
     assert!(res.is_err());
     // El error debería ser Unauthorized, no NotFound
     // Nota: Dependiendo de cómo esté implementado AppError, esto puede variar
@@ -68,7 +70,7 @@ async fn test_vault_path_security() {
 #[tokio::test]
 async fn test_auth_token_tampering() {
     let mgr = SessionManager::new();
-    let token = mgr.create_session("alice".to_string());
+    let token = mgr.create_session("alice".to_string()).unwrap();
     
     // Intentar modificar el token (suponiendo que fuera un JWT o similar, 
     // pero aquí es un UUID aleatorio, así que cualquier cambio lo invalida)

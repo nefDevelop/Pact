@@ -27,6 +27,11 @@ pub struct UserDelete {
     pub master_password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct MasterPasswordOnly {
+    pub master_password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AuthResponse {
     pub status: String,
@@ -112,7 +117,7 @@ pub struct SyncConfig {
     pub preferred_mode: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SyncPlan {
     pub to_push_folders: Vec<String>, // UIDs
     pub to_pull_folders: Vec<String>,

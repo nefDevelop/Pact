@@ -160,6 +160,8 @@
   let hasLoadedInitialConfig = $state(false);
   let isInitialLoading = $state(false);
 
+  let isSavingDb = $state(false);
+
   async function loadSyncConfig() {
     if (isInitialLoading) return;
     isInitialLoading = true;
@@ -219,14 +221,11 @@
     if (confirmAction && !confirm('¿Limpiar toda la configuración?')) return;
     try {
       // 1. Limpiamos configuración en el backend
-      console.log("[⚙️ SETTINGS] Desvinculando ruta actual...");
-      
       // set_vault_path (path: null) funciona sin token
       await api.post('/vault/config/path', { path: null });
 
       // Solo intentamos limpiar config remota si tenemos token, para evitar el 401
       if (globalState.authToken) {
-        console.log("[⚙️ SETTINGS] Limpiando configuración remota...");
         const empty = { preferred_mode: 'none', host: '', user: '', password: '', db_name: '' };
         try {
           await api.post('/sync/config', empty);
@@ -236,7 +235,6 @@
       }
 
       // 2. Limpieza TOTAL del cliente (esto debe ocurrir siempre)
-      console.log("[⚙️ SETTINGS] Realizando limpieza de almacenamiento local...");
       localStorage.clear();
       sessionStorage.clear();
       
@@ -255,7 +253,6 @@
       onClose?.();
 
       // Forzar recarga de usuarios (ahora debería venir vacío)
-      console.log("[⚙️ SETTINGS] Refrescando lista de usuarios (debería estar vacía)...");
       window.dispatchEvent(new CustomEvent('pact:refresh-users'));
       
       globalState.notify('Bóveda Reset', 'Se ha eliminado toda la configuración local.', 'success');
@@ -283,9 +280,12 @@
   });
 
   async function saveDatabaseSettings() {
+    if (isSavingDb) return;
+    isSavingDb = true;
     if (!isLocalEnabled && !isRemoteEnabled) {
       await unlinkAll(false);
       isOpen = false;
+      isSavingDb = false;
       return;
     }
 
@@ -307,6 +307,7 @@
       window.dispatchEvent(new CustomEvent('pact:refresh-users'));
       isOpen = false;
     } catch (error) { console.error(error); }
+    finally { isSavingDb = false; }
   }
 
   async function handleSecureAction() {
@@ -393,6 +394,27 @@
                 </div>
               {/each}
             </div>
+          {:else if activeTab === 'general'}
+            <div class="space-y-8 pb-32">
+              <div class="p-8 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-6">
+                <span class="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Seguridad</span>
+                <div class="flex items-center justify-between">
+                  <div class="flex flex-col">
+                    <span class="text-sm font-bold">Bloqueo Automático</span>
+                    <span class="text-[9px] opacity-30 uppercase font-black">Cerrar sesión por inactividad</span>
+                  </div>
+                  <select bind:value={globalState.autoLockMinutes} class="h-11 px-4 rounded-xl bg-[var(--md-surface)] text-xs font-bold border border-[var(--md-outline-variant)]/30 outline-none focus:border-[var(--md-primary)]/30 focus:ring-2 focus:ring-[var(--md-primary)]/10 transition-all appearance-none cursor-pointer" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%23666%22><path d=%22M5 8l5 5 5-5%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
+                    <option value={0}>Nunca</option>
+                    <option value={1}>1 minuto</option>
+                    <option value={2}>2 minutos</option>
+                    <option value={5}>5 minutos</option>
+                    <option value={10}>10 minutos</option>
+                    <option value={15}>15 minutos</option>
+                    <option value={30}>30 minutos</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           {:else if activeTab === 'database'}
             <div class="space-y-8 pb-32">
               <div class="grid grid-cols-2 gap-4">
@@ -437,7 +459,13 @@
           <div class="absolute bottom-0 left-0 right-0 pt-8 pb-8 px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20">
             <div class="flex justify-between items-center bg-[var(--md-surface-variant)]/50 backdrop-blur-md p-4 rounded-[32px] border border(--md-outline-variant)]/20 shadow-xl">
               <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95">Desvincular Todo</button>
-              <button onclick={saveDatabaseSettings} class="px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all" style="background-color: {globalState.userColor};">Guardar Cambios</button>
+              <button onclick={saveDatabaseSettings} disabled={isSavingDb} class="px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-40" style="background-color: {globalState.userColor};">
+                {#if isSavingDb}
+                  <Loader2 size={16} class="animate-spin inline mr-1" /> Guardando...
+                {:else}
+                  Guardar Cambios
+                {/if}
+              </button>
             </div>
           </div>
         {/if}

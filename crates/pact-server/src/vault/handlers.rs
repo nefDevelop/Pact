@@ -1,9 +1,10 @@
 use axum::{
-    extract::{State, Json, Path},
+    extract::{State, Json, Path, Query, Multipart},
     http::StatusCode,
     response::IntoResponse,
 };
 use std::sync::Arc;
+use std::collections::HashMap;
 use crate::db::Database;
 use crate::storage::StorageManager;
 use crate::schemas::{FolderCreate, AccountCreate, PendingAccount, VaultPath};
@@ -144,10 +145,12 @@ pub async fn update_folder(
 
 pub async fn delete_folder(
     State(db): State<Arc<dyn Database>>,
+    State(storage): State<Arc<StorageManager>>,
     Path(id): Path<i32>,
-    AuthenticatedUser(_session): AuthenticatedUser,
+    AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
     db.delete_folder(id).await?;
+    storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
 }
 
@@ -188,7 +191,11 @@ pub async fn create_account(
     };
 
     let id = db.create_account(&new_acc).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
+
+    if let Some(ref seed) = payload.totp_seed {
+        let _ = db.create_totp_setting(id, seed, None).await;
+    }
     
     Ok((StatusCode::CREATED, Json(id)))
 }
@@ -219,7 +226,7 @@ pub async fn update_account(
     };
 
     db.update_account(id, &updated, account.version + 1).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
 }
 
@@ -239,7 +246,7 @@ pub async fn toggle_favorite(
     updated.is_favorite = !account.is_favorite;
 
     db.update_account(id, &updated, account.version + 1).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
     
     Ok(Json(serde_json::json!({ "is_favorite": updated.is_favorite })))
 }
@@ -251,7 +258,7 @@ pub async fn delete_account(
     AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
     db.delete_account(id).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
 }
 
@@ -262,7 +269,7 @@ pub async fn restore_account(
     AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
     db.restore_account(id).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
 }
 
@@ -275,12 +282,13 @@ pub async fn empty_trash(
         .ok_or(AppError::NotFound)?;
 
     let count = db.empty_trash(user.id).await?;
-    let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+    storage.mark_dirty(&session.username);
     Ok(Json(serde_json::json!({ "deleted_count": count })))
 }
 
 pub async fn export_vault(
     State(db): State<Arc<dyn Database>>,
+    _user: AuthenticatedUser,
     Json(payload): Json<crate::schemas::UserDelete>,
 ) -> Result<impl IntoResponse> {
     // 1. Validar password
@@ -339,4 +347,108 @@ pub async fn get_pending_count(
 ) -> Result<impl IntoResponse> {
     let count = db.get_pending_count(&username).await?;
     Ok(Json(serde_json::json!({ "count": count })))
+}
+
+pub async fn upload_vault(
+    State(storage): State<Arc<StorageManager>>,
+    AuthenticatedUser(_session): AuthenticatedUser,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse> {
+    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
+        if field.name() == Some("file") {
+            let file_name = field.file_name().unwrap_or("uploaded.pcty").to_string();
+            let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+            let path = std::path::PathBuf::from(&file_name);
+            std::fs::write(&path, &data).map_err(|e| AppError::Internal(e.into()))?;
+            storage.set_path(Some(path));
+            return Ok(StatusCode::OK);
+        }
+    }
+    Err(AppError::BadRequest("No se encontró el archivo en la solicitud".to_string()))
+}
+
+pub async fn initialize_vault(
+    State(storage): State<Arc<StorageManager>>,
+    AuthenticatedUser(_session): AuthenticatedUser,
+    Json(payload): Json<HashMap<String, String>>,
+) -> Result<impl IntoResponse> {
+    let name = payload.get("name").map(|s| s.as_str()).unwrap_or("vault");
+    let file_name = format!("{}.pcty", name);
+    let path = std::path::PathBuf::from(&file_name);
+    storage.init_vault(&path).map_err(|e| AppError::BadRequest(e.to_string()))?;
+    storage.set_path(Some(path.clone()));
+    Ok(Json(serde_json::json!({ "path": path.to_string_lossy().to_string() })))
+}
+
+pub async fn get_totp_code(
+    State(db): State<Arc<dyn Database>>,
+    AuthenticatedUser(session): AuthenticatedUser,
+    Path(id): Path<i32>,
+) -> Result<impl IntoResponse> {
+    let user = db.get_user_by_username(&session.username).await?
+        .ok_or(AppError::NotFound)?;
+
+    let accounts = db.get_accounts_by_user(user.id).await?;
+    if !accounts.iter().any(|a| a.id == id) {
+        return Err(AppError::NotFound);
+    }
+
+    let setting = db.get_totp_setting_by_account(id).await?
+        .ok_or(AppError::NotFound)?;
+
+    let code = crate::vault::totp::get_totp_code(&setting.encrypted_seed);
+    Ok(Json(serde_json::json!({ "code": code })))
+}
+
+pub async fn update_account_icon(
+    State(db): State<Arc<dyn Database>>,
+    State(storage): State<Arc<StorageManager>>,
+    Path(id): Path<i32>,
+    AuthenticatedUser(session): AuthenticatedUser,
+    Json(payload): Json<HashMap<String, String>>,
+) -> Result<impl IntoResponse> {
+    let user = db.get_user_by_username(&session.username).await?
+        .ok_or(AppError::NotFound)?;
+
+    let accounts = db.get_accounts_by_user(user.id).await?;
+    let account = accounts.into_iter().find(|a| a.id == id).ok_or(AppError::NotFound)?;
+    let icon_data = payload.get("icon_data").cloned().unwrap_or_default();
+
+    let mut updated: CreateAccount = account.clone().into();
+    updated.icon_data = Some(icon_data);
+    db.update_account(id, &updated, account.version + 1).await?;
+    storage.mark_dirty(&session.username);
+    Ok(StatusCode::OK)
+}
+
+pub async fn proxy_icon(
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<impl IntoResponse> {
+    let url = params.get("url").ok_or(AppError::BadRequest("Falta parámetro url".to_string()))?;
+
+    let parsed = url::Url::parse(url).map_err(|_| AppError::BadRequest("URL inválida".to_string()))?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(AppError::BadRequest("Solo se permiten URLs HTTP/HTTPS".to_string()));
+    }
+    let host = parsed.host_str().unwrap_or("");
+    if host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" || host.starts_with("10.") || host.starts_with("192.168.") || host.starts_with("172.") {
+        return Err(AppError::BadRequest("URL no permitida".to_string()));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| AppError::Internal(e.into()))?;
+
+    let response = client.get(url)
+        .send()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Error al descargar: {}", e)))?;
+
+    let bytes = response.bytes().await.map_err(|e| AppError::BadRequest(format!("Error al leer: {}", e)))?;
+    use base64::Engine;
+    let base64_str = base64::engine::general_purpose::STANDARD.encode(&bytes);
+
+    Ok(Json(serde_json::json!({ "base64": base64_str })))
 }

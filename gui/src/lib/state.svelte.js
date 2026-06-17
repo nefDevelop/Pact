@@ -87,6 +87,11 @@ export const globalState = $state({
 
   resetInactivityTimer() {
     if (typeof window === 'undefined') return;
+
+    const saved = safeStorage.getItem('pact_autoLockMinutes');
+    if (saved !== null) {
+      this.autoLockMinutes = parseInt(saved, 10) || 5;
+    }
     
     this.remainingSeconds = this.autoLockMinutes * 60;
 
@@ -102,9 +107,10 @@ export const globalState = $state({
     }, 1000);
 
     this.inactivityTimer = setTimeout(() => {
-      console.log(`[🔒 SECURITY] Bóveda bloqueada por inactividad.`);
       this.forceLock("Sesión cerrada por inactividad.");
     }, (this.autoLockMinutes * 60 * 1000) + 500);
+
+    safeStorage.setItem('pact_autoLockMinutes', String(this.autoLockMinutes));
   },
 
   updateDesktopStatus() {

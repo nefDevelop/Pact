@@ -37,7 +37,7 @@
   let isInboxOpen = $state(false);
 
   // --- LÓGICA DE NOTIFICACIONES ---
-  let totalNotifications = $derived(() => {
+  let totalNotifications = $derived.by(() => {
     let count = globalState.pendingCount;
     if (globalState.trashCount > 10) count += 1;
     const isSyncStale = Date.now() - globalState.lastSyncSuccess > 30 * 60 * 1000;
@@ -107,7 +107,9 @@
       items = items.map(item => item.id === id ? {...item, is_favorite: data.is_favorite} : item);
       globalState.notify('Favoritos', data.is_favorite ? 'Añadido' : 'Eliminado', 'success', 2000);
       onDatabaseChange?.();
-    } catch (e) {}
+    } catch (e) {
+      if (e.message !== 'Unauthorized') console.warn('Error al marcar favorito:', e);
+    }
   }
 
   async function restoreAccount(id) {
@@ -116,7 +118,9 @@
       globalState.notify('Papelera', 'Cuenta restaurada', 'success');
       loadAccounts();
       onDatabaseChange?.();
-    } catch (e) {}
+    } catch (e) {
+      if (e.message !== 'Unauthorized') console.warn('Error al restaurar:', e);
+    }
   }
 
   async function handleEmptyTrash() {
@@ -126,12 +130,15 @@
       globalState.notify('Papelera', `Se han borrado ${data.deleted_count} cuentas.`, 'success');
       loadAccounts();
       onDatabaseChange?.();
-    } catch (e) {}
+    } catch (e) {
+      if (e.message !== 'Unauthorized') console.warn('Error al vaciar papelera:', e);
+    }
   }
 
   // --- LÓGICA TOTP ---
   let totpProgress = $state(100);
   let totpSeconds = $state(30);
+  let totpInterval = $state(null);
 
   async function fetchTOTP(accountId) {
     try {
@@ -142,13 +149,12 @@
 
   async function updateAllTOTP() {
     const accountsWithTOTP = items.filter(i => i.has_totp);
-    for (const acc of accountsWithTOTP) {
-      await fetchTOTP(acc.id);
-    }
+    await Promise.all(accountsWithTOTP.map(acc => fetchTOTP(acc.id)));
   }
 
   function startTOTPTimer() {
-    setInterval(() => {
+    if (totpInterval) clearInterval(totpInterval);
+    totpInterval = setInterval(() => {
       if (totpSeconds > 0) {
         totpSeconds--;
         totpProgress = (totpSeconds / 30) * 100;
@@ -250,6 +256,10 @@
     loadAccounts();
     globalState.refreshTrashCount();
     startTOTPTimer();
+
+    return () => {
+      if (totpInterval) clearInterval(totpInterval);
+    };
   });
 </script>
 
@@ -289,7 +299,13 @@
       </div>
 
       <div class="w-full max-w-2xl flex-1 overflow-y-auto pb-32 space-y-4 custom-scrollbar px-4">
-        {#if activeFilter !== 'all' && searchQuery.length === 0}
+        {#if isLoading}
+          <div class="space-y-4 px-4">
+            {#each [1,2,3,4] as _}
+              <div class="h-20 bg-[var(--md-surface-variant)] rounded-2xl animate-pulse opacity-50" />
+            {/each}
+          </div>
+        {:else if activeFilter !== 'all' && searchQuery.length === 0}
           <div class="flex items-center justify-between mb-6 px-4">
             <div class="flex items-center gap-3">
               <div class="w-1.5 h-1.5 rounded-full bg-[var(--md-primary)]"></div>
@@ -349,9 +365,9 @@
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button onclick={() => isInboxOpen = true} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications() > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative">
+          <button onclick={() => isInboxOpen = true} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative">
             <Bell size={20} strokeWidth={1.5} />
-            {#if totalNotifications() > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications()}</span>{/if}
+            {#if totalNotifications > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications}</span>{/if}
           </button>
           <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity"><Settings size={20} strokeWidth={1.5} /></button>
         </div>

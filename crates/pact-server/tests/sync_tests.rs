@@ -6,8 +6,7 @@ use uuid::Uuid;
 
 async fn setup_test_db() -> Arc<dyn Database> {
     let db_id = Uuid::new_v4().to_string();
-    let path = format!("/tmp/pact_test_{}.db", db_id);
-    let url = format!("sqlite:{}?mode=rwc", path);
+    let url = format!("sqlite:file:{}?mode=memory&cache=shared", db_id);
     
     let db = SqliteDatabase::new(&url).await.unwrap();
     db.migrate().await.expect("Migration failed");

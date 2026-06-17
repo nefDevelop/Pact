@@ -36,14 +36,7 @@ export const safeStorage = {
  * 2. authKey: Para autenticarse con el servidor (Hash derivado).
  */
 export async function deriveKeys(password, saltHex) {
-  const t0 = performance.now();
-  console.log("[🏎️ PERFORMANCE] Iniciando deriveKeys (JS -> Rust bridge)...");
-  
-  // Llamamos al comando de Rust para realizar el pesado Argon2id
   const keys = await invoke('derive_keys', { password, saltHex });
-
-  const t1 = performance.now();
-  console.log(`[🏎️ PERFORMANCE] deriveKeys (Rust Bridge) retornado en ${(t1 - t0).toFixed(2)}ms`);
 
   const authKey = keys.auth_key;
 
@@ -57,9 +50,6 @@ export async function deriveKeys(password, saltHex) {
     false,
     ['encrypt', 'decrypt']
   );
-
-  const t2 = performance.now();
-  console.log(`[🏎️ PERFORMANCE] Importación masterKey (WebCrypto) completada en ${(t2 - t1).toFixed(2)}ms. Total: ${(t2 - t0).toFixed(2)}ms`);
 
   return { masterKey, authKey };
 }
@@ -118,33 +108,30 @@ export async function decryptE2E(blobJson, masterKey) {
 }
 
 /**
- * Genera la huella digital del hardware (Audio + Canvas + Sistema + MachineID).
- * Silencioso y persistente en el mismo ordenador.
- * Mantenido solo para proteger el localStorage local.
+ * Genera la huella digital estable del dispositivo.
+ * Usa el machine-id del servidor como fuente principal, complementado con
+ * señales estables del navegador. Evita fuentes frágiles como canvas fingerprint
+ * o screen resolution que cambian con actualizaciones o cambios de monitor.
  */
 export async function generateHardwareFingerprint(externalMachineId = null) {
   const parts = [];
 
-  if (externalMachineId) parts.push(externalMachineId);
-  parts.push(navigator.hardwareConcurrency || 8);
-  parts.push(navigator['deviceMemory'] || 8);
-  parts.push(`${screen.width}x${screen.height}x${screen.colorDepth}`);
-  parts.push(Intl.DateTimeFormat().resolvedOptions().timeZone);
-
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 200; canvas.height = 50;
-    ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#f60"; ctx.fillRect(125, 1, 62, 20);
-    ctx.fillStyle = "#069"; ctx.fillText("pact_vault_fingerprint_2026", 2, 15);
-    parts.push(canvas.toDataURL());
-  } catch (e) { parts.push('canvas_error'); }
+  if (externalMachineId) {
+    parts.push(externalMachineId);
+  } else {
+    const ua = navigator.userAgent;
+    const stable = ua.match(/(Chrome|Firefox|Safari|Edg)\/[\d]+/);
+    parts.push(stable ? stable[0] : 'unknown');
+  }
+  parts.push(navigator.hardwareConcurrency || 4);
 
   const msgUint8 = new TextEncoder().encode(parts.join('|'));
   if (!window.isSecureContext || !crypto.subtle) {
-    let hash = 0; const str = parts.join('|');
+    let hash = 0;
+    const str = parts.join('|');
     for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    const fb = new Uint8Array(32); for (let i = 0; i < 32; i++) fb[i] = (hash >> (i % 4)) & 0xFF;
+    const fb = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) fb[i] = (hash >> (i % 4)) & 0xFF;
     return fb.buffer;
   }
 

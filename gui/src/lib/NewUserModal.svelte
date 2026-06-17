@@ -151,8 +151,6 @@
     
     isRegistering = true;
     try {
-      console.log(`[UI E2E] Iniciando registro para: ${name}`);
-      
       const saltBytes = crypto.getRandomValues(new Uint8Array(16));
       const saltHex = Array.from(saltBytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -165,7 +163,6 @@
         color: color
       });
 
-      console.log(`[UI E2E] Registro exitoso para: ${name}`);
       globalState.masterKey = masterKey;
 
       onSave({
