@@ -138,10 +138,15 @@
   }
 
   async function handleLock() {
-    await api.post('/auth/lock', {}, { silent: true });
-    isUnlocked = false;
-    showManager = false;
-    globalState.resetSessionState();
+    try {
+      await api.post('/auth/lock', {}, { silent: true });
+    } catch (e) {
+      // Ignoramos error si la sesión ya expiró o devuelve 400
+    } finally {
+      isUnlocked = false;
+      showManager = false;
+      globalState.resetSessionState();
+    }
   }
 
   function handleUserSelect(user) {

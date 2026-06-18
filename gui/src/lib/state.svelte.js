@@ -142,12 +142,13 @@ export const globalState = $state({
 
   async performSync(showNotify = false) {
     if (this.isSyncing) return;
+    if (!this.authToken) return; // Evitar llamadas si no hay sesión
     this.isSyncing = true;
     
     const { api } = await import('./api.js');
     
     try {
-      const plan = await api.post('/sync/run', {});
+      const plan = await api.post('/sync/run', { silent: true });
       this.lastSyncSuccess = Date.now();
       this.syncError = false;
       
@@ -170,7 +171,9 @@ export const globalState = $state({
         }
       }
     } catch (e) {
-      console.error("Error en sync auto:", e);
+      if (e.message !== "Unauthorized") {
+        console.error("Error en sync auto:", e);
+      }
       this.syncError = true;
     } finally {
       this.isSyncing = false;

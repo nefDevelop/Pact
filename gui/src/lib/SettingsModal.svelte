@@ -345,31 +345,31 @@
 </script>
 
 {#if isOpen}
-<div class="fixed inset-0 z-[100] flex items-center justify-center p-6 lg:p-12 overflow-hidden">
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6 lg:p-12 overflow-hidden">
   <button aria-label="Cerrar modal" class="absolute inset-0 bg-black/60 backdrop-blur-md border-none cursor-default w-full h-full" onclick={onClose}></button>
-  <div class="w-full max-w-[900px] h-[600px] bg-[var(--md-surface)] rounded-[48px] border border-black/[0.05] dark:border-white/[0.05] relative z-10 flex overflow-hidden shadow-2xl transition-colors duration-500">
+  <div class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface)] rounded-3xl sm:rounded-[48px] border border-black/[0.05] dark:border-white/[0.05] relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-2xl transition-colors duration-500">
     <!-- Sidebar -->
-    <div class="w-20 lg:w-64 bg-[var(--md-surface-variant)] border-r border-black/[0.02] dark:border-white/[0.05] p-4 lg:p-8 flex flex-col gap-2">
+    <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-black/[0.02] dark:border-white/[0.05] p-2 sm:p-4 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
       <h3 class="text-xl font-display font-black mb-6 px-2 hidden lg:block">Ajustes</h3>
       {#each tabs as tab}
-        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-4 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest {activeTab === tab.id ? 'text-white' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={tab.label}><tab.icon size={18} /><span class="hidden lg:block">{tab.label}</span></button>
+        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-md' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={tab.label}><tab.icon size={18} /><span class="hidden lg:block">{tab.label}</span></button>
       {/each}
     </div>
     <!-- Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <div class="p-8 pb-4 flex justify-between items-center shrink-0">
+      <div class="p-6 md:p-8 pb-2 md:pb-4 flex justify-between items-center shrink-0">
         <h4 class="text-[10px] font-ui font-black uppercase tracking-[0.2em] opacity-30">{tabs.find(t => t.id === activeTab)?.label || 'Ajustes'}</h4>
-        <button onclick={onClose} class="opacity-40 hover:opacity-100" aria-label="Cerrar"><X size={20} /></button>
+        <button onclick={onClose} class="opacity-40 hover:opacity-100 p-2 -mr-2" aria-label="Cerrar"><X size={20} /></button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-8 pt-0 space-y-8 custom-scrollbar relative flex flex-col">
+      <div class="flex-1 overflow-y-auto p-4 md:p-8 pt-0 space-y-6 md:space-y-8 custom-scrollbar relative flex flex-col">
         <div class="flex-1">
           {#if activeTab === 'users'}
             <div class="space-y-4">
               {#each users as u}
-                <div class="w-full h-20 bg-[var(--md-surface-variant)] rounded-[32px] px-6 flex items-center justify-between group border border-black/[0.02] dark:border-white/[0.05] hover:border-[var(--md-primary)]/20 transition-all">
-                  <div class="flex items-center gap-4 flex-1">
-                    <div class="w-12 h-12 rounded-full overflow-hidden border-2" style="border-color: {u.color}33"><img src={u.avatar} alt="avatar" class="w-full h-full object-cover" onerror={handleAvatarError} /></div>
+                <div class="w-full min-h-[5rem] py-3 bg-[var(--md-surface-variant)] rounded-3xl md:rounded-[32px] px-4 md:px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between group border border-black/[0.02] dark:border-white/[0.05] hover:border-[var(--md-primary)]/20 transition-all gap-4 sm:gap-0">
+                  <div class="flex items-center gap-3 md:gap-4 flex-1 w-full">
+                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 shrink-0" style="border-color: {u.color}33"><img src={u.avatar} alt="avatar" class="w-full h-full object-cover" onerror={handleAvatarError} /></div>
                     <div class="flex flex-col flex-1">
                       {#if editingUserId === u.id}
                         <div in:fade={{ duration: 200 }} class="flex items-center gap-3 bg-[var(--md-surface)] p-2 rounded-2xl border border-[var(--md-outline-variant)]/30 shadow-sm">
@@ -381,24 +381,24 @@
                         </div>
                       {:else}
                         <span class="text-sm font-bold tracking-tight">{u.name}</span>
-                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full" style="background-color: {u.color};"></div><span class="text-[9px] opacity-30 uppercase font-black">Protegida</span></div>
+                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {u.color};"></div><span class="text-[9px] opacity-30 uppercase font-black truncate">Protegida</span></div>
                       {/if}
                     </div>
                   </div>
-                  <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-                    <button onclick={() => forceSync(u.name)} class="p-2.5 rounded-xl hover:bg-blue-500/10 text-blue-500" aria-label="Forzar sincronización"><RefreshCw size={18} /></button>
-                    <button onclick={() => startEdit(u)} class="p-2.5 rounded-xl hover:bg-black/5" aria-label="Editar usuario"><Edit2 size={18} /></button>
-                    <button onclick={() => openSecureAction(u, 'export')} class="p-2.5 rounded-xl hover:bg-green-500/10 text-green-500" aria-label="Exportar datos"><Download size={18} /></button>
-                    <button onclick={() => openSecureAction(u, 'delete')} class="p-2.5 rounded-xl hover:bg-red-500/10 text-red-500" aria-label="Eliminar usuario"><Trash2 size={18} /></button>
+                  <div class="flex items-center justify-end gap-1 w-full sm:w-auto opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick={() => forceSync(u.name)} class="p-2 rounded-xl hover:bg-blue-500/10 text-blue-500 flex-1 sm:flex-none flex justify-center" aria-label="Forzar sincronización"><RefreshCw size={18} /></button>
+                    <button onclick={() => startEdit(u)} class="p-2 rounded-xl hover:bg-black/5 flex-1 sm:flex-none flex justify-center" aria-label="Editar usuario"><Edit2 size={18} /></button>
+                    <button onclick={() => openSecureAction(u, 'export')} class="p-2 rounded-xl hover:bg-green-500/10 text-green-500 flex-1 sm:flex-none flex justify-center" aria-label="Exportar datos"><Download size={18} /></button>
+                    <button onclick={() => openSecureAction(u, 'delete')} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 flex-1 sm:flex-none flex justify-center" aria-label="Eliminar usuario"><Trash2 size={18} /></button>
                   </div>
                 </div>
               {/each}
             </div>
           {:else if activeTab === 'general'}
             <div class="space-y-8 pb-32">
-              <div class="p-8 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-6">
+              <div class="p-6 md:p-8 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4 md:space-y-6">
                 <span class="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Seguridad</span>
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                   <div class="flex flex-col">
                     <span class="text-sm font-bold">Bloqueo Automático</span>
                     <span class="text-[9px] opacity-30 uppercase font-black">Cerrar sesión por inactividad</span>
@@ -417,36 +417,38 @@
             </div>
           {:else if activeTab === 'database'}
             <div class="space-y-8 pb-32">
-              <div class="grid grid-cols-2 gap-4">
-                <button onclick={() => isLocalEnabled = !isLocalEnabled} class="p-6 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 transition-all flex flex-col gap-3 {isLocalEnabled ? '' : 'opacity-40 grayscale'}" style={isLocalEnabled ? `border-color: ${globalState.userColor}; background-color: ${globalState.userColor}15; box-shadow: 0 0 20px ${globalState.userColor}15;` : ''} aria-label="Alternar almacenamiento local">
-                  <div class="flex justify-between w-full"><HardDrive size={24} /><div class="w-10 h-5 rounded-full bg-black/10 relative transition-colors" style={isLocalEnabled ? `background-color: ${globalState.userColor}` : ''}><div class="absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform" style={isLocalEnabled ? 'transform: translateX(20px)' : ''}></div></div></div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button onclick={() => isLocalEnabled = !isLocalEnabled} class="p-4 md:p-6 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 transition-all flex flex-col gap-3 {isLocalEnabled ? '' : 'opacity-40 grayscale'}" style={isLocalEnabled ? `border-color: ${globalState.userColor}; background-color: ${globalState.userColor}15; box-shadow: 0 0 20px ${globalState.userColor}15;` : ''} aria-label="Alternar almacenamiento local">
+                  <div class="flex justify-between w-full"><HardDrive size={24} /><div class="w-10 h-5 rounded-full bg-black/10 relative transition-colors shrink-0" style={isLocalEnabled ? `background-color: ${globalState.userColor}` : ''}><div class="absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform" style={isLocalEnabled ? 'transform: translateX(20px)' : ''}></div></div></div>
                   <div class="text-left"><span class="text-xs font-bold block">Local</span><span class="text-[9px] opacity-50 uppercase font-black">.pcty</span></div>
                 </button>
-                <button onclick={() => isRemoteEnabled = !isRemoteEnabled} class="p-6 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 transition-all flex flex-col gap-3 {isRemoteEnabled ? '' : 'opacity-40 grayscale'}" style={isRemoteEnabled ? `border-color: ${globalState.userColor}; background-color: ${globalState.userColor}15; box-shadow: 0 0 20px ${globalState.userColor}15;` : ''} aria-label="Alternar sincronización remota">
-                  <div class="flex justify-between w-full"><Server size={24} /><div class="w-10 h-5 rounded-full bg-black/10 relative transition-colors" style={isRemoteEnabled ? `background-color: ${globalState.userColor}` : ''}><div class="absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform" style={isRemoteEnabled ? 'transform: translateX(20px)' : ''}></div></div></div>
+                <button onclick={() => isRemoteEnabled = !isRemoteEnabled} class="p-4 md:p-6 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 transition-all flex flex-col gap-3 {isRemoteEnabled ? '' : 'opacity-40 grayscale'}" style={isRemoteEnabled ? `border-color: ${globalState.userColor}; background-color: ${globalState.userColor}15; box-shadow: 0 0 20px ${globalState.userColor}15;` : ''} aria-label="Alternar sincronización remota">
+                  <div class="flex justify-between w-full"><Server size={24} /><div class="w-10 h-5 rounded-full bg-black/10 relative transition-colors shrink-0" style={isRemoteEnabled ? `background-color: ${globalState.userColor}` : ''}><div class="absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform" style={isRemoteEnabled ? 'transform: translateX(20px)' : ''}></div></div></div>
                   <div class="text-left"><span class="text-xs font-bold block">Remoto</span><span class="text-[9px] opacity-50 uppercase font-black">MariaDB</span></div>
                 </button>
               </div>
               {#if isLocalEnabled}
-                <div class="p-8 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4">
+                <div class="p-4 md:p-8 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4">
                   <span class="text-[9px] font-black uppercase opacity-30 flex justify-between items-center mb-1">Ruta .pcty</span>
-                  <div class="flex gap-2">
-                    <input readonly value={globalState.vaultPath || 'Sin vincular'} class="flex-1 h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs font-mono opacity-60" aria-label="Ruta actual de la bóveda" />
-                    {#if globalState.vaultPath}
-                      <button onclick={unlinkVaultPath} class="h-11 px-4 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">Desvincular</button>
-                    {:else}
-                      <button onclick={() => selectVaultFile('open')} class="h-11 px-4 rounded-xl bg-black/5 text-[10px] font-black uppercase tracking-widest">Elegir</button>
-                    {/if}
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <input readonly value={globalState.vaultPath || 'Sin vincular'} class="flex-1 w-full h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs font-mono opacity-60 truncate" aria-label="Ruta actual de la bóveda" />
+                    <div class="flex gap-2 sm:w-auto w-full">
+                      {#if globalState.vaultPath}
+                        <button onclick={unlinkVaultPath} class="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all whitespace-nowrap">Desvincular</button>
+                      {:else}
+                        <button onclick={() => selectVaultFile('open')} class="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-black/5 text-[10px] font-black uppercase tracking-widest hover:bg-black/10 transition-all whitespace-nowrap">Elegir</button>
+                      {/if}
+                    </div>
                   </div>
                 </div>
               {/if}
               {#if isRemoteEnabled}
-                <div class="p-8 rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4">
-                  <div class="grid grid-cols-2 gap-4"><input bind:value={syncConfig.host} placeholder="Servidor" class="h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Servidor de base de datos" /><input bind:value={syncConfig.db_name} placeholder="DB" class="h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Nombre de la base de datos" /></div>
-                  <div class="grid grid-cols-2 gap-4"><input bind:value={syncConfig.user} placeholder="Usuario" class="h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Usuario de la base de datos" /><input type="password" bind:value={syncConfig.password} placeholder="Contraseña" class="h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Contraseña de la base de datos" /></div>
-                  <div class="flex justify-between items-center pt-2">
+                <div class="p-4 md:p-8 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><input bind:value={syncConfig.host} placeholder="Servidor" class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Servidor de base de datos" /><input bind:value={syncConfig.db_name} placeholder="DB" class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Nombre de la base de datos" /></div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><input bind:value={syncConfig.user} placeholder="Usuario" class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Usuario de la base de datos" /><input type="password" bind:value={syncConfig.password} placeholder="Contraseña" class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label="Contraseña de la base de datos" /></div>
+                  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-2 gap-4 sm:gap-0">
                     <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full {isConnectionVerified ? 'bg-green-500' : 'bg-red-500'}"></div><span class="text-[9px] font-black uppercase opacity-40">{isConnectionVerified ? 'Lista' : 'Sin conexión'}</span></div>
-                    <button onclick={() => verifyConnection(true)} class="text-[9px] font-black uppercase tracking-widest text-[var(--md-primary)] bg-[var(--md-primary)]/10 hover:bg-[var(--md-primary)]/20 px-4 py-2 rounded-xl transition-all active:scale-95">Probar Conexión</button>
+                    <button onclick={() => verifyConnection(true)} class="w-full sm:w-auto text-[9px] font-black uppercase tracking-widest text-[var(--md-primary)] bg-[var(--md-primary)]/10 hover:bg-[var(--md-primary)]/20 px-4 py-3 sm:py-2 rounded-xl transition-all active:scale-95">Probar Conexión</button>
                   </div>
                 </div>
               {/if}
@@ -456,10 +458,10 @@
 
         <!-- Botones de Acción Fijos Abajo (Solo en Tab Database) -->
         {#if activeTab === 'database'}
-          <div class="absolute bottom-0 left-0 right-0 pt-8 pb-8 px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20">
-            <div class="flex justify-between items-center bg-[var(--md-surface-variant)]/50 backdrop-blur-md p-4 rounded-[32px] border border(--md-outline-variant)]/20 shadow-xl">
-              <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95">Desvincular Todo</button>
-              <button onclick={saveDatabaseSettings} disabled={isSavingDb} class="px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-40" style="background-color: {globalState.userColor};">
+          <div class="absolute bottom-0 left-0 right-0 pt-4 pb-4 px-4 md:pt-8 md:pb-8 md:px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20 pointer-events-none">
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--md-surface-variant)]/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/20 shadow-2xl gap-2 sm:gap-0 pointer-events-auto">
+              <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-4 md:px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95 w-full sm:w-auto">Desvincular Todo</button>
+              <button onclick={saveDatabaseSettings} disabled={isSavingDb} class="px-4 md:px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-40 w-full sm:w-auto" style="background-color: {globalState.userColor};">
                 {#if isSavingDb}
                   <Loader2 size={16} class="animate-spin inline mr-1" /> Guardando...
                 {:else}

@@ -351,8 +351,8 @@
     <!-- VISTA 2: GESTOR COMPLETO -->
     <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.15] flex flex-col overflow-hidden transition-all duration-500">
       
-      <header class="w-full h-24 px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-4">
+      <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2 md:gap-4">
           <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2"><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
@@ -373,7 +373,7 @@
         </div>
       </header>
 
-      <div class="flex-1 flex overflow-hidden">
+      <div class="flex-1 flex flex-col-reverse md:flex-row overflow-hidden relative">
         <Sidebar 
           {folders} 
           bind:activeFilter 
@@ -384,8 +384,8 @@
           {iconMap}
         />
 
-        <section class="flex-1 border-r border-black/[0.05] dark:border-white/[0.15] flex flex-col bg-[var(--md-surface)]">
-          <div class="p-6 border-b border-black/[0.05] dark:border-white/[0.15]">
+        <section class="flex-1 md:border-r border-black/[0.05] dark:border-white/[0.15] flex flex-col bg-[var(--md-surface)] overflow-hidden">
+          <div class="p-4 md:p-6 border-b border-black/[0.05] dark:border-white/[0.15]">
             <div class="relative">
               <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-20" size={16} />
               <input 
@@ -457,6 +457,35 @@
                   {getIconUrl}
                />
             </aside>
+            <!-- MOBILE OVERLAY PARA DETALLE -->
+            <div class="xl:hidden absolute inset-0 z-50 bg-[var(--md-surface)] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
+              <div class="p-4 border-b border-black/[0.05] dark:border-white/[0.15] shrink-0">
+                <button onclick={() => expandedCardId = null} class="p-2 rounded-xl hover:bg-black/5 opacity-60 hover:opacity-100 flex items-center gap-2 transition-all">
+                  <ArrowLeft size={20} /> <span class="font-bold text-xs uppercase tracking-widest">Volver</span>
+                </button>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
+                <AccountCard 
+                  item={sel} 
+                  userColor={user.color} 
+                  expanded={true}
+                  onToggleExpanded={() => expandedCardId = null}
+                  isFavorite={sel.is_favorite}
+                  isDeleted={sel.is_deleted}
+                  {totpProgress}
+                  {totpSeconds}
+                  onToggleFavorite={toggleFavorite}
+                  onTogglePassword={togglePassword}
+                  onRestore={restoreAccount}
+                  isVisible={visiblePasswords.has(sel.id)}
+                  {iconMap}
+                  {loadedIcons}
+                  onIconLoad={handleIconLoad}
+                  onIconError={handleIconError}
+                  {getIconUrl}
+               />
+              </div>
+            </div>
           {/if}
         {/if}
       </div>
