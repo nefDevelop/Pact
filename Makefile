@@ -5,7 +5,7 @@
 NPM = npm
 GUI_DIR = gui
 CARGO = cargo
-TAURI = npx tauri
+TAURI = npx --package @tauri-apps/cli tauri
 
 # Puertos configurables
 API_PORT = 8002

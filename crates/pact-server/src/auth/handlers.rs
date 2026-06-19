@@ -61,6 +61,7 @@ pub async fn get_salt(
 
 pub async fn register(
     State(db): State<Arc<dyn Database>>,
+    State(storage): State<Arc<StorageManager>>,
     State(limiter): State<SharedRateLimiter>,
     Json(payload): Json<UserRegister>,
 ) -> Result<impl IntoResponse> {
@@ -103,6 +104,7 @@ pub async fn register(
     };
 
     db.create_user(&new_user).await?;
+    storage.mark_dirty(&payload.username);
     tracing::debug!("Escritura en DB completada en {:?}", t_db.elapsed());
     tracing::debug!("Registro total completado en {:?}", t_total.elapsed());
 

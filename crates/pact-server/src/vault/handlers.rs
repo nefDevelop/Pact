@@ -51,19 +51,31 @@ pub async fn set_vault_path(
     storage.set_path(path.clone());
 
     if let Some(p) = path {
-        tracing::info!("[VAULT] Aplicando cambios en DB local para la ruta: {:?}", p);
+        tracing::info!("[VAULT] Paso 1: Ruta fijada, reseteando DB local");
         db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
 
         if !is_new {
-            if let Ok(users) = storage.list_users() {
-                tracing::info!("[VAULT] Usuarios detectados en bóveda: {:?}", users);
-                if let Some(first_user) = users.first() {
-                    tracing::info!("[VAULT] Extrayendo base de datos inicial del usuario: {}", first_user);
-                    let _ = storage.extract_db(first_user, std::path::Path::new("pact.db"));
-                } else {
-                    tracing::warn!("[VAULT] Bóveda vacía, no hay usuarios que cargar.");
+            tracing::info!("[VAULT] Paso 2: Listando usuarios en la bóveda...");
+            match storage.list_users() {
+                Ok(users) => {
+                    tracing::info!("[VAULT] Usuarios encontrados en bóveda: {:?} (total: {})", users, users.len());
+                    if let Some(first_user) = users.first() {
+                        tracing::info!("[VAULT] Paso 3: Extrayendo DB del usuario '{}' a pact.db", first_user);
+                        match storage.extract_db(first_user, std::path::Path::new("pact.db")) {
+                            Ok(true) => tracing::info!("[VAULT] DB de '{}' extraída correctamente a pact.db", first_user),
+                            Ok(false) => tracing::warn!("[VAULT] No se encontró archivo {}.db dentro de la bóveda", first_user),
+                            Err(e) => tracing::error!("[VAULT] Error extrayendo DB de '{}': {:?}", first_user, e),
+                        }
+                    } else {
+                        tracing::warn!("[VAULT] Bóveda vacía, no hay usuarios que cargar.");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("[VAULT] Error al listar usuarios: {:?}", e);
                 }
             }
+        } else {
+            tracing::info!("[VAULT] Bóveda nueva, no se listan usuarios.");
         }
     } else {
         tracing::warn!("[VAULT] Se ha desvinculado la bóveda actual.");

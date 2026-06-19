@@ -16,7 +16,8 @@
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
   // Soporte para Tauri v2
-  const invoke = typeof window !== 'undefined' && (window.__TAURI__ || !!window.__TAURI_INTERNALS__) 
+  const isTauri = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__);
+  const invoke = isTauri
     ? (async () => (await import('@tauri-apps/api/core')).invoke) 
     : null;
 
@@ -111,7 +112,10 @@
           globalState.vaultPath = path;
           loadUsers(true);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error('promptForVaultPath error:', e);
+        globalState.notify('Error', `No se pudo abrir la bóveda: ${e.message || e}`, 'error');
+      }
     } else {
       if (mode === 'open') {
         const input = document.createElement('input');
@@ -321,7 +325,7 @@
             </div>
           </div>
           
-          <div class="w-full max-w-[400px] relative z-10 rounded-[32px] animate-in fade-in zoom-in duration-500 border border-black/[0.05] dark:border-white/[0.05]">
+          <div class="w-full max-w-[400px] relative z-10">
             <LoginBox user={selectedUser} onUnlock={() => { isUnlocked = true; loadFolders(); }} />
           </div>
         {:else if isUnlocked}

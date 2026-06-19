@@ -1,4 +1,18 @@
+use std::sync::Mutex;
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
+
+struct ServerProcess(Mutex<Option<std::process::Child>>);
+
+impl Drop for ServerProcess {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.0.lock().unwrap().take() {
+            log::info!("Deteniendo pact-server...");
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
 
 #[tauri::command]
 async fn browse_file(app: tauri::AppHandle, mode: String) -> Result<Option<String>, String> {
@@ -23,8 +37,8 @@ async fn browse_file(app: tauri::AppHandle, mode: String) -> Result<Option<Strin
 
 #[derive(serde::Serialize)]
 struct DerivedKeys {
-    master_key: String, // Hex para JS
-    auth_key: String,   // Hex para JS
+    master_key: String,
+    auth_key: String,
 }
 
 #[tauri::command]
@@ -44,22 +58,60 @@ async fn derive_keys(password: String, salt_hex: String) -> Result<DerivedKeys, 
     })
 }
 
+fn start_server() -> Option<std::process::Child> {
+    let server_path = std::env::current_exe().ok()?
+        .parent()?
+        .join("pact-server");
+
+    if !server_path.exists() {
+        log::warn!("pact-server no encontrado en: {:?}", server_path);
+        return None;
+    }
+
+    log::info!("Iniciando pact-server desde: {:?}", server_path);
+    let mut cmd = std::process::Command::new(&server_path);
+    cmd.env("RUST_LOG", "pact_server=debug,tower_http=debug");
+    cmd.env("PACT_CORS_ORIGIN", "*");
+    cmd.stdout(std::process::Stdio::inherit());
+    cmd.stderr(std::process::Stdio::inherit());
+
+    match cmd.spawn()
+    {
+        Ok(child) => {
+            log::info!("pact-server iniciado con PID: {}", child.id());
+            Some(child)
+        }
+        Err(e) => {
+            log::error!("Error al iniciar pact-server: {}", e);
+            None
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let app = tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![browse_file, derive_keys])
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .build(),
+      )?;
+
+      let child = start_server();
+      app.manage(ServerProcess(Mutex::new(child)));
+
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application");
+
+  app.run(|_handle, event| {
+    if let tauri::RunEvent::Exit = event {
+      log::info!("Pact Desktop finalizado.");
+    }
+  });
 }
 
