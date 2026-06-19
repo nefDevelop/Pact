@@ -124,10 +124,8 @@
     ((isRepeatingChars || isSequential) && password.length < 12)
   );
 
-  let hasComplexChars = $derived(/[ñáéíóúÁÉÍÓÚÑ]/.test(password));
-
   let requirements = $derived([
-    { label: 'Mínimo 8 caracteres', met: password.length >= 8 },
+    { label: 'Mínimo 12 caracteres', met: password.length >= 12 },
     { label: 'Una mayúscula', met: /[A-Z]/.test(password) },
     { label: 'Un número', met: /[0-9]/.test(password) },
     { label: 'Símbolo (!@#$...)', met: /[!@#$%^&*(),.?":{}|<>_]/.test(password) }
@@ -136,8 +134,9 @@
   let passwordStrength = $derived.by(() => {
     if (isCriticallyWeak || password.length === 0) return 0;
     let metCount = requirements.filter(r => r.met).length;
-    if (password.length < 8) return 1;
-    if (metCount === 4 && (password.length >= 12 || hasComplexChars)) return 4;
+    console.log('[DEBUG] password:', password, 'length:', password.length, 'metCount:', metCount, 'reqs:', requirements.map(r => r.met), 'isCriticallyWeak:', isCriticallyWeak);
+    if (password.length < 12) return Math.min(metCount, 3);
+    if (metCount === 4) return 4;
     return Math.min(metCount, 3);
   });
 

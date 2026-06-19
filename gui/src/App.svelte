@@ -9,7 +9,7 @@
   import FolderModal from './lib/FolderModal.svelte';
   import VaultModal from './lib/VaultModal.svelte';
   import NotificationProvider from './lib/NotificationProvider.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
@@ -38,6 +38,10 @@
   // Flags de Modals
   let isNamingFolder = $state(false);
   let isNamingVault = $state(false);
+
+  // Referencia al pill para posicionar el dropdown
+  let pillRef = $state();
+  let pillRect = $state(null);
 
   async function loadFolders() {
     try {
@@ -129,12 +133,24 @@
     }
   }
 
-  async function handleNewUserClick() {
-    if (!globalState.vaultPath) {
-      promptForVaultPath('open');
-      return;
-    }
+  function handleNewUserClick() {
     isModalOpen = true;
+    isDropdownOpen = false;
+    pillRect = null;
+  }
+
+  function toggleDropdown() {
+    isDropdownOpen = !isDropdownOpen;
+    if (!isDropdownOpen) {
+      pillRect = null;
+    } else {
+      tick().then(() => {
+        if (pillRef) {
+          const rect = pillRef.getBoundingClientRect();
+          pillRect = { top: rect.bottom + 8, left: rect.left, width: rect.width };
+        }
+      });
+    }
   }
 
   async function handleLock() {
@@ -155,6 +171,7 @@
     globalState.selectedUser = user;
     globalState.userColor = user.color;
     isDropdownOpen = false;
+    pillRect = null;
   }
 
   function handleAddUser() { loadUsers(); }
@@ -244,11 +261,20 @@
     <!-- Dropdown Click-Outside Backdrop moved to TOP level -->
     <div 
       class="fixed inset-0 z-[60] bg-black/10 lg:hidden cursor-default"
-      onclick={() => { isDropdownOpen = false; }}
+      onclick={() => { isDropdownOpen = false; pillRect = null; }}
       onkeydown={(e) => e.key === 'Escape' && (isDropdownOpen = false)}
       role="button"
       tabindex="-1"
     ></div>
+    
+    <!-- Mobile Dropdown (positioned fixed para estar sobre el backdrop) -->
+    {#if pillRect}
+      <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }}
+           class="fixed z-[61] p-4 bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
+           style="top: {pillRect.top}px; left: {pillRect.left}px; width: {pillRect.width}px">
+        <UserList onSelect={(u) => { handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
+      </div>
+    {/if}
   {/if}
   
   {#if !isUnlocked || (isUnlocked && !showManager)}
@@ -263,7 +289,7 @@
     </div>
   {/if}
 
-  <div class="flex-1 w-full {isUnlocked ? 'max-w-none' : 'max-w-7xl'} mx-auto relative overflow-hidden transition-all duration-700 ease-in-out">
+  <div class="flex-1 w-full {isUnlocked ? 'max-w-none' : 'max-w-7xl'} mx-auto relative lg:overflow-hidden transition-all duration-700 ease-in-out">
     <div class="grid {isUnlocked || users.length === 0 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[1fr_400px_1fr]'} w-full h-full gap-12 px-4 lg:p-8 transition-all duration-700 ease-in-out">
 
       {#if !isUnlocked && users.length > 0}
@@ -274,12 +300,11 @@
         {#if selectedUser && !isUnlocked}
           
           <!-- Mobile User Profile Pill -->
-          <div class="w-full max-w-[400px] mb-8 relative z-[70] flex lg:hidden flex-col gap-2">
+          <div class="w-full max-w-[400px] mb-6 flex lg:hidden flex-col gap-2">
             <div class="w-full flex items-center bg-white dark:bg-[#16151a] h-20 rounded-full border border-black/[0.08] dark:border-white/[0.08] group/pill">
               <button 
-                  onclick={() => { 
-                    isDropdownOpen = !isDropdownOpen; 
-                  }}
+                bind:this={pillRef}
+                onclick={toggleDropdown}
                 class="flex-1 h-full px-3 flex items-center rounded-l-full active:scale-[0.98] transition-all min-w-0 cursor-pointer"
               >
                 <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-black/5 p-0.5 border-2 ml-1" style="border-color: {selectedUser.color}66">
@@ -288,20 +313,12 @@
                 <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
                   <span class="text-sm font-bold truncate">{selectedUser.name}</span>
                   <span class="text-[10px] font-black uppercase tracking-widest opacity-30">
-                    {isDropdownOpen ? 'Cerrar' : 'Cambiar / Nuevo'}
+                    {isDropdownOpen ? 'Cerrar' : 'Cambiar'}
                   </span>
                 </div>
                 <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
               </button>
             </div>
-
-            <!-- Actual Dropdown Content -->
-            {#if isDropdownOpen}
-              <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }} 
-                   class="absolute top-full left-0 right-0 mt-2 p-4 bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl z-[80] max-h-[300px] overflow-y-auto custom-scrollbar">
-                <UserList onSelect={(u) => { handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
-              </div>
-            {/if}
           </div>
           
           <div class="w-full max-w-[400px] relative z-10 rounded-[32px] animate-in fade-in zoom-in duration-500 border border-black/[0.05] dark:border-white/[0.05]">

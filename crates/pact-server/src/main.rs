@@ -11,7 +11,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use pact_server::{
     db::{Database, SqliteDatabase},
     auth::session::SessionManager,
-    auth::middleware::AuthenticatedUser,
     storage::StorageManager,
     AppState, auth, vault, sync
 };
@@ -232,7 +231,6 @@ async fn status_handler(State(state): State<AppState>) -> Json<StatusResponse> {
 }
 
 async fn machine_id_handler(
-    _user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Json<MachineIdResponse> {
     Json(MachineIdResponse {

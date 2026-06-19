@@ -110,7 +110,7 @@
 
   <!-- Add User Button -->
   <button 
-    onclick={onAddClick}
+    onclick={(e) => { e.stopPropagation(); onAddClick?.(); }}
     class="flex items-center gap-3 p-2 pr-4 mt-2 transition-[background-color,border-color,opacity] duration-500 ease-in-out border border-dashed border-black/[0.05] dark:border-white/[0.05] opacity-30 hover:opacity-100 hover:border-[var(--md-primary)]/20 hover:bg-white/30 dark:hover:bg-white/[0.01] w-full rounded-full"
     title="Agregar Usuario"
   >
