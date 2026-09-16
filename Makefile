@@ -11,7 +11,7 @@ TAURI = npx --package @tauri-apps/cli tauri
 API_PORT = 8002
 GUI_PORT = 8088
 
-.PHONY: help install install-gui test test-rs test-gui lint lint-gui format run-server dev clean build-tauri dev-tauri
+.PHONY: help install install-gui test test-rs test-gui test-unit test-integration coverage mutants lint format run-server dev clean dev-tauri
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -28,6 +28,19 @@ test-rs: ## Ejecuta tests de los crates de Rust (Core y Server)
 
 test-gui: ## Ejecuta tests de la interfaz con Vitest
 	cd $(GUI_DIR) && npx vitest run
+
+test-unit: ## Ejecuta unitarias Rust (session, ratelimit, crypto, db)
+	$(CARGO) test --workspace --test session_tests --test ratelimit_tests --test db_crud_tests
+	$(CARGO) test --workspace -- pact_core
+
+test-integration: ## Ejecuta tests de integración (API, sync, use_cases, storage, security)
+	$(CARGO) test --workspace --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests
+
+coverage: ## Genera reporte de cobertura con tarpaulin (requiere: cargo install cargo-tarpaulin)
+	$(CARGO) tarpaulin --workspace --out Html --output-dir coverage
+
+mutants: ## Ejecuta testing de mutación (requiere: cargo install cargo-mutants)
+	$(CARGO) mutants --check
 
 # --- MODOS DE DESARROLLO ---
 
@@ -92,7 +105,7 @@ run-server: ## Lanza el servidor de producción (Backend sirve la GUI)
 
 # --- CALIDAD Y LIMPIEZA ---
 
-lint: lint-gui audit ## Ejecuta los linters y auditorías de seguridad
+lint: audit ## Ejecuta los linters y auditorías de seguridad
 	cd $(GUI_DIR) && $(NPM) run lint
 	$(CARGO) clippy -- -D warnings
 

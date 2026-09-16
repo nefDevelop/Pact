@@ -283,4 +283,39 @@ mod tests {
         assert_eq!(p1.len(), 16);
         assert_ne!(p1, p2); // Extremadamente improbable que sean iguales
     }
+
+    #[test]
+    fn test_derivar_claves_dual_consistency() {
+        let password = "test_password";
+        let salt = b"test-salt-value";
+
+        let (mk1, ak1) = derivar_claves_dual(password, salt).unwrap();
+        let (mk2, ak2) = derivar_claves_dual(password, salt).unwrap();
+
+        assert_eq!(mk1, mk2);
+        assert_eq!(ak1, ak2);
+        assert_eq!(mk1.len(), KEY_LEN);
+        assert_eq!(ak1.len(), KEY_LEN);
+    }
+
+    #[test]
+    fn test_derivar_claves_dual_different_keys() {
+        let password = "test_password";
+        let salt = b"test-salt-value";
+
+        let (master_key, auth_key) = derivar_claves_dual(password, salt).unwrap();
+
+        assert_ne!(master_key, auth_key);
+    }
+
+    #[test]
+    fn test_derivar_claves_dual_different_passwords() {
+        let salt = b"test-salt-value";
+
+        let (mk1, ak1) = derivar_claves_dual("password1", salt).unwrap();
+        let (mk2, ak2) = derivar_claves_dual("password2", salt).unwrap();
+
+        assert_ne!(mk1, mk2);
+        assert_ne!(ak1, ak2);
+    }
 }

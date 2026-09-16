@@ -20,9 +20,13 @@ pub struct SessionManager {
 
 impl SessionManager {
     pub fn new() -> Self {
+        Self::new_with_timeout(Duration::hours(1))
+    }
+
+    pub fn new_with_timeout(timeout: Duration) -> Self {
         Self {
             sessions: DashMap::new(),
-            session_timeout: Duration::hours(1),
+            session_timeout: timeout,
         }
     }
 
