@@ -5,6 +5,31 @@
     <link rel="icon" type="image/svg+xml" href="/pact_icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pact · Secure Vault</title>
+    <script>
+      // Aplica el tema ANTES del primer pintado.
+      //
+      // Va inline (no como módulo) a propósito: tiene que ejecutarse antes de
+      // que el bundle monte la app, para que el primer frame ya use la paleta
+      // correcta. Sin esto la app arranca con los colores claros de `:root` y
+      // salta a oscuro después, un parpadeo muy visible en el AppImage.
+      //
+      // Solo decide el modo; los valores exactos los fija `applyM3Palette` con
+      // el color del usuario (`lib/themeMode.js`). Aquí basta con la clase y
+      // `color-scheme` para que el webview use el tema nativo correcto.
+      (function () {
+        try {
+          const root = document.documentElement;
+          const saved = window.localStorage.getItem('pact_theme');
+          const prefers =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const dark = saved === 'dark' || (saved !== 'light' && prefers);
+          root.classList.toggle('dark', !!dark);
+          root.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          // localStorage bloqueado: nos quedamos con la preferencia del sistema.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

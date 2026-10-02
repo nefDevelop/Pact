@@ -1,9 +1,8 @@
 <script>
   import { Loader2, Sun, Moon, ArrowRightLeft, HardDrive, Cloud } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
-  import { safeStorage } from './crypto_utils.js';
+  import { setTheme } from './themeMode.js';
   import { i18n } from './i18n.svelte.js';
-  import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicInOut } from 'svelte/easing';
 
@@ -16,31 +15,10 @@
   
   const CurrentIcon = $derived(modeIcon());
 
+  // La decisión inicial del tema y la paleta se aplican en `main.js` (antes de
+  // montar); aquí solo se cambia cuando el usuario pulsa el conmutador.
   function toggleTheme() {
-    globalState.isDark = !globalState.isDark;
-    // Persistimos la preferencia para mantenerla entre sesiones.
-    safeStorage.setItem('pact_theme', globalState.isDark ? 'dark' : 'light');
-  }
-
-  $effect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', globalState.isDark);
-      globalState.updateTonalPalette();
-    }
-  });
-
-  onMount(() => {
-    if (typeof document !== 'undefined') {
-      const saved = safeStorage.getItem('pact_theme');
-      if (saved === 'dark') globalState.isDark = true;
-      else if (saved === 'light') globalState.isDark = false;
-      else globalState.isDark = document.documentElement.classList.contains('dark') ||
-                                window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-  });
-
-  async function sync_all() {
-    await globalState.performSync(true);
+    setTheme(!globalState.isDark);
   }
 </script>
 

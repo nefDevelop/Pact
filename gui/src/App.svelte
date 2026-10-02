@@ -15,6 +15,7 @@
   import { api } from './lib/api.js';
   import { decryptE2E } from './lib/crypto_utils.js';
   import { i18n } from './lib/i18n.svelte.js';
+  import { applyTheme } from './lib/themeMode.js';
   import { invoke as tauriInvoke } from '@tauri-apps/api/core';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
@@ -235,6 +236,14 @@
       loadUsers(true);
     }
   }
+
+  // La paleta tonal se deriva del color del usuario. Cuando se selecciona o
+  // cambia un usuario (LoginBox, Ajustes) hay que re-aplicarla: antes solo se
+  // re-aplicaba al cambiar el tema, así que el color real del usuario no se
+  // aplicaba hasta que el usuario alternaba claro/oscuro.
+  $effect(() => {
+    applyTheme(globalState.userColor);
+  });
 
   onMount(() => {
     globalState.initialize().then(() => loadUsers());

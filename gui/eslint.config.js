@@ -8,7 +8,15 @@
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.svelte-kit/**', 'coverage/**'],
+    // `src/wasm/` lo genera `wasm-pack` (ver `make build-wasm`): es código
+    // ajeno y cambia en cada build, así que no se lintea.
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      '.svelte-kit/**',
+      'coverage/**',
+      'src/wasm/**',
+    ],
   },
   {
     files: ['**/*.js'],

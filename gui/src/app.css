@@ -64,6 +64,40 @@
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
   --elev-2: 0 3px 8px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04);
   --elev-3: 0 10px 26px rgba(0, 0, 0, 0.10), 0 3px 6px rgba(0, 0, 0, 0.05);
+
+  color-scheme: light;
+}
+
+/* Fallbacks del modo oscuro.
+   El script inline de index.html pone la clase `dark` en <html> antes de pintar,
+   pero la paleta con el hue del usuario la aplica `applyM3Palette` después. Sin
+   estos valores habría un instante con fondo oscuro y texto casi negro (el
+   fallback de `--md-on-background` de arriba), legible solo en modo claro.
+   Aquí se fija `color-scheme` para que el webview use tema nativo oscuro. */
+:root.dark {
+  --md-background: #141318;
+  --md-on-background: #e4e1e6;
+  --md-surface: #1f1e24;
+  --md-on-surface: #e4e1e6;
+  --md-surface-1: #24222a;
+  --md-surface-2: #2a2830;
+  --md-surface-3: #302e37;
+  --md-surface-variant: #3a3742;
+  --md-on-surface-variant: #cac4d0;
+  --md-outline: #8b8590;
+  --md-outline-variant: #514c59;
+  --md-primary: #cfbcff;
+  --md-on-primary: #371e73;
+  --md-primary-container: #4f378b;
+  --md-on-primary-container: #eaddff;
+  --md-border: rgba(255, 255, 255, 0.14);
+  --md-border-window: rgba(255, 255, 255, 0.20);
+
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 3px 10px rgba(0, 0, 0, 0.40);
+  --elev-3: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 26px rgba(0, 0, 0, 0.50);
+
+  color-scheme: dark;
 }
 
 /* Base Tonal */
