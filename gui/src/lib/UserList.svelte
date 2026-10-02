@@ -83,7 +83,7 @@
             </div>
           </div>
           <div 
-            class="absolute -bottom-1 -right-1 w-4 h-4 rounded-md border border-[var(--md-surface)] flex items-center justify-center text-[7px] font-black shadow-sm"
+            class="absolute -bottom-1 -right-1 w-4 h-4 rounded-md border border-[var(--md-surface)] flex items-center justify-center text-[7px] font-black shadow-elev-1"
             style="background-color: var(--u-primary); color: var(--u-on-primary);"
           >
             {user.name.substring(0, 1).toUpperCase()}
@@ -113,7 +113,7 @@
   <!-- Add User Button -->
   <button 
     onclick={(e) => { e.stopPropagation(); onAddClick?.(); }}
-    class="flex items-center gap-3 p-2 pr-4 mt-2 transition-[background-color,border-color,opacity] duration-500 ease-in-out border border-dashed border-black/[0.05] dark:border-white/[0.05] opacity-30 hover:opacity-100 hover:border-[var(--md-primary)]/20 hover:bg-white/30 dark:hover:bg-white/[0.01] w-full rounded-full"
+    class="flex items-center gap-3 p-2 pr-4 mt-2 transition-[background-color,border-color,opacity] duration-500 ease-in-out border border-dashed border-border opacity-30 hover:opacity-100 hover:border-[var(--md-primary)]/20 hover:bg-white/30 dark:hover:bg-white/[0.01] w-full rounded-full"
     title={i18n.t('userModal.title')}
   >
     <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-[var(--md-on-background)] transition-colors duration-500 ease-in-out">

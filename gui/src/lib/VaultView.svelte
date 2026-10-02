@@ -297,7 +297,7 @@
   {#if !showManager}
     <!-- VISTA 1: ACCESO RÁPIDO -->
     <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
-      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-black/[0.1] dark:border-white/[0.15] mb-8 w-full max-w-2xl">
+      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border mb-8 w-full max-w-2xl">
         <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
           <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-black/5 dark:bg-white/[0.1]" />
         </div>
@@ -320,7 +320,7 @@
           type="text" 
           bind:value={searchQuery} 
           placeholder={i18n.t('vault.searchQuick')} 
-          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-black/[0.1] dark:border-white/[0.15] outline-none text-[var(--md-on-background)] transition-all" 
+          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-border outline-none text-[var(--md-on-background)] transition-all" 
         />
         {#if searchQuery.length > 0}
           <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.clearSearch')}><X size={18} /></button>
@@ -373,16 +373,16 @@
 
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
-        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label={i18n.t('vault.openManager')}>
+        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-border flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label={i18n.t('vault.openManager')}>
           <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
         </button>
       </div>
     </div>
   {:else}
     <!-- VISTA 2: GESTOR COMPLETO -->
-    <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.15] flex flex-col overflow-hidden transition-all duration-500">
+    <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
       
-      <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
+      <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-border flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
           <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label={i18n.t('vault.back')}><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
@@ -411,15 +411,15 @@
           {iconMap}
         />
 
-        <section class="flex-1 md:border-r border-black/[0.05] dark:border-white/[0.15] flex flex-col bg-[var(--md-surface)] overflow-hidden">
-          <div class="p-4 md:p-6 border-b border-black/[0.05] dark:border-white/[0.15]">
+        <section class="flex-1 md:border-r border-border flex flex-col bg-[var(--md-surface)] overflow-hidden">
+          <div class="p-4 md:p-6 border-b border-border">
             <div class="relative">
               <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-20" size={16} />
               <input 
                 type="text" 
                 bind:value={searchQuery} 
                 placeholder={i18n.t('vault.filterPlaceholder')} 
-                class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-black/5" 
+                class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-border" 
               />
             </div>
           </div>
@@ -488,7 +488,7 @@
             </aside>
             <!-- MOBILE OVERLAY PARA DETALLE -->
             <div class="xl:hidden absolute inset-0 z-50 bg-[var(--md-surface)] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
-              <div class="p-4 border-b border-black/[0.05] dark:border-white/[0.15] shrink-0">
+              <div class="p-4 border-b border-border shrink-0">
                 <button onclick={() => expandedCardId = null} class="p-2 rounded-xl hover:bg-black/5 opacity-60 hover:opacity-100 flex items-center gap-2 transition-all">
                   <ArrowLeft size={20} /> <span class="font-bold text-xs uppercase tracking-widest">Volver</span>
                 </button>

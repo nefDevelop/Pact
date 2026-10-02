@@ -39,7 +39,7 @@
 </script>
 
 <div 
-  class="bg-[var(--md-surface)] rounded-[32px] p-6 border border-black/[0.05] dark:border-white/[0.05] flex flex-col gap-4 animate-in slide-in-from-bottom-4 text-left w-full transition-[background-color,border-color,opacity]"
+  class="bg-[var(--md-surface)] rounded-[32px] p-6 border border-border flex flex-col gap-4 animate-in slide-in-from-bottom-4 text-left w-full transition-[background-color,border-color,opacity]"
   style="--hover-border: {userColor}1a; {expanded ? `background-color: ${userColor}0d; border-color: ${userColor}1a;` : ''}"
   onmouseenter={(e) => !expanded && (e.currentTarget.style.borderColor = 'var(--hover-border)')}
   onmouseleave={(e) => !expanded && (e.currentTarget.style.borderColor = '')}
@@ -53,7 +53,7 @@
       onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onToggleExpanded()}
       class="flex items-center gap-4 cursor-pointer outline-none flex-1 min-w-0"
     >
-      <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 shadow-sm relative overflow-hidden" style="background-color: {item.icon_data || loadedIcons[item.id] ? 'transparent' : item.color}">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shrink-0 shadow-elev-1 relative overflow-hidden" style="background-color: {item.icon_data || loadedIcons[item.id] ? 'transparent' : item.color}">
         {#if item.icon_data}
           <img src={item.icon_data} alt="" class="absolute inset-0 w-full h-full object-cover" />
         {:else}

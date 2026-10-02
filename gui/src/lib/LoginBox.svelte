@@ -64,8 +64,8 @@
   }
 </script>
 
-<div class="rounded-[48px] p-12 border border-black/[0.05] dark:border-white/[0.05] shadow-2xl transition-all duration-500 ease-in-out w-full max-w-[440px] relative z-10"
-     style="background-color: var(--md-surface); color: var(--md-on-surface); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);">
+<div class="rounded-[48px] p-12 border border-border shadow-elev-3 transition-all duration-500 ease-in-out w-full max-w-[440px] relative z-10"
+     style="background-color: var(--md-surface-2); color: var(--md-on-surface);">
   
   <div class="flex items-center gap-6 mb-10">
     <div class="w-20 h-20 rounded-full p-1 flex items-center justify-center shrink-0 relative">
@@ -124,7 +124,7 @@
     <button 
       type="submit"
       disabled={isLoading}
-      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-50 overflow-hidden relative group shadow-lg"
+      class="w-full h-16 rounded-full font-ui font-medium text-sm uppercase tracking-[0.2em] transition-all duration-500 ease-in-out mt-4 active:scale-[0.98] disabled:opacity-50 overflow-hidden relative group shadow-elev-2"
       style="background-color: var(--md-primary); color: var(--md-on-primary);"
     >
       <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>

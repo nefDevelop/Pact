@@ -298,12 +298,12 @@
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
-  class="h-screen bg-[#f6f8fb] dark:bg-[#0b0a0d] text-[#1c1b1f] dark:text-[#e6e1e5] font-sans flex flex-col relative transition-colors duration-700 overflow-hidden { !isUnlocked ? 'items-center justify-center' : '' }">
+  class="h-screen bg-[var(--md-background)] text-[var(--md-on-background)] font-sans flex flex-col relative transition-colors duration-700 overflow-hidden { !isUnlocked ? 'items-center justify-center' : '' }">
   
   {#if isDragging}
-    <div class="fixed inset-0 z-[100] bg-[#6750A4]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[#6750A4]/40 m-8 rounded-[64px]">
+    <div class="fixed inset-0 z-[100] bg-[#6750A4]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[var(--md-primary)]/40 m-8 rounded-[64px]">
       <div class="flex flex-col items-center gap-6 scale-110">
-        <div class="w-32 h-32 rounded-[48px] bg-[#6750A4] text-white flex items-center justify-center shadow-2xl shadow-[#6750A4]/40 animate-bounce">
+        <div class="w-32 h-32 rounded-[48px] bg-[#6750A4] text-white flex items-center justify-center shadow-elev-3  animate-bounce">
           <File size={64} strokeWidth={2.5} />
         </div>
         <div class="text-center">
@@ -329,7 +329,7 @@
     <!-- Mobile Dropdown (positioned fixed para estar sobre el backdrop) -->
     {#if pillRect}
       <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }}
-           class="fixed z-[61] p-4 bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
+           class="fixed z-[61] p-4 bg-[var(--md-surface-2)] rounded-[32px] border border-border shadow-elev-3 max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
            style="top: {pillRect.top}px; left: {pillRect.left}px; width: {pillRect.width}px">
         <UserList onSelect={(u) => { handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
       </div>
@@ -340,7 +340,7 @@
     <div class="fixed top-8 right-8 flex gap-3 z-50">
       <button 
         onclick={() => isSettingsOpen = true}
-        class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
+        class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-border opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
         title={i18n.t('app.settings')}
         aria-label={i18n.t('app.settings')}
       >
@@ -361,7 +361,7 @@
           
           <!-- Mobile User Profile Pill -->
           <div class="w-full max-w-[400px] mb-6 flex lg:hidden flex-col gap-2">
-            <div class="w-full flex items-center bg-white dark:bg-[#16151a] h-20 rounded-full border border-black/[0.08] dark:border-white/[0.08] group/pill">
+            <div class="w-full flex items-center bg-[var(--md-surface-2)] h-20 rounded-full border border-border group/pill">
               <button 
                 bind:this={pillRef}
                 onclick={toggleDropdown}
@@ -411,9 +411,9 @@
               {/if}
             </div>
             
-            <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-black/20 dark:border-white/20 rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
-              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform"><File size={24} /></div>
+            <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-border rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
+              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><File size={24} /></div>
                 <div class="flex flex-col text-left">
                   <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.openVault')}</span>
                   <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.openVaultHint')}</span>
@@ -422,8 +422,8 @@
 
               <div class="h-px w-12 bg-black/10 dark:bg-white/10 mx-auto"></div>
 
-              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[#6750A4]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[var(--md-primary)]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
                 <div class="flex flex-col text-left">
                   <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.createVault')}</span>
                   <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
@@ -478,8 +478,7 @@
 </main>
 
 <style>
-  :global(body) { margin: 0; padding: 0; background-color: #f6f8fb; overflow: hidden; }
-  :global(.dark body) { background-color: #0b0a0d; }
+  :global(body) { margin: 0; padding: 0; overflow: hidden; }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes zoom-in { from { transform: scale(0.95); } to { transform: scale(1); } }
   @keyframes slide-in-from-right { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

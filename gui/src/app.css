@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens semánticos de borde y elevación (estilo mixto, intensidad sutil).
+   theme.js los recalcula con el hue de la semilla; aquí van los fallbacks. */
+@theme {
+  --color-border: var(--md-border);
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+}
 /* Fuentes Locales */
 @font-face {
   font-family: 'Mukta';
@@ -34,7 +43,16 @@
   /* Fallbacks por si no hay paleta generada aún */
   --md-background: #f6f8fb;
   --md-surface: #ffffff;
+  --md-surface-1: #fdfdfe;
+  --md-surface-2: #fbfbfd;
+  --md-surface-3: #f8f8fb;
   --md-primary: #6750A4;
+  --md-border: rgba(0, 0, 0, 0.07);
+
+  /* Elevación sutil (se recalcula en theme.js por tema) */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elev-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --elev-3: 0 6px 16px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 /* Base Tonal */

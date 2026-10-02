@@ -160,13 +160,13 @@
 <div class="fixed inset-0 z-[120] flex items-center justify-center p-6 lg:p-12">
   <button class="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in border-none w-full h-full cursor-default" onclick={onClose} aria-label="Cerrar modal"></button>
 
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label={isEditing ? 'Editar entrada' : 'Nueva entrada'} class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-2xl">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label={isEditing ? 'Editar entrada' : 'Nueva entrada'} class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] border border-border relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-elev-3">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center shrink-0">
       <div class="flex flex-col">
         <div class="flex items-center gap-3">
           <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{isEditing ? i18n.t('entry.edit') : i18n.t('entry.new')}</h3>
-          {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[#6750A4]/20 animate-pulse">Rápida</span>{/if}
+          {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[var(--md-primary)]/20 animate-pulse">Rápida</span>{/if}
         </div>
         <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{isEditing ? i18n.t('entry.editSubtitle') : i18n.t('entry.addSubtitle')}</p>
       </div>
@@ -178,18 +178,18 @@
     <div class="flex-1 overflow-y-auto p-8 pt-2 space-y-6 custom-scrollbar">
       <div class="space-y-4">
         <div class="flex items-end gap-4">
-          <div class="w-14 h-14 rounded-2xl border border-black/10 dark:border-white/10 flex items-center justify-center text-lg font-black text-white shrink-0 transition-all duration-300" style="background-color: {color}">
+          <div class="w-14 h-14 rounded-2xl border border-border flex items-center justify-center text-lg font-black text-white shrink-0 transition-all duration-300" style="background-color: {color}">
             {title ? title.substring(0, 2).toUpperCase() : '?'}
           </div>
           <div class="flex-1 space-y-1.5">
             <label for="e-title" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2">{i18n.t('entry.service')}</label>
-            <input id="e-title" bind:value={title} placeholder="Ej. GitHub" class="w-full h-11 bg-[var(--md-surface-variant)] rounded-xl px-4 outline-none font-bold text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] transition-all" />
+            <input id="e-title" bind:value={title} placeholder="Ej. GitHub" class="w-full h-11 bg-[var(--md-surface-variant)] rounded-xl px-4 outline-none font-bold text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] transition-all" />
           </div>
         </div>
 
         <div class="space-y-1.5">
           <label for="e-user" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><User size={10}/> {i18n.t('entry.user')}</label>
-          <input id="e-user" bind:value={username} placeholder="nombre@ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] transition-all" />
+          <input id="e-user" bind:value={username} placeholder="nombre@ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] transition-all" />
         </div>
 
         <div class="space-y-3">
@@ -202,7 +202,7 @@
             {/if}
           </div>
           <div class="relative">
-            <input id="e-pass" type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="••••••••" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-24 outline-none text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
+            <input id="e-pass" type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="••••••••" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-24 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
               <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.generate')} aria-label={i18n.t('entry.generate')}><Dice5 size={16}/></button>
               <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all" aria-label={showPassword ? i18n.t('entry.hidePassword') : i18n.t('entry.showPassword')}>
@@ -260,7 +260,7 @@
             </div>
           {/if}
           <div class="relative">
-            <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[#6750A4]/20 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
+            <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[var(--md-primary)]/30 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.paste')} aria-label={i18n.t('entry.paste')}>
               <ClipboardPaste size={16} />
             </button>
@@ -291,7 +291,7 @@
           <div class="space-y-6 animate-in slide-in-from-top-2">
             <div class="space-y-1.5">
               <label for="e-web" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Globe size={10}/> {i18n.t('entry.website')}</label>
-              <input id="e-web" bind:value={website} placeholder="https://ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[#6750A4]/20" />
+              <input id="e-web" bind:value={website} placeholder="https://ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30" />
             </div>
 
             <div class="space-y-3">
@@ -312,11 +312,11 @@
               </div>
 
               <div class="grid grid-cols-2 gap-2">
-                <button onclick={() => folderId = null} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === null ? 'bg-[#6750A4] text-white border-[#6750A4] shadow-md shadow-[#6750A4]/20' : 'border-black/5 dark:border-white/10 opacity-40 hover:opacity-100'}">
+                <button onclick={() => folderId = null} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === null ? 'bg-[#6750A4] text-white border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
                   {i18n.t('common.none')}
                 </button>
                 {#each folders.filter(f => f.uid !== 'system-trash') as f}
-                  <button onclick={() => folderId = f.id} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === f.id ? 'bg-[#6750A4] text-white border-[#6750A4] shadow-md shadow-[#6750A4]/20' : 'border-black/5 dark:border-white/10 opacity-40 hover:opacity-100'}">
+                  <button onclick={() => folderId = f.id} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === f.id ? 'bg-[#6750A4] text-white border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
                     {f.name}
                   </button>
                 {/each}
@@ -327,9 +327,9 @@
       </div>
     </div>
 
-    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center shrink-0">
+    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-border flex justify-end gap-4 items-center shrink-0">
       <button onclick={onClose} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">{i18n.t('common.cancel')}</button>
-      <button onclick={handleSave} disabled={!title || !username || !password || isCriticallyWeak || !isSeedValid || isSaving} class="px-10 h-14 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/5">
+      <button onclick={handleSave} disabled={!title || !username || !password || isCriticallyWeak || !isSeedValid || isSaving} class="px-10 h-14 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-elev-2">
         {#if isSaving}
           <Loader2 size={18} class="animate-spin" /> {i18n.t('common.saving')}
         {:else}

@@ -66,12 +66,30 @@ export const applyM3Palette = (hex, isDark) => {
     root.style.setProperty('--md-surface', `hsl(${h}, ${isDark ? 8 : 10}%, ${isDark ? 10 : 100}%)`);
     root.style.setProperty('--md-on-surface', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 90 : 10}%)`);
     
-    root.style.setProperty('--md-surface-variant', `hsl(${h}, ${isDark ? 12 : 14}%, ${isDark ? 24 : 92}%)`);
+    root.style.setProperty('--md-surface-variant', `hsl(${h}, ${isDark ? 12 : 14}%, ${isDark ? 20 : 92}%)`);
     root.style.setProperty('--md-on-surface-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 80 : 30}%)`);
 
     // Outline
     root.style.setProperty('--md-outline', `hsl(${h}, ${isDark ? 10 : 12}%, 50%)`);
-    root.style.setProperty('--md-outline-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 40 : 80}%)`);
+    root.style.setProperty('--md-outline-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 30 : 84}%)`);
+
+    // Borde semántico (estilo mixto, sutil) y superficies de elevación M3.
+    root.style.setProperty('--md-border', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 26 : 90}%)`);
+    root.style.setProperty('--md-surface-1', `hsl(${h}, ${isDark ? 9 : 14}%, ${isDark ? 12 : 99}%)`);
+    root.style.setProperty('--md-surface-2', `hsl(${h}, ${isDark ? 10 : 16}%, ${isDark ? 14 : 98}%)`);
+    root.style.setProperty('--md-surface-3', `hsl(${h}, ${isDark ? 12 : 18}%, ${isDark ? 17 : 97}%)`);
+
+    // Elevación: en claro, sombras tenues; en oscuro, sombras muy suaves (la
+    // superficie tintada hace el trabajo principal).
+    if (isDark) {
+        root.style.setProperty('--elev-1', '0 1px 2px rgba(0, 0, 0, 0.35)');
+        root.style.setProperty('--elev-2', '0 2px 8px rgba(0, 0, 0, 0.40)');
+        root.style.setProperty('--elev-3', '0 8px 24px rgba(0, 0, 0, 0.45)');
+    } else {
+        root.style.setProperty('--elev-1', `0 1px 2px hsl(${h} 30% 20% / 0.04), 0 1px 3px hsl(${h} 30% 20% / 0.04)`);
+        root.style.setProperty('--elev-2', `0 2px 6px hsl(${h} 30% 20% / 0.05), 0 1px 2px hsl(${h} 30% 20% / 0.04)`);
+        root.style.setProperty('--elev-3', `0 6px 16px hsl(${h} 30% 20% / 0.07), 0 2px 4px hsl(${h} 30% 20% / 0.04)`);
+    }
 
     // Error
     const errorH = 0;

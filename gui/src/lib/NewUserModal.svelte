@@ -211,7 +211,7 @@
     role="presentation"
   ></div>
 
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-2xl">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] border border-border relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-elev-3">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">
@@ -247,7 +247,7 @@
           </div>
           <button 
             onclick={generateNewAvatar}
-            class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white dark:bg-[#2b2930] border border-black/10 dark:border-white/10 flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-sm"
+            class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--md-surface-3)] border border-border flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-elev-1"
             aria-label="Generar nuevo avatar"
           >
             <Dice5 size={14} />
@@ -260,7 +260,7 @@
             type="text" 
             bind:value={name}
             placeholder="Ej. Neftali"
-            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[#6750A4]/10 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
+            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
           />
         </div>
       </div>
@@ -284,7 +284,7 @@
             type={showPassword ? 'text' : 'password'}
             bind:value={password}
             placeholder="Introduce una clave fuerte..."
-            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[#6750A4]/10 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
+            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
           />
           <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button 
@@ -371,14 +371,14 @@
     </div>
 
     <!-- Actions -->
-    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center">
+    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-border flex justify-end gap-4 items-center">
       {#if isRegistering}
         <div class="flex items-center gap-4 pr-4 animate-in fade-in slide-in-from-right-4">
           <div class="flex flex-col items-end">
             <span class="text-[10px] font-black uppercase tracking-widest text-[#6750A4]">Cifrado de Grado Militar</span>
             <span class="text-[9px] opacity-40 font-bold uppercase">Procesando Argon2id...</span>
           </div>
-          <div class="w-10 h-10 rounded-full border-4 border-[#6750A4]/10 border-t-[#6750A4] animate-spin"></div>
+          <div class="w-10 h-10 rounded-full border-4 border-[var(--md-primary)] border-t-[var(--md-primary)] animate-spin"></div>
         </div>
       {:else}
         <button 
@@ -390,7 +390,7 @@
         <button 
           onclick={handleSave}
           disabled={!name || passwordStrength < 4 || isCriticallyWeak}
-          class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/10"
+          class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-elev-2"
           style="background-color: {color}"
         >
           <ShieldCheck size={18} />

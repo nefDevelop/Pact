@@ -49,7 +49,7 @@
   <div class="flex items-center gap-8">
     <!-- LOGO DE PACT (Altura igualada al bloque de texto) -->
     <div class="flex items-center gap-3 py-1.5">
-      <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg shadow-[#6750A4]/10 overflow-hidden p-2 transition-colors duration-500" 
+      <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-elev-2  overflow-hidden p-2 transition-colors duration-500" 
            style="background-color: var(--md-primary); color: {globalState.isDark ? '#000000' : '#ffffff'};">
         <svg
           width="100%"
@@ -130,7 +130,7 @@
         {:else}
           <CurrentIcon size={16} class={globalState.hasConflicts ? 'text-amber-500' : 'opacity-30'} />
           {#if globalState.hasConflicts}
-            <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white dark:border-[#1c1b1f]"></span>
+            <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-[var(--md-surface)]"></span>
           {/if}
         {/if}
       </div>

@@ -17,7 +17,7 @@
   }
 </script>
 
-<aside class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 border-r-0 md:border-r border-black/[0.05] dark:border-white/[0.15] flex flex-row md:flex-col p-2 md:py-6 transition-[background-color,border-color] duration-500 ease-in-out shrink-0 z-20 overflow-x-auto md:overflow-x-visible custom-scrollbar gap-2 md:gap-0 items-center md:items-stretch">
+<aside class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 border-r-0 md:border-r border-border flex flex-row md:flex-col p-2 md:py-6 transition-[background-color,border-color] duration-500 ease-in-out shrink-0 z-20 overflow-x-auto md:overflow-x-visible custom-scrollbar gap-2 md:gap-0 items-center md:items-stretch">
   <div class="px-1 md:px-3 lg:px-4 md:mb-6 shrink-0">
     <button 
       onclick={onOpenNewEntry} 
@@ -80,11 +80,11 @@
     {/each}
   </nav>
 
-  <div class="px-1 md:px-2 lg:px-4 md:mt-auto pt-0 md:pt-4 flex items-center shrink-0 border-l md:border-l-0 border-black/[0.1] dark:border-white/[0.1] ml-2 md:ml-0 pl-2 md:pl-0">
+  <div class="px-1 md:px-2 lg:px-4 md:mt-auto pt-0 md:pt-4 flex items-center shrink-0 border-l md:border-l-0 border-border ml-2 md:ml-0 pl-2 md:pl-0">
     {#if activeFilter === 'trash'}
       <button 
         onclick={onEmptyTrash}
-        class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all bg-red-600 text-white shadow-lg shadow-red-500/20 active:scale-95 group shrink-0"
+        class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all bg-red-600 text-white shadow-elev-2 shadow-red-500/20 active:scale-95 group shrink-0"
       >
         <Trash2 size={16} class="group-hover:scale-110 transition-transform" />
         <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.emptyTrash')}</span>
