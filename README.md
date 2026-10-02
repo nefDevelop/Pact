@@ -126,6 +126,12 @@ make build-windows  # Instaladores Windows (NSIS + MSI); requiere ejecutarse en 
 > Requiere **wasm-pack** (`cargo install wasm-pack`) y el target
 > `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
 > `make build` los invoca vía `build-wasm` antes de compilar la GUI.
+>
+> **Nota (AppImage):** `tauri build` crea un watcher de ficheros con inotify.
+> Si te aparece `Too many open files` al empaquetar, es que has agotado
+> `fs.inotify.max_user_instances` (por defecto 128, y cada shell abierto
+> consume una). Súbelo con `sudo sysctl -w fs.inotify.max_user_instances=1024`
+> o cierra terminals. No afecta a `rpm` ni a `deb`.
 
 > El escritorio empaqueta `pact-server` como **sidecar** de Tauri
 > (`externalBin`). Por eso `build-desktop` y `dev-tauri` ejecutan antes

@@ -13,6 +13,9 @@ GUI_PORT = 8088
 
 # Directorio de artefactos de Cargo (el contenedor lo sobreescribe con target-container)
 CARGO_TARGET_DIR ?= target
+# Formatos de paquete del escritorio. Por defecto `rpm` (Fedora/RHEL), que es lo
+# verificado en este entorno; en Debian/Ubuntu usa `make build-desktop BUNDLES=deb`.
+BUNDLES ?= rpm
 # Triple del host para nombrar el sidecar de Tauri
 TARGET_TRIPLE := $(shell rustc -Vv 2>/dev/null | sed -n 's/^host: //p')
 EXEEXT := $(if $(findstring Windows_NT,$(OS)),.exe,)
@@ -109,19 +112,17 @@ prepare-sidecar: ## Genera el binario del servidor que Tauri empaqueta como side
 	@mkdir -p $(SIDECAR_DIR)
 	@cp $(CARGO_TARGET_DIR)/release/pact-server$(EXEEXT) $(SIDECAR)
 
-build-desktop: build-gui prepare-sidecar ## Genera la aplicación de escritorio nativa (DEB y Binario)
-	@echo "Construyendo Pact Desktop (Tauri)..."
-	# AppImage va en un target aparte (`build-appimage`): su empaquetado usa
-	# linuxdeploy, que descarga herramientas y necesita libfuse2, y puede fallar
-	# en entornos sin FUSE. No lo mezclamos con el build por defecto.
-	cd crates/pact-desktop && $(TAURI) build --verbose --bundles deb
+build-desktop: build-gui prepare-sidecar ## Empaqueta el escritorio en $(BUNDLES) (rpm por defecto; deb en Debian/Ubuntu)
+	@echo "Construyendo Pact Desktop (bundles: $(BUNDLES))..."
+	cd crates/pact-desktop && $(TAURI) build --verbose --bundles $(BUNDLES)
 	@mkdir -p build/desktop
-	@echo "Copiando binario nativo y paquete DEB..."
+	@echo "Copiando binario nativo y paquetes..."
 	@cp $(CARGO_TARGET_DIR)/release/pact-desktop$(EXEEXT) build/desktop/pact-desktop-raw
-	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \;
-	@echo "✓ Versiones generadas en build/desktop/ (DEB y pact-desktop-raw)"
+	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f \
+		\( -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} build/desktop/ \;
+	@echo "✓ Paquetes en build/desktop/ ($(BUNDLES)) y binario en pact-desktop-raw"
 
-build-appimage: build-gui prepare-sidecar ## Genera además el AppImage (requiere libfuse2 y red para linuxdeploy)
+build-appimage: build-gui prepare-sidecar ## Empaqueta AppImage (opt-in; usa linuxdeploy y puede fallar por EMFILE)
 	@echo "Construyendo Pact Desktop (AppImage)..."
 	cd crates/pact-desktop && $(TAURI) build --verbose --bundles appimage
 	@mkdir -p build/desktop
