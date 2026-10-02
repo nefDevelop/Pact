@@ -9,14 +9,12 @@
 
   $effect(() => {
     const username = user.username || user.name;
-    if (user && username) {
-      if (!globalState.selectedUser || globalState.selectedUser.username !== username) {
-        globalState.selectedUser = { ...user, username };
-        globalState.userColor = user.color;
-        globalState.startPendingPolling();
-      }
+    if (user && username && (!globalState.selectedUser || globalState.selectedUser.username !== username)) {
+      globalState.selectedUser = { ...user, username };
+      globalState.userColor = user.color;
     }
-    return () => globalState.stopPendingPolling();
+    // El polling de pendientes se detiene al cerrar sesión (resetSessionState).
+    if (!globalState.pendingInterval) globalState.startPendingPolling();
   });
 
   async function handleLogin() {
@@ -37,16 +35,19 @@
 
       globalState.masterKey = masterKey;
       globalState.authToken = data.token;
-      globalState.dbMode = data.source;
       globalState.userColor = user.color;
-      
-      if (data.source === 'hybrid' || data.source === 'remote') {
-        globalState.performSync(false);
-      }
+
+      // Ajusta el modo (local/remoto/híbrido) a partir de la config guardada.
+      // El auto-sync lo arranca App.svelte al detectar la bóveda desbloqueada.
+      await globalState.refreshSyncConfig();
 
       onUnlock?.();
     } catch (error) {
-      console.error('Error de login:', error);
+      const msg = error.message === 'Unauthorized'
+        ? 'Contraseña incorrecta o usuario no válido.'
+        : (error.message || 'No se pudo iniciar sesión.');
+      globalState.notify('Acceso denegado', msg, 'error');
+      password = '';
     } finally {
       isLoading = false;
     }

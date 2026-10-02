@@ -551,13 +551,21 @@ async fn test_delete_account_soft() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/vault/accounts", base))
+    // Las cuentas en papelera solo se devuelven con include_deleted=true.
+    let resp = client.get(format!("{}/vault/accounts?include_deleted=true", base))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     let body: Value = resp.json().await.unwrap();
     let accounts = body.as_array().unwrap();
     assert_eq!(accounts.len(), 1);
     assert!(accounts[0]["deleted_at"].is_string());
+
+    // Por defecto, la cuenta borrada no aparece.
+    let resp = client.get(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body.as_array().unwrap().len(), 0);
 }
 
 #[tokio::test]

@@ -48,16 +48,12 @@ pub async fn run_sync(
 
     let engine = SyncEngine::new(local_db.as_ref(), &remote_db, user.id);
 
-    // 1. Generar plan
-    let plan = match engine.generate_plan().await {
-        Ok(p) => p,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse { error: format!("Error generando plan: {}", e) })).into_response(),
-    };
-
-    // 2. Aplicar plan
-    match engine.apply_plan(&plan).await {
-        Ok(_) => (StatusCode::OK, Json(plan)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse { error: format!("Error aplicando plan: {}", e) })).into_response(),
+    // Calculamos el plan de reconciliación sin aplicarlo. La aplicación se
+    // solicita explícitamente con POST /sync/apply para que el cliente pueda
+    // revisar los cambios (y eventuales conflictos) antes de confirmarlos.
+    match engine.generate_plan().await {
+        Ok(plan) => (StatusCode::OK, Json(plan)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse { error: format!("Error generando plan: {}", e) })).into_response(),
     }
 }
 

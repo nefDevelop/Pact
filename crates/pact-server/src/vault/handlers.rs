@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use crate::db::Database;
 use crate::storage::StorageManager;
-use crate::schemas::{FolderCreate, AccountCreate, PendingAccount, VaultPath};
+use crate::schemas::{FolderCreate, AccountCreate, AccountQuery, PendingAccount, VaultPath};
 use crate::models::{CreateFolder, CreateAccount};
 use crate::auth::middleware::AuthenticatedUser;
 use crate::error::{AppError, Result};
@@ -171,11 +171,25 @@ pub async fn delete_folder(
 pub async fn get_accounts(
     State(db): State<Arc<dyn Database>>,
     AuthenticatedUser(session): AuthenticatedUser,
+    Query(query): Query<AccountQuery>,
 ) -> Result<impl IntoResponse> {
     let user = db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    let accounts = db.get_accounts_by_user(user.id).await?;
+    let mut accounts = db.get_accounts_by_user(user.id).await?;
+
+    // Por defecto se ocultan las cuentas en papelera; el cliente pide
+    // `include_deleted=true` cuando navega a la vista de papelera.
+    if !query.include_deleted {
+        accounts.retain(|a| a.deleted_at.is_none());
+    }
+    if let Some(favorite) = query.is_favorite {
+        accounts.retain(|a| a.is_favorite == favorite);
+    }
+    if let Some(folder_id) = query.folder_id {
+        accounts.retain(|a| a.folder_id == Some(folder_id));
+    }
+
     Ok(Json(accounts))
 }
 
@@ -205,8 +219,11 @@ pub async fn create_account(
     let id = db.create_account(&new_acc).await?;
     storage.mark_dirty(&session.username);
 
-    if let Some(ref seed) = payload.totp_seed {
-        let _ = db.create_totp_setting(id, seed, None).await;
+    // Solo persistimos un ajuste TOTP si el usuario aportó una semilla real.
+    if let Some(seed) = payload.totp_seed.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if let Err(e) = db.create_totp_setting(id, seed, None).await {
+            tracing::warn!("[VAULT] No se pudo guardar el seed TOTP de la cuenta {}: {}", id, e);
+        }
     }
     
     Ok((StatusCode::CREATED, Json(id)))

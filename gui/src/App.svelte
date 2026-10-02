@@ -9,7 +9,7 @@
   import FolderModal from './lib/FolderModal.svelte';
   import VaultModal from './lib/VaultModal.svelte';
   import NotificationProvider from './lib/NotificationProvider.svelte';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
@@ -30,6 +30,7 @@
   let isSettingsOpen = $state(false);
   let isEntryModalOpen = $state(false);
   let entryModalMode = $state('normal');
+  let entryToEdit = $state(null);
   let folders = $state([]);
   let vaultRef = $state();
   let isUnlocked = $state(false);
@@ -64,7 +65,7 @@
     try {
       const data = await api.get('/auth/users');
       const userList = data.users || [];
-      if (data.source) globalState.dbMode = data.source;
+      // El modo de BD se determina tras autenticar (refreshSyncConfig), no aquí.
       globalState.vaultPath = data.vault_path || '';
 
       users = userList.map(u => ({
@@ -180,9 +181,41 @@
 
   function handleAddUser() { loadUsers(); }
 
-  function openEntryModal(mode) {
+  function openEntryModal(mode = 'normal') {
+    entryToEdit = null;
     entryModalMode = mode;
     isEntryModalOpen = true;
+  }
+
+  function handleEditEntry(entry) {
+    entryToEdit = entry;
+    entryModalMode = 'normal';
+    isEntryModalOpen = true;
+  }
+
+  // Cifra/descifra ya se resuelve en el modal; aquí persistimos en el backend.
+  async function handleSaveEntry(payload) {
+    const { id, ...body } = payload;
+    try {
+      if (id) {
+        await api.put(`/vault/accounts/${id}`, body);
+        globalState.notify('Bóveda', 'Entrada actualizada', 'success');
+      } else {
+        await api.post('/vault/accounts', body);
+        globalState.notify('Bóveda', 'Entrada guardada', 'success');
+      }
+      if (vaultRef) await vaultRef.loadAccounts();
+      globalState.refreshTrashCount();
+      return true;
+    } catch (e) {
+      // api.js ya notifica el error; mantenemos el modal abierto.
+      return false;
+    }
+  }
+
+  function handleDatabaseChange() {
+    loadFolders();
+    globalState.refreshTrashCount();
   }
 
   // Drag & Drop
@@ -215,6 +248,27 @@
     };
   });
 
+  // Auto-bloqueo por inactividad y auto-sync mientras la bóveda está abierta.
+  // `untrack` evita que los cambios de estado internos (isSyncing, timers...)
+  // vuelvan a disparar este efecto en bucle.
+  $effect(() => {
+    const unlocked = isUnlocked;
+    const mode = globalState.dbMode;
+    untrack(() => {
+      if (unlocked) {
+        globalState.startInactivityWatch();
+        if (mode === 'remote' || mode === 'hybrid') {
+          globalState.startAutoSync();
+        } else {
+          globalState.stopAutoSync();
+        }
+      } else {
+        globalState.stopInactivityWatch();
+        globalState.stopAutoSync();
+      }
+    });
+  });
+
   function handleKeydown(e) {
     if (e.key === 'Escape') {
       if (isEntryModalOpen) { isEntryModalOpen = false; return; }
@@ -232,7 +286,7 @@
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
-      if (isUnlocked) isEntryModalOpen = true;
+      if (isUnlocked) openEntryModal('normal');
     }
   }
 </script>
@@ -336,8 +390,10 @@
               {folders}
               onLock={handleLock} 
               onOpenSettings={() => isSettingsOpen = true}
-              onOpenNewEntry={(m) => openEntryModal(m || 'normal')}
+              onOpenNewEntry={() => openEntryModal('normal')}
               onOpenNewFolder={() => isNamingFolder = true}
+              onEditEntry={handleEditEntry}
+              onDatabaseChange={handleDatabaseChange}
               bind:showManager
             />
           </div>
@@ -398,10 +454,12 @@
   <NewEntryModal 
     isOpen={isEntryModalOpen} 
     mode={entryModalMode} 
+    entry={entryToEdit}
     {folders} 
     user={selectedUser}
+    onSave={handleSaveEntry}
     onOpenNewFolder={() => isNamingFolder = true}
-    onClose={() => isEntryModalOpen = false} 
+    onClose={() => { isEntryModalOpen = false; entryToEdit = null; }} 
   />
 
   <FolderModal 

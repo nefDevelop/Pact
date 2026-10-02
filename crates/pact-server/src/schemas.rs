@@ -94,6 +94,14 @@ pub struct FolderCreate {
 // --- ACCOUNTS ---
 
 #[derive(Debug, Deserialize)]
+pub struct AccountQuery {
+    #[serde(default)]
+    pub include_deleted: bool,
+    pub is_favorite: Option<bool>,
+    pub folder_id: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AccountCreate {
     pub folder_id: Option<i32>,
     pub title: String,
@@ -101,6 +109,7 @@ pub struct AccountCreate {
     pub username_site: Option<String>,
     pub encrypted_pass: String,
     pub totp_seed: Option<String>,
+    #[serde(default)]
     pub is_favorite: bool,
     pub icon_data: Option<String>,
 }

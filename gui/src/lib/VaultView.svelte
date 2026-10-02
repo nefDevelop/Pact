@@ -9,7 +9,7 @@
   import { decryptE2E } from './crypto_utils.js';
   import brandWhitelist from './brand_whitelist.json';
 
-  let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onDatabaseChange, showManager = $bindable() } = $props();
+  let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onEditEntry, onDatabaseChange, showManager = $bindable() } = $props();
   
   // Mapa de iconos para renderizado dinámico
   const iconMap = {
@@ -109,6 +109,24 @@
       onDatabaseChange?.();
     } catch (e) {
       if (e.message !== 'Unauthorized') console.warn('Error al marcar favorito:', e);
+    }
+  }
+
+  function editAccount(entry) {
+    onEditEntry?.(entry);
+  }
+
+  async function deleteAccount(id) {
+    if (!confirm('¿Mover esta cuenta a la papelera?')) return;
+    try {
+      await api.delete(`/vault/accounts/${id}`);
+      globalState.notify('Papelera', 'Cuenta movida a la papelera', 'success');
+      expandedCardId = null;
+      await loadAccounts();
+      globalState.refreshTrashCount();
+      onDatabaseChange?.();
+    } catch (e) {
+      if (e.message !== 'Unauthorized') console.warn('Error al eliminar cuenta:', e);
     }
   }
 
@@ -302,7 +320,7 @@
         {#if isLoading}
           <div class="space-y-4 px-4">
             {#each [1,2,3,4] as _}
-              <div class="h-20 bg-[var(--md-surface-variant)] rounded-2xl animate-pulse opacity-50" />
+              <div class="h-20 bg-[var(--md-surface-variant)] rounded-2xl animate-pulse opacity-50"></div>
             {/each}
           </div>
         {:else if activeFilter !== 'all' && searchQuery.length === 0}
@@ -329,6 +347,8 @@
               onToggleFavorite={toggleFavorite}
               onTogglePassword={togglePassword}
               onRestore={restoreAccount}
+              onEdit={editAccount}
+              onDelete={deleteAccount}
               isVisible={visiblePasswords.has(item.id)}
               {iconMap}
               {loadedIcons}
@@ -449,6 +469,8 @@
                   onToggleFavorite={toggleFavorite}
                   onTogglePassword={togglePassword}
                   onRestore={restoreAccount}
+                  onEdit={editAccount}
+                  onDelete={deleteAccount}
                   isVisible={visiblePasswords.has(sel.id)}
                   {iconMap}
                   {loadedIcons}
@@ -477,6 +499,8 @@
                   onToggleFavorite={toggleFavorite}
                   onTogglePassword={togglePassword}
                   onRestore={restoreAccount}
+                  onEdit={editAccount}
+                  onDelete={deleteAccount}
                   isVisible={visiblePasswords.has(sel.id)}
                   {iconMap}
                   {loadedIcons}

@@ -4,7 +4,9 @@
   import { encryptE2E } from './crypto_utils.js';
   import bip39 from './bip39_es.json';
 
-  let { isOpen, onSave, onClose, onOpenNewFolder, folders = [], mode = 'normal', isUnlocked } = $props();
+  let { isOpen, onSave, onClose, onOpenNewFolder, folders = [], mode = 'normal', entry = null, isUnlocked } = $props();
+
+  const isEditing = $derived(!!entry?.id);
 
   let title = $state('');
   let username = $state('');
@@ -52,6 +54,25 @@
     }
   }
 
+  // Pre-rellena el formulario al abrir el modal: con los datos descifrados de
+  // la entrada al editar, o vacío al crear una nueva.
+  $effect(() => {
+    if (!isOpen) return;
+    if (entry) {
+      title = entry.title || '';
+      username = entry.username || '';
+      password = entry.password || '';
+      website = entry.website || '';
+      folderId = entry.folder_id ?? null;
+      totpSeed = '';
+      showAdvanced = true;
+    } else {
+      title = ''; username = ''; password = ''; totpSeed = ''; website = '';
+      folderId = null; showAdvanced = false;
+    }
+    clipboardError = false;
+  });
+
   let isCommonPassword = $derived(forbiddenPasswords.includes(password.toLowerCase()));
   let isCriticallyWeak = $derived(isCommonPassword || (password.length > 0 && password.length < 6));
   let isSeedValid = $derived(!totpSeed || /^[A-Z2-7]+=*$/.test(totpSeed.toUpperCase().replace(/\s/g, '')));
@@ -95,17 +116,21 @@
       const encryptedPass = await encryptE2E(password, globalState.masterKey);
 
       if (onSave) {
-        onSave({ 
-          title: encryptedTitle, 
+        const saved = await onSave({
+          id: entry?.id,
+          folder_id: folderId,
+          title: encryptedTitle,
           url: encryptedUrl,
-          username_site: encryptedUser, 
-          encrypted_pass: encryptedPass, 
-          totpSeed, // TOTP por ahora lo dejamos o lo ciframos también si quieres
-          folder_id: folderId, 
-          color, 
-          is_favorite: false,
-          icon_data: null 
+          username_site: encryptedUser,
+          encrypted_pass: encryptedPass,
+          // El seed TOTP se almacena tal cual lo entrega autenticador (Base32).
+          totp_seed: totpSeed.trim() || null,
+          is_favorite: entry ? entry.is_favorite : false,
+          // Al editar se conserva el icono existente; al crear aún no hay.
+          icon_data: entry?.icon_data ?? null
         });
+        // Si el guardado falló, mantenemos el modal abierto con los datos.
+        if (saved === false) return;
         resetForm();
         onClose();
       }
@@ -131,10 +156,10 @@
     <div class="px-8 pt-8 pb-4 flex justify-between items-center shrink-0">
       <div class="flex flex-col">
         <div class="flex items-center gap-3">
-          <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">Nueva Entrada</h3>
-          {#if mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[#6750A4]/20 animate-pulse">Rápida</span>{/if}
+          <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{isEditing ? 'Editar Entrada' : 'Nueva Entrada'}</h3>
+          {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[#6750A4]/20 animate-pulse">Rápida</span>{/if}
         </div>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30">Añadir cuenta al llavero</p>
+        <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{isEditing ? 'Actualizar credencial guardada' : 'Añadir cuenta al llavero'}</p>
       </div>
       <button onclick={onClose} class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors opacity-40 hover:opacity-100" aria-label="Cerrar">
         <X size={20} />
@@ -290,7 +315,7 @@
           <Loader2 size={18} class="animate-spin" /> Guardando...
         {:else}
           <ShieldCheck size={18} /> 
-          {mode === 'quick' ? 'Añadir Ahora' : 'Guardar Entrada'}
+          {isEditing ? 'Guardar Cambios' : (mode === 'quick' ? 'Añadir Ahora' : 'Guardar Entrada')}
         {/if}
       </button>
     </div>
