@@ -1,6 +1,7 @@
 <script>
   import { User, Key, Copy, Eye, Star, ChevronDown, RefreshCw, Pencil, Trash2 } from 'lucide-svelte';
   import { globalState } from '../state.svelte.js';
+  import { i18n } from '../i18n.svelte.js';
 
   let { 
     item, 
@@ -30,9 +31,9 @@
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      globalState.notify('Copiado', `${label} copiado al portapapeles`, 'success', 2000);
+      globalState.notify('Copiado', i18n.t('common.copied', { label }), 'success', 2000);
     } catch (e) {
-      globalState.notify('Error', 'No se pudo copiar al portapapeles', 'error');
+      globalState.notify('Error', i18n.t('common.copyError'), 'error');
     }
   }
 </script>
@@ -136,7 +137,7 @@
           <User size={14} class="opacity-20 shrink-0" />
           <span class="text-xs font-medium truncate">{item.username}</span>
         </div>
-        <button onclick={() => copyToClipboard(item.username, 'Usuario')} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title="Copiar usuario" aria-label="Copiar usuario"><Copy size={14}/></button>
+        <button onclick={() => copyToClipboard(item.username, i18n.t('common.copyUser'))} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title={i18n.t('common.copyUser')} aria-label={i18n.t('common.copyUser')}><Copy size={14}/></button>
       </div>
       <div class="h-12 bg-[var(--md-surface-variant)] transition-colors duration-500 rounded-2xl px-4 flex items-center justify-between group">
         <div class="flex items-center gap-3 overflow-hidden">
@@ -147,8 +148,8 @@
           </div>
         </div>
         <div class="flex gap-1">
-          <button onclick={() => onTogglePassword(item.id)} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title="Mostrar contraseña" aria-label="Mostrar contraseña"><Eye size={14}/></button>
-          <button onclick={() => copyToClipboard(item.password, 'Contraseña')} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title="Copiar contraseña" aria-label="Copiar contraseña"><Copy size={14}/></button>
+          <button onclick={() => onTogglePassword(item.id)} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title={i18n.t('entry.showPassword')} aria-label={i18n.t('entry.showPassword')}><Eye size={14}/></button>
+          <button onclick={() => copyToClipboard(item.password, i18n.t('common.copyPass'))} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title={i18n.t('common.copyPass')} aria-label={i18n.t('common.copyPass')}><Copy size={14}/></button>
         </div>
       </div>
       
@@ -159,7 +160,7 @@
           </div>
           <div class="flex items-center gap-3 relative z-10">
             <span class="text-[9px] font-black opacity-20 font-mono">{totpSeconds}s</span>
-            <button onclick={() => copyToClipboard(item.totp, 'Código TOTP')} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title="Copiar código" aria-label="Copiar código TOTP"><Copy size={14}/></button>
+            <button onclick={() => copyToClipboard(item.totp, i18n.t('common.copyTotp'))} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title={i18n.t('common.copyTotp')} aria-label={i18n.t('common.copyTotp')}><Copy size={14}/></button>
           </div>
           <div class="absolute bottom-0 left-0 h-[2px] transition-all" style="width: {totpProgress}%; background-color: {userColor}; opacity: 0.3;"></div>
         </div>

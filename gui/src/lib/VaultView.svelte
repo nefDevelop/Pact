@@ -7,6 +7,7 @@
   import { globalState } from './state.svelte.js';
   import { api, apiAssetUrl } from './api.js';
   import { decryptE2E, encryptE2E, generateTOTP } from './crypto_utils.js';
+  import { i18n } from './i18n.svelte.js';
   import brandWhitelist from './brand_whitelist.json';
 
   let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onEditEntry, onDatabaseChange, showManager = $bindable() } = $props();
@@ -126,6 +127,7 @@
     try {
       await api.post(`/vault/accounts/${id}/restore`);
       globalState.notify('Papelera', 'Cuenta restaurada', 'success');
+      // nota: mensajes internos se mantienen en español salvo los de UI principal
       loadAccounts();
       onDatabaseChange?.();
     } catch (e) {
@@ -134,7 +136,7 @@
   }
 
   async function handleEmptyTrash() {
-    if (!confirm('¿Seguro que quieres vaciar la papelera?')) return;
+    if (!confirm(i18n.t('sidebar.emptyTrashConfirm'))) return;
     try {
       const data = await api.delete('/vault/accounts/trash/empty');
       globalState.notify('Papelera', `Se han borrado ${data.deleted_count} cuentas.`, 'success');
@@ -303,12 +305,12 @@
           <span class="text-sm font-bold truncate text-[var(--md-on-background)]">{user.name}</span>
           <div class="flex items-center gap-1.5 mt-0.5">
             <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
-            <span class="text-[9px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">Sesión Activa</span>
+            <span class="text-[9px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">{i18n.t('vault.quickAccess')}</span>
           </div>
         </div>
         <div class="flex items-center gap-1 mr-2">
-          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title="Agregar Credencial" aria-label="Agregar credencial"><Plus size={18}/></button>
-          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear" aria-label="Bloquear sesión"><LogOut size={18}/></button>
+          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title={i18n.t('vault.addCredential')} aria-label={i18n.t('vault.addCredential')}><Plus size={18}/></button>
+          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title={i18n.t('vault.lock')} aria-label={i18n.t('vault.lock')}><LogOut size={18}/></button>
         </div>
       </div>
 
@@ -317,11 +319,11 @@
         <input 
           type="text" 
           bind:value={searchQuery} 
-          placeholder="¿Qué necesitas buscar ahora?" 
+          placeholder={i18n.t('vault.searchQuick')} 
           class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-black/[0.1] dark:border-white/[0.15] outline-none text-[var(--md-on-background)] transition-all" 
         />
         {#if searchQuery.length > 0}
-          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label="Limpiar búsqueda"><X size={18} /></button>
+          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.clearSearch')}><X size={18} /></button>
         {/if}
       </div>
 
@@ -371,7 +373,7 @@
 
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
-        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label="Abrir gestor de bóveda">
+        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label={i18n.t('vault.openManager')}>
           <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
         </button>
       </div>
@@ -382,19 +384,19 @@
       
       <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
-          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label="Volver al acceso rápido"><ArrowLeft size={20} /></button>
+          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label={i18n.t('vault.back')}><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
               <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-black/5 dark:bg-white/[0.1]" />
             </div>
             <div class="flex flex-col">
               <h2 class="text-base font-bold leading-none text-[var(--md-on-background)]">{user.name}</h2>
-              <span class="text-[8px] font-black uppercase tracking-widest opacity-20 mt-1.5 text-[var(--md-on-background)]">Gestor de Bóveda</span>
+              <span class="text-[8px] font-black uppercase tracking-widest opacity-20 mt-1.5 text-[var(--md-on-background)]">{i18n.t('vault.manager')}</span>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity" aria-label="Abrir ajustes"><Settings size={20} strokeWidth={1.5} /></button>
+          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.settings')}><Settings size={20} strokeWidth={1.5} /></button>
         </div>
       </header>
 
@@ -416,7 +418,7 @@
               <input 
                 type="text" 
                 bind:value={searchQuery} 
-                placeholder="Filtrar credenciales..." 
+                placeholder={i18n.t('vault.filterPlaceholder')} 
                 class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-black/5" 
               />
             </div>

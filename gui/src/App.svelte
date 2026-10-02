@@ -14,6 +14,7 @@
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
   import { decryptE2E } from './lib/crypto_utils.js';
+  import { i18n } from './lib/i18n.svelte.js';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
   // Soporte para Tauri v2
@@ -314,8 +315,8 @@
           <File size={64} strokeWidth={2.5} />
         </div>
         <div class="text-center">
-          <h2 class="text-4xl font-black tracking-tight text-[#6750A4]">Suelta tu Bóveda</h2>
-          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[#6750A4]">Solo archivos .pcty</p>
+          <h2 class="text-4xl font-black tracking-tight text-[#6750A4]">{i18n.t('app.dropVault')}</h2>
+          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[#6750A4]">{i18n.t('app.dropVaultHint')}</p>
         </div>
       </div>
     </div>
@@ -348,8 +349,8 @@
       <button 
         onclick={() => isSettingsOpen = true}
         class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
-        title="Configuración"
-        aria-label="Abrir configuración"
+        title={i18n.t('app.settings')}
+        aria-label={i18n.t('app.settings')}
       >
         <Settings size={20} strokeWidth={2.5} />
       </button>
@@ -380,7 +381,7 @@
                 <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
                   <span class="text-sm font-bold truncate">{selectedUser.name}</span>
                   <span class="text-[10px] font-black uppercase tracking-widest opacity-30">
-                    {isDropdownOpen ? 'Cerrar' : 'Cambiar'}
+                    {isDropdownOpen ? i18n.t('common.close') : i18n.t('app.change')}
                   </span>
                 </div>
                 <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
@@ -411,10 +412,10 @@
           <div class="flex flex-col items-center text-center opacity-50 gap-8 animate-in fade-in zoom-in duration-700">
             <div class="flex flex-col gap-2">
               {#if globalState.vaultPath}
-                <p class="text-xl lg:text-2xl font-bold tracking-tight">Bóveda vacía: {globalState.vaultPath.split('/').pop()}</p>
-                <p class="text-sm opacity-60">Crea tu primer usuario en esta bóveda para continuar.</p>
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.emptyVaultTitle', { name: globalState.vaultPath.split('/').pop() })}</p>
+                <p class="text-sm opacity-60">{i18n.t('app.emptyVaultHint')}</p>
               {:else}
-                <p class="text-xl lg:text-2xl font-bold tracking-tight">Crea tu primer usuario para empezar.</p>
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.noUsersTitle')}</p>
               {/if}
             </div>
             
@@ -422,8 +423,8 @@
               <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
                 <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform"><File size={24} /></div>
                 <div class="flex flex-col text-left">
-                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Abrir Bóveda</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Seleccionar archivo .pcty</span>
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.openVault')}</span>
+                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.openVaultHint')}</span>
                 </div>
               </button>
 
@@ -432,8 +433,8 @@
               <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
                 <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[#6750A4]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
                 <div class="flex flex-col text-left">
-                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Crear Nueva</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Empezar desde cero</span>
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.createVault')}</span>
+                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
                 </div>
               </button>
             </div>
@@ -444,7 +445,7 @@
       {#if !isUnlocked && users.length > 0}
         <div class="hidden lg:flex flex-col justify-center h-full animate-in fade-in slide-in-from-right duration-1000">
           <div class="p-2">
-            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-6 ml-4">Usuarios</h2>
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-6 ml-4">{i18n.t('app.users')}</h2>
             <UserList onSelect={handleUserSelect} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
           </div>
         </div>

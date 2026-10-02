@@ -3,6 +3,7 @@
   import { globalState } from './state.svelte.js';
   import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
+  import { i18n } from './i18n.svelte.js';
   let { user, onUnlock } = $props();
   let password = $state('');
   let isLoading = $state(false);
@@ -44,9 +45,9 @@
       onUnlock?.();
     } catch (error) {
       const msg = error.message === 'Unauthorized'
-        ? 'Contraseña incorrecta o usuario no válido.'
-        : (error.message || 'No se pudo iniciar sesión.');
-      globalState.notify('Acceso denegado', msg, 'error');
+        ? i18n.t('login.incorrect')
+        : (error.message || i18n.t('login.failed'));
+      globalState.notify(i18n.t('login.denied'), msg, 'error');
       password = '';
     } finally {
       isLoading = false;
@@ -100,7 +101,7 @@
       <div class="flex items-center gap-3 mt-2">
         <div class="flex items-center gap-2">
           <Lock size={12} class="opacity-40" style="color: {user.color}" />
-          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
+          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">{i18n.t('login.locked')}</span>
         </div>
       </div>
     </div>
@@ -108,7 +109,7 @@
 
   <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-8">
     <div class="space-y-4">
-      <label for="pass" class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60 px-2" style="color: var(--md-on-surface)">Contraseña Maestra</label>
+      <label for="pass" class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-60 px-2" style="color: var(--md-on-surface)">{i18n.t('login.masterPassword')}</label>
       <input 
         id="pass"
         type="password" 
@@ -116,7 +117,7 @@
         required
         class="w-full h-16 bg-[var(--md-surface-variant)] rounded-2xl px-6 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/10 text-sm font-body font-bold"
         style="color: var(--md-on-surface)"
-        placeholder="Introduce tu clave para entrar"
+        placeholder={i18n.t('login.placeholder')}
       />
     </div>
 
@@ -131,11 +132,11 @@
         {#if isLoading}
           <div class="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
           <div class="flex flex-col items-start leading-none">
-            <span class="text-[10px] font-black tracking-widest">Verificando...</span>
-            <span class="text-[8px] opacity-60 font-bold">Argon2id Security</span>
+            <span class="text-[10px] font-black tracking-widest">{i18n.t('login.verifying')}</span>
+            <span class="text-[8px] opacity-60 font-bold">{i18n.t('login.argon')}</span>
           </div>
         {:else}
-          <span>Desbloquear Bóveda</span>
+          <span>{i18n.t('login.unlock')}</span>
         {/if}
       </div>
     </button>

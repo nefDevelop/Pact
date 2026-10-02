@@ -1,5 +1,6 @@
 <script>
   import { Grid, Star, Plus, Folder, Trash2 } from 'lucide-svelte';
+  import { i18n } from '../i18n.svelte.js';
   
   let { 
     folders, 
@@ -22,11 +23,11 @@
       onclick={onOpenNewEntry} 
       class="w-12 md:w-full h-12 rounded-2xl text-white flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-3 hover:scale-[1.02] transition-all shrink-0" 
       style="background-color: var(--md-primary); color: var(--md-on-primary);" 
-      title="Nuevo Ítem"
-      aria-label="Nueva entrada"
+      title={i18n.t('sidebar.newItem')}
+      aria-label={i18n.t('sidebar.newItem')}
     >
       <Plus size={18} />
-      <span class="hidden lg:block font-bold text-[10px] uppercase tracking-widest">Nuevo Ítem</span>
+      <span class="hidden lg:block font-bold text-[10px] uppercase tracking-widest">{i18n.t('sidebar.newItem')}</span>
     </button>
   </div>
   
@@ -37,7 +38,7 @@
       style={activeFilter === 'all' ? 'background-color: var(--md-primary-container); color: var(--md-on-primary-container);' : ''}
     >
       <Grid size={16} />
-      <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">Todos</span>
+      <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.all')}</span>
     </button>
     
     <button 
@@ -46,21 +47,21 @@
       style={activeFilter === 'favorites' ? 'background-color: var(--md-primary-container); color: var(--md-on-primary-container);' : ''}
     >
       <Star size={16} fill={activeFilter === 'favorites' ? "currentColor" : "none"} />
-      <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">Favoritos</span>
+      <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.favorites')}</span>
     </button>
 
     <div class="w-px md:w-auto h-8 md:h-px bg-black/[0.1] dark:bg-white/[0.1] my-auto md:my-4 mx-2 shrink-0"></div>
     
     <div class="hidden lg:flex items-center justify-between px-4 mb-2 shrink-0">
-      <p class="text-[8px] font-black uppercase tracking-[0.2em] opacity-20">Carpetas</p>
+      <p class="text-[8px] font-black uppercase tracking-[0.2em] opacity-20">{i18n.t('sidebar.folders')}</p>
       <button 
         onclick={onOpenNewFolder} 
         class="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 opacity-20 hover:opacity-100 transition-colors" 
         style="--hover-color: {userColor};" 
         onmouseenter={(e) => applyStyle(e, 'color', 'var(--hover-color)')} 
         onmouseleave={(e) => applyStyle(e, 'color', '')} 
-        title="Nueva Carpeta"
-        aria-label="Nueva carpeta"
+        title={i18n.t('sidebar.newFolder')}
+        aria-label={i18n.t('sidebar.newFolder')}
       >
         <Plus size={12} />
       </button>
@@ -86,7 +87,7 @@
         class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all bg-red-600 text-white shadow-lg shadow-red-500/20 active:scale-95 group shrink-0"
       >
         <Trash2 size={16} class="group-hover:scale-110 transition-transform" />
-        <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">Vaciar Papelera</span>
+        <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.emptyTrash')}</span>
       </button>
     {:else}
       <button 
@@ -94,7 +95,7 @@
         class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all opacity-40 hover:opacity-100 hover:bg-black/5 shrink-0"
       >
         <Trash2 size={16} />
-        <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">Papelera</span>
+        <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.trash')}</span>
       </button>
     {/if}
   </div>

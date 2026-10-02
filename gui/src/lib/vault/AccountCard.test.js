@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
 import AccountCard from './AccountCard.svelte';
+import { i18n } from '../i18n.svelte.js';
 
 function buildItem(overrides = {}) {
   return {
@@ -51,6 +52,7 @@ describe('AccountCard', () => {
   let target;
 
   beforeEach(() => {
+    i18n.lang = 'es';
     target = document.createElement('div');
     document.body.appendChild(target);
     Object.defineProperty(navigator, 'clipboard', {
@@ -97,7 +99,7 @@ describe('AccountCard', () => {
     const component = mount(AccountCard, { target, props: buildProps(item) });
     flushSync();
 
-    target.querySelector('[aria-label="Copiar contraseña"]').click();
+    target.querySelector('[aria-label="Contraseña"]').click();
     await Promise.resolve();
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('s3cret');

@@ -4,6 +4,7 @@
   import { globalState } from './state.svelte.js';
   import { encryptE2E } from './crypto_utils.js';
   import { focusTrap } from './focusTrap.js';
+  import { i18n } from './i18n.svelte.js';
   
   let { isOpen = $bindable(), userColor, onFolderCreated } = $props();
   
@@ -61,8 +62,8 @@
     <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nueva carpeta" class="w-full max-w-[400px] bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 p-8 shadow-2xl animate-in zoom-in duration-300">
       <div class="flex justify-between items-start mb-2">
         <div>
-          <h3 class="text-xl font-bold">Nueva Carpeta</h3>
-          <p class="text-[10px] font-black uppercase tracking-widest opacity-30">Categoriza tus credenciales</p>
+          <h3 class="text-xl font-bold">{i18n.t('folder.title')}</h3>
+          <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{i18n.t('folder.subtitle')}</p>
         </div>
         <button onclick={() => isOpen = false} class="p-2 opacity-20 hover:opacity-100 transition-opacity">
           <X size={20} />
@@ -73,7 +74,7 @@
         <input 
           type="text" 
           bind:value={newFolderName} 
-          placeholder="Ej. Ocio, Trabajo..." 
+          placeholder={i18n.t('folder.placeholder')} 
           class="w-full h-12 bg-black/5 dark:bg-white/5 rounded-2xl px-5 focus:outline-none font-bold border border-transparent focus:border-[var(--md-primary)] transition-colors" 
         />
         
@@ -90,13 +91,13 @@
         </div>
 
         <div class="flex justify-end gap-3 pt-2">
-          <button onclick={() => isOpen = false} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">Cancelar</button>
+          <button onclick={() => isOpen = false} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">{i18n.t('common.cancel')}</button>
           <button 
             onclick={confirmCreateFolder} 
             class="px-8 h-12 rounded-full bg-[#6750A4] text-white text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-30"
             disabled={!newFolderName}
           >
-            Crear
+            {i18n.t('common.create')}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@
   import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
   import { focusTrap } from './focusTrap.js';
+  import { i18n } from './i18n.svelte.js';
   
   let { isOpen, onSave, onClose, users = [] } = $props();
   
@@ -214,8 +215,8 @@
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">
-        <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">Nuevo Usuario</h3>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">Configurar identidad personal</p>
+        <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{i18n.t('userModal.title')}</h3>
+        <p class="text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">{i18n.t('userModal.subtitle')}</p>
       </div>
       <button 
         onclick={onClose}
@@ -253,7 +254,7 @@
           </button>
         </div>
         <div class="flex-1 flex flex-col gap-2">
-          <label for="identity-alias" class="text-[10px] font-black uppercase tracking-widest opacity-30 px-2 text-[var(--md-on-background)]">Alias de Usuario</label>
+          <label for="identity-alias" class="text-[10px] font-black uppercase tracking-widest opacity-30 px-2 text-[var(--md-on-background)]">{i18n.t('userModal.alias')}</label>
           <input 
             id="identity-alias"
             type="text" 
@@ -268,7 +269,7 @@
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
           <label for="master-pass" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">
-            <Lock size={10} /> Contraseña Maestra
+            <Lock size={10} /> {i18n.t('userModal.masterPassword')}
           </label>
           {#if password}
             <span class="text-[9px] font-black uppercase tracking-tighter {isCriticallyWeak ? 'text-red-600 animate-pulse' : (passwordStrength >= 4 ? 'text-blue-500 font-black' : 'opacity-40')}">
@@ -340,7 +341,7 @@
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
           <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30">
-            <Palette size={10} /> Identificador Visual
+            <Palette size={10} /> {i18n.t('userModal.identify')}
           </span>
           <button 
             onclick={refreshColors}
@@ -384,7 +385,7 @@
           onclick={onClose}
           class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all"
         >
-          Cancelar
+          {i18n.t('common.cancel')}
         </button>
         <button 
           onclick={handleSave}
@@ -393,7 +394,7 @@
           style="background-color: {color}"
         >
           <ShieldCheck size={18} />
-          Crear Identidad
+          {i18n.t('userModal.create')}
         </button>
       {/if}
     </div>

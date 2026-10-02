@@ -3,6 +3,7 @@
   import { globalState } from './state.svelte.js';
   import { encryptE2E } from './crypto_utils.js';
   import { focusTrap } from './focusTrap.js';
+  import { i18n } from './i18n.svelte.js';
   import bip39 from './bip39_es.json';
 
   let { isOpen, onSave, onClose, onOpenNewFolder, folders = [], mode = 'normal', entry = null, isUnlocked } = $props();
@@ -164,10 +165,10 @@
     <div class="px-8 pt-8 pb-4 flex justify-between items-center shrink-0">
       <div class="flex flex-col">
         <div class="flex items-center gap-3">
-          <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{isEditing ? 'Editar Entrada' : 'Nueva Entrada'}</h3>
+          <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{isEditing ? i18n.t('entry.edit') : i18n.t('entry.new')}</h3>
           {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[#6750A4]/20 animate-pulse">Rápida</span>{/if}
         </div>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{isEditing ? 'Actualizar credencial guardada' : 'Añadir cuenta al llavero'}</p>
+        <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{isEditing ? i18n.t('entry.editSubtitle') : i18n.t('entry.addSubtitle')}</p>
       </div>
       <button onclick={onClose} class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors opacity-40 hover:opacity-100" aria-label="Cerrar">
         <X size={20} />
@@ -181,19 +182,19 @@
             {title ? title.substring(0, 2).toUpperCase() : '?'}
           </div>
           <div class="flex-1 space-y-1.5">
-            <label for="e-title" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2">Servicio</label>
+            <label for="e-title" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2">{i18n.t('entry.service')}</label>
             <input id="e-title" bind:value={title} placeholder="Ej. GitHub" class="w-full h-11 bg-[var(--md-surface-variant)] rounded-xl px-4 outline-none font-bold text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] transition-all" />
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <label for="e-user" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><User size={10}/> Usuario</label>
+          <label for="e-user" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><User size={10}/> {i18n.t('entry.user')}</label>
           <input id="e-user" bind:value={username} placeholder="nombre@ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] transition-all" />
         </div>
 
         <div class="space-y-3">
           <div class="flex justify-between items-center px-2">
-            <label for="e-pass" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Lock size={10}/> Contraseña</label>
+            <label for="e-pass" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Lock size={10}/> {i18n.t('entry.password')}</label>
             {#if password}
               <span class="text-[8px] font-black uppercase tracking-tighter {isCriticallyWeak ? 'text-red-600 animate-pulse' : (passwordStrength >= 4 ? 'text-blue-500' : 'opacity-40')}">
                 {strengthText[passwordStrength]}
@@ -203,8 +204,8 @@
           <div class="relative">
             <input id="e-pass" type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="••••••••" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-24 outline-none text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Generar frase segura" aria-label="Generar frase segura"><Dice5 size={16}/></button>
-              <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.generate')} aria-label={i18n.t('entry.generate')}><Dice5 size={16}/></button>
+              <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all" aria-label={showPassword ? i18n.t('entry.hidePassword') : i18n.t('entry.showPassword')}>
                 {#if showPassword} <EyeOff size={16} /> {:else} <Eye size={16} /> {/if}
               </button>
             </div>
@@ -213,7 +214,7 @@
           {#if isCriticallyWeak}
             <div class="bg-red-500/5 border border-red-500/10 rounded-xl p-3 flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
               <AlertTriangle size={14} class="text-red-500 shrink-0 mt-0.5" />
-              <p class="text-[10px] opacity-70 leading-tight text-red-600 font-bold">Contraseña vulnerable o muy común. Por favor, cámbiala.</p>
+              <p class="text-[10px] opacity-70 leading-tight text-red-600 font-bold">{i18n.t('entry.weak')}</p>
             </div>
           {:else}
             <div class="flex gap-1.5 h-1 px-2">
@@ -238,29 +239,29 @@
 
         <div class="space-y-1.5">
           <div class="flex justify-between items-center px-2">
-            <label for="e-2fa" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><KeyRound size={10}/> Seed 2FA (TOTP)</label>
+            <label for="e-2fa" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><KeyRound size={10}/> {i18n.t('entry.totpLabel')}</label>
             {#if totpSeed && !isSeedValid}
-              <span class="text-[8px] font-black uppercase tracking-tighter text-red-600 animate-pulse">Formato Base32 Inválido</span>
+              <span class="text-[8px] font-black uppercase tracking-tighter text-red-600 animate-pulse">{i18n.t('entry.totpInvalid')}</span>
             {:else if totpSeed && isSeedValid}
               <div class="flex items-center gap-1 text-green-500">
                 <ShieldCheck size={10} />
-                <span class="text-[8px] font-black uppercase tracking-tighter opacity-60">Semilla Válida</span>
+                <span class="text-[8px] font-black uppercase tracking-tighter opacity-60">{i18n.t('entry.totpValid')}</span>
               </div>
             {/if}
           </div>
           {#if isEditing && entry?.has_totp}
             <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--md-surface-variant)]">
               <span class="text-[9px] font-black uppercase tracking-widest {removeTotp ? 'text-red-500' : 'text-green-600'}">
-                {removeTotp ? 'Se eliminará al guardar' : '2FA activado'}
+                {removeTotp ? i18n.t('entry.totpWillRemove') : i18n.t('entry.totpOn')}
               </span>
               <button onclick={() => { removeTotp = !removeTotp; if (removeTotp) totpSeed = ''; }} class="text-[9px] font-black uppercase tracking-widest {removeTotp ? 'text-green-600' : 'text-red-500'} hover:opacity-70 transition-opacity">
-                {removeTotp ? 'Conservar' : 'Quitar 2FA'}
+                {removeTotp ? i18n.t('entry.totpKeep') : i18n.t('entry.totpRemove')}
               </button>
             </div>
           {/if}
           <div class="relative">
             <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[#6750A4]/20 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
-            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Pegar desde portapapeles" aria-label="Pegar seed desde el portapapeles">
+            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.paste')} aria-label={i18n.t('entry.paste')}>
               <ClipboardPaste size={16} />
             </button>
           </div>
@@ -274,7 +275,7 @@
           {/if}
           {#if clipboardError}
             <p class="text-[8px] text-red-500 font-bold px-2 animate-in fade-in slide-in-from-top-1">
-              Usa Ctrl+V (Navegador bloquea pegado automático)
+              {i18n.t('entry.pasteHint')}
             </p>
           {/if}
         </div>
@@ -283,18 +284,18 @@
       <div class="pt-2">
         <button onclick={() => showAdvanced = !showAdvanced} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest opacity-20 hover:opacity-100 transition-opacity mb-4">
           {#if showAdvanced}<ChevronUp size={12}/>{:else}<ChevronDown size={12}/>{/if}
-          Opciones avanzadas
+          {i18n.t('entry.advanced')}
         </button>
 
         {#if showAdvanced}
           <div class="space-y-6 animate-in slide-in-from-top-2">
             <div class="space-y-1.5">
-              <label for="e-web" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Globe size={10}/> Sitio Web (URL)</label>
+              <label for="e-web" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Globe size={10}/> {i18n.t('entry.website')}</label>
               <input id="e-web" bind:value={website} placeholder="https://ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[#6750A4]/20" />
             </div>
 
             <div class="space-y-3">
-              <span class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Palette size={10}/> Color Identificador</span>
+              <span class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Palette size={10}/> {i18n.t('entry.color')}</span>
               <div class="flex flex-wrap gap-3 px-2">
                 {#each colors as c}
                   <button aria-label="Elegir color {c}" onclick={() => color = c} class="w-7 h-7 rounded-full transition-all hover:scale-110 {color === c ? 'ring-2 ring-[#6750A4] ring-offset-4 dark:ring-offset-[#16151a]' : ''}" style="background-color: {c}"></button>
@@ -304,15 +305,15 @@
 
             <div class="space-y-3">
               <div class="flex justify-between items-center px-2">
-                <span class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Folder size={10}/> Categoría</span>
+                <span class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Folder size={10}/> {i18n.t('entry.category')}</span>
                 <button onclick={onOpenNewFolder} class="text-[8px] font-black uppercase tracking-widest text-[#6750A4] hover:opacity-100 transition-opacity flex items-center gap-1">
-                  <Plus size={10}/> Nueva
+                  <Plus size={10}/> {i18n.t('entry.newCategory')}
                 </button>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
                 <button onclick={() => folderId = null} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === null ? 'bg-[#6750A4] text-white border-[#6750A4] shadow-md shadow-[#6750A4]/20' : 'border-black/5 dark:border-white/10 opacity-40 hover:opacity-100'}">
-                  Ninguna
+                  {i18n.t('common.none')}
                 </button>
                 {#each folders.filter(f => f.uid !== 'system-trash') as f}
                   <button onclick={() => folderId = f.id} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === f.id ? 'bg-[#6750A4] text-white border-[#6750A4] shadow-md shadow-[#6750A4]/20' : 'border-black/5 dark:border-white/10 opacity-40 hover:opacity-100'}">
@@ -327,13 +328,13 @@
     </div>
 
     <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center shrink-0">
-      <button onclick={onClose} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">Cancelar</button>
+      <button onclick={onClose} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">{i18n.t('common.cancel')}</button>
       <button onclick={handleSave} disabled={!title || !username || !password || isCriticallyWeak || !isSeedValid || isSaving} class="px-10 h-14 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] font-black text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/5">
         {#if isSaving}
-          <Loader2 size={18} class="animate-spin" /> Guardando...
+          <Loader2 size={18} class="animate-spin" /> {i18n.t('common.saving')}
         {:else}
           <ShieldCheck size={18} /> 
-          {isEditing ? 'Guardar Cambios' : (mode === 'quick' ? 'Añadir Ahora' : 'Guardar Entrada')}
+          {isEditing ? i18n.t('entry.saveChanges') : (mode === 'quick' ? i18n.t('entry.addNow') : i18n.t('entry.saveEntry'))}
         {/if}
       </button>
     </div>
