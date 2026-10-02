@@ -193,7 +193,7 @@ async fn main() {
         .route("/vault/initialize", post(vault::handlers::initialize_vault))
         .route("/vault/totp/:id", get(vault::handlers::get_totp_seed))
         .route("/vault/accounts/:id/icon", axum::routing::patch(vault::handlers::update_account_icon))
-        .route("/vault/proxy-icon", get(vault::handlers::proxy_icon))
+        .route("/vault/icon", get(vault::handlers::proxy_icon_image))
         .route("/sync/run", post(sync::handlers::run_sync))
         .route("/sync/apply", post(sync::handlers::apply_sync))
         .route("/sync/check", get(sync::handlers::check_sync))

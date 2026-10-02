@@ -1,7 +1,7 @@
 use axum::{
     extract::{State, Json, Path, Query, Multipart},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -19,26 +19,18 @@ const MAX_TITLE_LEN: usize = 200;
 const MAX_NAME_LEN: usize = 2048;
 const MAX_ICON_BYTES: usize = 1024 * 1024; // 1 MB
 
-/// Comprueba si una IP resuelta apunta a un rango privado, loopback o de
-/// enlace local. Se usa para mitigar SSRF en el proxy de iconos.
-fn is_forbidden_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            let octets = v4.octets();
-            v4.is_loopback()
-                || v4.is_private()
-                || v4.is_link_local()
-                || v4.is_unspecified()
-                || v4.is_broadcast()
-                || (octets[0] == 100 && (64..128).contains(&octets[1])) // CGNAT 100.64.0.0/10
-        }
-        IpAddr::V6(v6) => {
-            v6.is_loopback()
-                || v6.is_unspecified()
-                || v6.is_unique_local()
-                || v6.is_unicast_link_local()
-        }
-    }
+/// Valida que el dominio sea un nombre de host razonable (no una IP ni algo
+/// con caracteres peligrosos) antes de pedir su icono a los proveedores.
+fn is_valid_domain(domain: &str) -> bool {
+    let d = domain.trim().to_ascii_lowercase();
+    !d.is_empty()
+        && d.len() <= 253
+        && d.contains('.')
+        && !d.starts_with('.')
+        && !d.ends_with('.')
+        && !d.contains("..")
+        && d.parse::<IpAddr>().is_err()
+        && d.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
 }
 
 pub async fn get_vault_path(
@@ -604,35 +596,25 @@ pub async fn update_account_icon(
     Ok(StatusCode::OK)
 }
 
-pub async fn proxy_icon(
+/// Sirve el icono de un dominio a través de una allowlist de proveedores.
+///
+/// No requiere cabecera `Authorization` porque se usa directamente en `<img>`
+/// (que no puede enviar cabeceras). El servidor solo contacta con proveedores
+/// fijos y valida el dominio, de modo que el webview nunca habla con terceros
+/// y no se puede convertir en un SSRF arbitrario.
+pub async fn proxy_icon_image(
     Query(params): Query<HashMap<String, String>>,
-    _user: AuthenticatedUser,
-) -> Result<impl IntoResponse> {
-    let url = params.get("url").ok_or(AppError::BadRequest("Falta parámetro url".to_string()))?;
-
-    let parsed = url::Url::parse(url).map_err(|_| AppError::BadRequest("URL inválida".to_string()))?;
-    let scheme = parsed.scheme();
-    if scheme != "http" && scheme != "https" {
-        return Err(AppError::BadRequest("Solo se permiten URLs HTTP/HTTPS".to_string()));
+) -> Result<Response> {
+    let domain = params.get("domain").cloned().unwrap_or_default();
+    if !is_valid_domain(&domain) {
+        return Err(AppError::BadRequest("Dominio inválido".to_string()));
     }
 
-    let host = parsed.host_str().ok_or(AppError::BadRequest("URL sin host".to_string()))?;
-    let port = parsed.port_or_known_default().unwrap_or(443);
-
-    // Resolvemos el DNS y rechazamos cualquier IP en rangos privados/loopback
-    // para mitigar SSRF (incluye metadata cloud 169.254.169.254, etc.).
-    let addrs = tokio::net::lookup_host((host, port)).await
-        .map_err(|_| AppError::BadRequest("No se pudo resolver el host".to_string()))?;
-    let mut any = false;
-    for addr in addrs {
-        any = true;
-        if is_forbidden_ip(addr.ip()) {
-            return Err(AppError::BadRequest("URL no permitida".to_string()));
-        }
-    }
-    if !any {
-        return Err(AppError::BadRequest("No se pudo resolver el host".to_string()));
-    }
+    let providers = [
+        format!("https://unavatar.io/{}?fallback=false", domain),
+        format!("https://www.google.com/s2/favicons?sz=128&domain={}", domain),
+        format!("https://logo.hunter.io/{}", domain),
+    ];
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
@@ -640,23 +622,36 @@ pub async fn proxy_icon(
         .build()
         .map_err(|e| AppError::Internal(e.into()))?;
 
-    let response = client.get(url)
-        .send()
-        .await
-        .map_err(|e| AppError::BadRequest(format!("Error al descargar: {}", e)))?;
-
-    if let Some(len) = response.content_length() {
-        if len as usize > MAX_ICON_BYTES {
-            return Err(AppError::BadRequest("Imagen demasiado grande".to_string()));
+    for url in providers {
+        let resp = match client.get(&url).send().await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        if !resp.status().is_success() {
+            continue;
         }
+        let content_type = resp
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("image/png")
+            .to_string();
+        if !content_type.starts_with("image/") {
+            continue;
+        }
+        let bytes = match resp.bytes().await {
+            Ok(b) if !b.is_empty() && b.len() <= MAX_ICON_BYTES => b,
+            _ => continue,
+        };
+        return Ok((
+            [
+                (header::CONTENT_TYPE, content_type),
+                (header::CACHE_CONTROL, "public, max-age=86400".to_string()),
+            ],
+            bytes,
+        )
+            .into_response());
     }
 
-    let bytes = response.bytes().await.map_err(|e| AppError::BadRequest(format!("Error al leer: {}", e)))?;
-    if bytes.len() > MAX_ICON_BYTES {
-        return Err(AppError::BadRequest("Imagen demasiado grande".to_string()));
-    }
-
-    use base64::Engine;
-    let base64_str = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(Json(serde_json::json!({ "base64": base64_str })))
+    Err(AppError::NotFound)
 }

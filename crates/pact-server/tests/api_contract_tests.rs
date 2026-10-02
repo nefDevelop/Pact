@@ -66,7 +66,7 @@ fn build_router(state: AppState) -> axum::Router {
         .route("/vault/initialize", post(pact_server::vault::handlers::initialize_vault))
         .route("/vault/totp/:id", get(pact_server::vault::handlers::get_totp_seed))
         .route("/vault/accounts/:id/icon", axum::routing::patch(pact_server::vault::handlers::update_account_icon))
-        .route("/vault/proxy-icon", get(pact_server::vault::handlers::proxy_icon))
+        .route("/vault/icon", get(pact_server::vault::handlers::proxy_icon_image))
         .route("/sync/run", post(pact_server::sync::handlers::run_sync))
         .route("/sync/apply", post(pact_server::sync::handlers::apply_sync))
         .route("/sync/check", get(pact_server::sync::handlers::check_sync))
@@ -777,7 +777,6 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("DELETE", format!("{}/vault/accounts/trash/empty", base)),
         ("GET", format!("{}/vault/pending-entries", base)),
         ("POST", format!("{}/auth/update", base)),
-        ("GET", format!("{}/vault/proxy-icon", base)),
         ("POST", format!("{}/vault/initialize", base)),
         ("POST", format!("{}/vault/upload", base)),
         ("GET", format!("{}/vault/config/path", base)),
@@ -1064,16 +1063,17 @@ async fn test_update_account_icon() {
 }
 
 #[tokio::test]
-async fn test_proxy_icon_blocks_private_addresses() {
+async fn test_icon_endpoint_rejects_invalid_domain() {
     let db = setup_test_db().await;
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
-    let token = register_and_login(&base, "proxy_user", "pass").await;
     let client = reqwest::Client::new();
-
-    let resp = client.get(format!("{}/vault/proxy-icon?url=http://127.0.0.1/favicon.ico", base))
-        .header("Authorization", format!("Bearer {}", token))
-        .send().await.unwrap();
-    assert_eq!(resp.status(), 400);
+    // IP directa y dominio vacío deben rechazarse sin salir a la red.
+    for domain in ["127.0.0.1", "169.254.169.254", "sin-punto"] {
+        let resp = client.get(format!("{}/vault/icon?domain={}", base, domain))
+            .send().await.unwrap();
+        assert_eq!(resp.status(), 400, "dominio {domain}");
+    }
 }
+

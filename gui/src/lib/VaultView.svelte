@@ -5,7 +5,7 @@
   import Sidebar from './vault/Sidebar.svelte';
   import AccountCard from './vault/AccountCard.svelte';
   import { globalState } from './state.svelte.js';
-  import { api } from './api.js';
+  import { api, apiAssetUrl } from './api.js';
   import { decryptE2E, encryptE2E, generateTOTP } from './crypto_utils.js';
   import brandWhitelist from './brand_whitelist.json';
 
@@ -185,61 +185,70 @@
   // --- ICONOS ---
   const brandSet = new Set(brandWhitelist);
 
-  function getIconUrl(item, attempt = 0) {
-    if (!item || item.website === 'none') return null;
-    let domain = '';
+  function getDomain(item) {
+    if (!item) return null;
     const website = (item.website || '').trim();
     const title = (item.title || '').trim();
+    let domain = '';
 
-    if (website && website.length > 2) {
+    if (website && website.length > 2 && website !== 'none') {
       try {
         const urlStr = website.startsWith('http') ? website : `https://${website}`;
-        const url = new URL(urlStr);
-        domain = url.hostname.replace('www.', '').toLowerCase();
-      } catch (e) { domain = website.replace('www.', '').split('/')[0].toLowerCase(); }
+        domain = new URL(urlStr).hostname.replace('www.', '').toLowerCase();
+      } catch (e) {
+        domain = website.replace('www.', '').split('/')[0].toLowerCase();
+      }
     } else {
       if (!title || title.includes(' ') || title.length > 25 || title.length < 2) return null;
       const titleClean = title.toLowerCase();
       const possibleDomains = [`${titleClean}.com`, `${titleClean}.org`, `${titleClean}.io`, titleClean];
-      domain = possibleDomains.find(d => brandSet.has(d));
-      if (!domain) return null;
+      domain = possibleDomains.find(d => brandSet.has(d)) || '';
     }
 
     if (!domain || domain.length < 4 || !domain.includes('.') || domain.includes(' ')) return null;
-    if (attempt === 0) return `https://unavatar.io/${domain}?fallback=false`;
-    if (attempt === 1) return `https://logo.hunter.io/${domain}`;
-    if (attempt === 2) return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-    return null;
+    return domain;
   }
 
-  async function saveIconToDB(id, url) {
+  // El icono se sirve a través del backend (allowlist de proveedores); el
+  // webview nunca contacta directamente con terceros.
+  function getIconUrl(item) {
+    const domain = getDomain(item);
+    return domain ? apiAssetUrl(`/vault/icon?domain=${encodeURIComponent(domain)}`) : null;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function saveIconToDB(id, domain) {
     try {
-      const data = await api.get(`/vault/proxy-icon?url=${encodeURIComponent(url)}`, { silent: true });
-      if (!data.base64 || !globalState.masterKey) return;
+      if (!globalState.masterKey) return;
+      const res = await fetch(apiAssetUrl(`/vault/icon?domain=${encodeURIComponent(domain)}`));
+      if (!res.ok) return;
+      const dataUrl = await blobToDataUrl(await res.blob());
+      if (!dataUrl || !dataUrl.startsWith('data:image')) return;
       // El icono se cifra E2E antes de persistirlo (no debe revelar el servicio).
-      const encryptedIcon = await encryptE2E(data.base64, globalState.masterKey);
+      const encryptedIcon = await encryptE2E(dataUrl, globalState.masterKey);
       await api.patch(`/vault/accounts/${id}/icon`, { icon_data: encryptedIcon });
-      items = items.map(it => it.id === id ? {...it, icon_data: data.base64} : it);
+      items = items.map(it => it.id === id ? {...it, icon_data: dataUrl} : it);
     } catch (e) {}
   }
 
-  function handleIconLoad(id, url, e) {
+  function handleIconLoad(item, e) {
     e.target.classList.remove('opacity-0');
-    loadedIcons[id] = true;
-    const item = items.find(it => it.id === id);
-    if (item && !item.icon_data && url.startsWith('http')) {
-      saveIconToDB(id, url);
+    loadedIcons[item.id] = true;
+    const domain = getDomain(item);
+    if (!item.icon_data && domain) {
+      saveIconToDB(item.id, domain);
     }
   }
 
-  let iconAttempts = $state({});
   function handleIconError(item, e) {
-    const currentAttempt = (iconAttempts[item.id] !== undefined) ? iconAttempts[item.id] : 0;
-    if (currentAttempt < 2) {
-      iconAttempts[item.id] = currentAttempt + 1;
-      const nextUrl = getIconUrl(item, currentAttempt + 1);
-      if (nextUrl) { e.currentTarget.src = nextUrl; return; }
-    }
     e.currentTarget.style.display = 'none';
     loadedIcons[item.id] = false;
   }
@@ -430,7 +439,7 @@
                       src={getIconUrl(item)} 
                       alt="" 
                       class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity"
-                      onload={(e) => handleIconLoad(item.id, getIconUrl(item), e)}
+                      onload={(e) => handleIconLoad(item, e)}
                       onerror={(e) => handleIconError(item, e)}
                     />
                   {/if}

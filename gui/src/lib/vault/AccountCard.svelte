@@ -60,7 +60,7 @@
             src={getIconUrl(item)} 
             alt="" 
             class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity"
-            onload={(e) => onIconLoad(item.id, getIconUrl(item), e)}
+            onload={(e) => onIconLoad(item, e)}
             onerror={(e) => onIconError(item, e)}
           />
         {/if}

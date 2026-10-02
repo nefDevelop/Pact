@@ -359,13 +359,16 @@ plaintext seed and cannot generate codes.
 - **Request Body**: `{ "icon_data": "data:image/png;base64,..." }`
 - **Response**: `200 OK`.
 
-### Proxy Icon
-`GET /vault/proxy-icon?url=<https_url>` *(authenticated)*
+### Get Icon
+`GET /vault/icon?domain=<domain>` *(no auth; se usa en `<img>`)*
 
-Download a remote icon server-side. Resolves DNS and blocks private/loopback/
-link-local/CGNAT addresses (SSRF protection), does not follow redirects and caps
-the response at 1 MB.
-- **Response**: `200 OK` with `{ "base64": "..." }`, `400 Bad Request`.
+Devuelve el icono de marca de un dominio a través de una **allowlist** de
+proveedores (unavatar, Google favicons, Hunter). El servidor valida el dominio
+(rechaza IPs y caracteres peligrosos) y solo contacta con proveedores fijos, de
+forma que el webview nunca habla directamente con terceros.
+- **Response**: `200 OK` con los bytes de la imagen (y `Cache-Control`),
+  `400 Bad Request` si el dominio es inválido, `404 Not Found` si no se
+  encuentra ninguna imagen.
 
 ---
 

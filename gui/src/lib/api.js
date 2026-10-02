@@ -108,3 +108,9 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+
+// URL absoluta para recursos servidos por el backend (p. ej. iconos en <img>,
+// donde no se pueden enviar cabeceras de autenticación).
+export function apiAssetUrl(path) {
+    return API_BASE + path;
+}
