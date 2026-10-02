@@ -11,8 +11,16 @@ TAURI = npx --package @tauri-apps/cli tauri
 API_PORT = 8002
 GUI_PORT = 8088
 
+# Directorio de artefactos de Cargo (el contenedor lo sobreescribe con target-container)
+CARGO_TARGET_DIR ?= target
+# Triple del host para nombrar el sidecar de Tauri
+TARGET_TRIPLE := $(shell rustc -Vv 2>/dev/null | sed -n 's/^host: //p')
+EXEEXT := $(if $(findstring Windows_NT,$(OS)),.exe,)
+SIDECAR_DIR = crates/pact-desktop/binaries
+SIDECAR = $(SIDECAR_DIR)/pact-server-$(TARGET_TRIPLE)$(EXEEXT)
+
 .PHONY: help install install-gui deps test test-rs test-gui test-unit test-integration coverage mutants lint format run-server dev clean dev-tauri \
-	build build-gui build-server build-desktop build-tauri check check-rs check-gui audit
+	build build-gui build-server build-desktop build-tauri prepare-sidecar check check-rs check-gui audit
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -57,12 +65,10 @@ dev: deps ## Lanza Pact en modo Desarrollo (Rust API + Vite en navegador)
 	@echo "Frontend: http://localhost:$(GUI_PORT)"
 	(trap 'kill 0' SIGINT; $(CARGO) run -p pact-server & cd $(GUI_DIR) && $(NPM) run dev -- --port $(GUI_PORT))
 
-dev-tauri: deps ## Lanza Pact en modo Escritorio Nativo (Tauri + Svelte)
+dev-tauri: deps prepare-sidecar ## Lanza Pact en modo Escritorio Nativo (Tauri + Svelte)
 	@echo "Lanzando Pact en TAURI DEV MODE..."
 	-pkill -9 -f "pact-server" 2>/dev/null; sleep 1
-	# Tauri es quien arranca pact-server (hijo de la ventana). Compilamos el binario antes
-	# para que start_server lo encuentre junto al ejecutable de desarrollo.
-	$(CARGO) build -p pact-server
+	# Tauri empaqueta/arranca pact-server (sidecar) como hijo de la ventana.
 	(trap 'kill 0' SIGINT; cd $(GUI_DIR) && $(NPM) run dev -- --port $(GUI_PORT) < /dev/null & cd crates/pact-desktop && npx --package @tauri-apps/cli tauri dev < /dev/null)
 
 # --- MODOS DE PRODUCCIÓN / BUILD ---
@@ -77,18 +83,23 @@ build-server: build-gui ## Genera el binario del servidor independiente (Standal
 	@echo "Construyendo Pact Server (Release)..."
 	$(CARGO) build -p pact-server --release
 	@mkdir -p build/server
-	@cp target/release/pact-server build/server/
+	@cp $(CARGO_TARGET_DIR)/release/pact-server$(EXEEXT) build/server/
 	@echo "✓ Binario del servidor generado en build/server/pact-server"
 
-build-desktop: build-gui ## Genera la aplicación de escritorio nativa (DEB y Binario)
+prepare-sidecar: ## Genera el binario del servidor que Tauri empaqueta como sidecar
+	@echo "Preparando sidecar: $(SIDECAR)"
+	$(CARGO) build -p pact-server --release
+	@mkdir -p $(SIDECAR_DIR)
+	@cp $(CARGO_TARGET_DIR)/release/pact-server$(EXEEXT) $(SIDECAR)
+
+build-desktop: build-gui prepare-sidecar ## Genera la aplicación de escritorio nativa (DEB y Binario)
 	@echo "Construyendo Pact Desktop (Tauri)..."
 	# Desactivamos AppImage para evitar problemas de FUSE/linuxdeploy
 	cd crates/pact-desktop && $(TAURI) build --verbose --bundles deb
 	@mkdir -p build/desktop
 	@echo "Copiando binario nativo y paquete DEB..."
-	@cp target-container/release/pact-desktop build/desktop/pact-desktop-raw || cp target/release/pact-desktop build/desktop/pact-desktop-raw
-	@find target-container/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \; || \
-	 find target/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \;
+	@cp $(CARGO_TARGET_DIR)/release/pact-desktop$(EXEEXT) build/desktop/pact-desktop-raw
+	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \;
 	@echo "✓ Versiones generadas en build/desktop/ (DEB y pact-desktop-raw)"
 
 build-tauri: build-desktop ## Alias de build-desktop (compatibilidad con el README)
@@ -143,4 +154,5 @@ clean: ## Limpia archivos temporales y cachés
 	rm -rf $(GUI_DIR)/.svelte-kit
 	rm -rf gui/node_modules
 	rm -rf crates/pact-desktop/target
+	rm -rf crates/pact-desktop/binaries
 	rm -rf build/

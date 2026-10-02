@@ -62,15 +62,27 @@ async fn derive_keys(password: String, salt_hex: String) -> Result<DerivedKeys, 
     })
 }
 
-fn start_server() -> Option<std::process::Child> {
-    let server_path = std::env::current_exe().ok()?
-        .parent()?
-        .join("pact-server");
-
-    if !server_path.exists() {
-        log::warn!("pact-server no encontrado en: {:?}", server_path);
-        return None;
+/// Localiza el binario del servidor empaquetado como sidecar junto al
+/// ejecutable de la app (Tauri lo copia sin el sufijo del target triple).
+fn resolve_server_path() -> Option<std::path::PathBuf> {
+    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    for name in ["pact-server", "pact-server.exe"] {
+        let candidate = dir.join(name);
+        if candidate.exists() {
+            return Some(candidate);
+        }
     }
+    None
+}
+
+fn start_server() -> Option<std::process::Child> {
+    let server_path = match resolve_server_path() {
+        Some(path) => path,
+        None => {
+            log::warn!("pact-server (sidecar) no encontrado junto al ejecutable");
+            return None;
+        }
+    };
 
     log::info!("Iniciando pact-server desde: {:?}", server_path);
     let mut cmd = std::process::Command::new(&server_path);

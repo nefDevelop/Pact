@@ -26,6 +26,9 @@ Thumbs.db
 .env.*
 !.env.example
 
+# --- TAURI SIDECAR ---
+crates/pact-desktop/binaries/
+
 # --- PACT SPECIFIC ---
 *.db
 *.db-journal

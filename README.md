@@ -114,6 +114,13 @@ make build-server   # Solo el binario standalone del servidor
 make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
 ```
 
+> El escritorio empaqueta `pact-server` como **sidecar** de Tauri
+> (`externalBin`). Por eso `build-desktop` y `dev-tauri` ejecutan antes
+> `make prepare-sidecar`, que compila el servidor y lo copia a
+> `crates/pact-desktop/binaries/pact-server-<triple>`. Si compilas
+> `pact-desktop` manualmente (`cargo build -p pact-desktop`) necesitas haber
+> generado el sidecar primero.
+
 ---
 
 ## Verificación y Calidad
