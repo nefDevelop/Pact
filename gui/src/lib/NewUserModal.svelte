@@ -211,7 +211,7 @@
     role="presentation"
   ></div>
 
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] border border-border-window relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-elev-3">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] ring-window relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-elev-3">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">

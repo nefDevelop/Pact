@@ -380,9 +380,10 @@
     </div>
   {:else}
     <!-- VISTA 2: GESTOR COMPLETO -->
-    <!-- Envoltorio con aire vertical en pantallas pequeñas: sin él el panel
-         redondeado se pega al borde superior del área útil. -->
-    <div class="w-full h-full py-4 md:py-0">
+    <!-- Envoltorio con aire vertical: sin él el panel redondeado se pegaba al
+         borde superior. El problema es de alto disponible, no de ancho, así que
+         el padding se aplica a todos los tamaños (antes se anulaba en `md`). -->
+    <div class="w-full h-full py-4">
       <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
       
       <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-border flex justify-between items-center shrink-0">

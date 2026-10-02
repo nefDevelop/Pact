@@ -58,7 +58,7 @@
   --md-primary-container: #eaddff;
   --md-on-primary-container: #21005d;
   --md-border: rgba(0, 0, 0, 0.16);
-  --md-border-window: rgba(0, 0, 0, 0.22);
+  --md-border-window: rgba(0, 0, 0, 0.14);
 
   /* Elevación (se recalcula en theme.js por tema) */
   --elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -98,6 +98,21 @@ body {
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05); border-radius: 10px; }
   .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); }
+
+  /* Filete interior de las superficies flotantes.
+     Un `border` de 1px sobre radios grandes (48px, rounded-full) se dibuja por
+     tramos: los rectos a cobertura completa y la curva antialiasada, así que el
+     anillo se ve más brillante en los laterales que en las esquinas. Dibujarlo
+     como pseudo-elemento interior lo traza como un único contorno uniforme.
+     No fijamos `position`: el elemento debe aportarlo (relative/fixed). */
+  .ring-window::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid var(--md-border-window);
+    pointer-events: none;
+  }
 }
 
 /* Animaciones */

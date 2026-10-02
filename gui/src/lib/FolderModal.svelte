@@ -59,7 +59,7 @@
       tabindex="-1"
       aria-label="Cerrar modal"
     ></div>
-    <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nueva carpeta" class="w-full max-w-[400px] bg-[var(--md-surface-2)] rounded-[32px] border border-border-window relative z-10 p-8 shadow-elev-3 animate-in zoom-in duration-300">
+    <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nueva carpeta" class="w-full max-w-[400px] bg-[var(--md-surface-2)] rounded-[32px] ring-window relative z-10 p-8 shadow-elev-3 animate-in zoom-in duration-300">
       <div class="flex justify-between items-start mb-2">
         <div>
           <h3 class="text-xl font-bold">{i18n.t('folder.title')}</h3>

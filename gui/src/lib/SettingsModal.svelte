@@ -307,12 +307,14 @@
 {#if isOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6 lg:p-12 overflow-hidden">
   <button aria-label="Cerrar modal" class="absolute inset-0 bg-black/60 backdrop-blur-md border-none cursor-default w-full h-full" onclick={onClose}></button>
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface-2)] rounded-3xl sm:rounded-[48px] border border-border-window relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-elev-3 transition-colors duration-500">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface-2)] rounded-3xl sm:rounded-[48px] ring-window relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-elev-3 transition-colors duration-500">
     <!-- Sidebar -->
     <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-border p-2 sm:p-4 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
       <h3 class="text-xl font-display font-black mb-6 px-2 hidden lg:block">{i18n.t('settings.title')}</h3>
       {#each tabs as tab}
-        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><tab.icon size={18} class="md:!h-[22px] md:!w-[22px]" /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
+        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><!-- 22px fijo: se mantiene el tamaño tanto con el rail colapsado como
+               expandido, para que no salte al redimensionar la ventana. -->
+          <tab.icon size={22} /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
       {/each}
     </div>
     <!-- Content Area -->

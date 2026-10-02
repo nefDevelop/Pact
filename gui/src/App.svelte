@@ -329,7 +329,7 @@
     <!-- Mobile Dropdown (positioned fixed para estar sobre el backdrop) -->
     {#if pillRect}
       <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }}
-           class="fixed z-[61] p-4 bg-[var(--md-surface-2)] rounded-[32px] border border-border-window shadow-elev-3 max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
+           class="fixed z-[61] p-4 bg-[var(--md-surface-2)] rounded-[32px] ring-window shadow-elev-3 max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
            style="top: {pillRect.top}px; left: {pillRect.left}px; width: {pillRect.width}px">
         <UserList onSelect={(u) => { handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
       </div>
