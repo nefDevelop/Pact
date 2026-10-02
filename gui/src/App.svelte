@@ -15,13 +15,14 @@
   import { api } from './lib/api.js';
   import { decryptE2E } from './lib/crypto_utils.js';
   import { i18n } from './lib/i18n.svelte.js';
+  import { invoke as tauriInvoke } from '@tauri-apps/api/core';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
   // Soporte para Tauri v2
   const isTauri = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__);
-  const invoke = isTauri
-    ? (async () => (await import('@tauri-apps/api/core')).invoke) 
-    : null;
+  // Import estático: `@tauri-apps/api/core` ya está en el bundle (lo usa
+  // crypto_utils.js), así que el import dinámico solo impedía separar el chunk.
+  const invoke = isTauri ? tauriInvoke : null;
 
   let users = $state([]);
   let isLoading = $state(true);
@@ -109,8 +110,7 @@
   async function promptForVaultPath(mode = 'open') {
     if (invoke) {
       try {
-        const invoker = await invoke();
-        const path = await invoker('browse_file', { mode });
+        const path = await invoke('browse_file', { mode });
         if (path) {
           await api.post('/vault/config/path', { path, force_init: mode === 'save' });
           globalState.vaultPath = path;

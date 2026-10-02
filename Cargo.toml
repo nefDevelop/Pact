@@ -17,6 +17,16 @@ license = "MIT"
 [profile.dev.package."*"]
 opt-level = 3
 
+# Perfil de producción: el binario del sidecar se distribuye dentro del paquete
+# de escritorio, así que reducimos tamaño y mejoramos el arranque.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+# `panic = "abort"` reduce el binario, pero `pact-desktop` usa hilos de Tauri y
+# no aporta BENEFicio medible aquí: se deja el unwind por defecto.
+
 [workspace.dependencies]
 # Crypto
 argon2 = "0.5.3"

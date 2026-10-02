@@ -92,8 +92,13 @@ fn start_server() -> Option<std::process::Child> {
 
     log::info!("Iniciando pact-server desde: {:?}", server_path);
     let mut cmd = std::process::Command::new(&server_path);
-    cmd.env("RUST_LOG", "pact_server=debug,tower_http=debug");
-    cmd.env("PACT_CORS_ORIGIN", "*");
+    // El servidor usa `info` por defecto: no fijamos RUST_LOG para que el nivel se
+    // pueda elevar sin recompilar (p. ej. RUST_LOG=debug para diagnóstico).
+    //
+    // CORS: no fijamos `PACT_CORS_ORIGIN` porque el servidor ya permite por
+    // defecto los orígenes del webview de Tauri. Fijarlo en `*` activaba CORS
+    // permisivo, que dejaba leer los endpoints públicos desde cualquier página.
+    cmd.env_remove("PACT_CORS_ORIGIN");
     cmd.stdout(std::process::Stdio::inherit());
     cmd.stderr(std::process::Stdio::inherit());
 

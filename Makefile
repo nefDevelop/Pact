@@ -137,8 +137,15 @@ lint: audit deps ## Ejecuta los linters y auditorías de seguridad
 	# Se lintan Core y Server (pact-desktop requiere dependencias de sistema de Tauri)
 	$(CARGO) clippy -p pact-core -p pact-server --all-targets -- -D warnings
 
-audit: ## Escanea vulnerabilidades en dependencias JS (npm audit)
+audit: ## Escanea vulnerabilidades en dependencias (npm audit + cargo audit)
+	@echo "--- Dependencias JS (npm audit) ---"
 	cd $(GUI_DIR) && $(NPM) audit --audit-level=high || true
+	@echo "--- Dependencias Rust (cargo audit) ---"
+	@if command -v cargo-audit >/dev/null 2>&1 || cargo audit --version >/dev/null 2>&1; then \
+		cargo audit; \
+	else \
+		echo "cargo-audit no está instalado. Instálalo con: cargo install cargo-audit"; \
+	fi
 
 check: check-rs check-gui ## Verifica errores en Rust y GUI (Svelte)
 

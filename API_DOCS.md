@@ -44,18 +44,20 @@ Check if the server is up and running.
 ### Get Server Status
 `GET /status`
 
-Get the current state of the server, including version and active sessions.
+Get the current state of the server, including its version.
 - **Response**: `200 OK`
 - **Body**: `StatusResponse` (JSON)
 ```json
 {
   "status": "Running",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engine": "Rust/Axum",
-  "database": "SQLite (Connected)",
-  "active_sessions": 5
+  "database": "SQLite (Connected)"
 }
 ```
+
+> This endpoint is public and deliberately omits `active_sessions`: exposing it
+> would let any local page infer whether the user currently has the app open.
 
 ### Get Machine ID
 `GET /system/machine-id` *(authenticated)*

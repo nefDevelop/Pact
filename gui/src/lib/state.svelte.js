@@ -1,5 +1,9 @@
 import { safeStorage } from './crypto_utils.js';
 import { applyM3Palette } from './theme.js';
+// `api.js` solo usa `globalState` dentro de sus métodos, nunca al cargar el
+// módulo, así que el ciclo con este import estático es seguro y evita el
+// import dinámico que impedía separar el chunk.
+import { api } from './api.js';
 
 /**
  * @typedef {Object} User
@@ -167,7 +171,6 @@ export const globalState = $state({
     }
     this.isSyncing = true;
     
-    const { api } = await import('./api.js');
     
     try {
       // `/sync/run` calcula el plan (no lo aplica). Enviamos un cuerpo vacío.
@@ -216,7 +219,6 @@ export const globalState = $state({
   // Si no existe configuración, se permanece en modo local.
   async refreshSyncConfig() {
     if (!this.authToken) return;
-    const { api } = await import('./api.js');
     try {
       // El machine-id ahora requiere sesión; lo obtenemos al autenticar.
       if (!this.machineId) {
@@ -231,7 +233,6 @@ export const globalState = $state({
   },
 
   async refreshTrashCount() {
-    const { api } = await import('./api.js');
     try {
       const items = await api.get('/vault/accounts?include_deleted=true', { silent: true });
       this.trashCount = items.filter(i => !!i.deleted_at).length;
@@ -247,8 +248,7 @@ export const globalState = $state({
     if (this.syncInterval) clearInterval(this.syncInterval);
     
     this.syncInterval = setInterval(async () => {
-      const { api } = await import('./api.js');
-      try {
+        try {
         const data = await api.get('/sync/check', { silent: true });
         if (data.has_changes) {
           this.performSync(true);
@@ -284,7 +284,6 @@ export const globalState = $state({
     // Re-comprobación por si se inyecta tarde
     setTimeout(() => this.updateDesktopStatus(), 1500);
 
-    const { api } = await import('./api.js');
 
     try {
       // Machine-id y config de sync requieren sesión; en el arranque no hay

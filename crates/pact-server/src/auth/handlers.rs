@@ -235,7 +235,9 @@ pub async fn login(
         return Err(AppError::Unauthorized);
     }
 
-    let user = user.unwrap();
+    // `authorized` solo puede ser true si el usuario existía, pero evitamos el
+    // `unwrap` para que un cambio futuro de la lógica no provoque un panic (500).
+    let user = user.ok_or(AppError::Unauthorized)?;
 
     // 2. Crear sesión
     let token = session_mgr.create_session(user.username.clone())
