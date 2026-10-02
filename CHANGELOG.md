@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-10-03
+
+Correcciones de la ventana en blanco al abrir el AppImage, y del arranque cuando
+el puerto de la API ya está ocupado. Sin cambios en el formato del contenedor ni
+en el modelo Zero-Knowledge.
+
+### Fixed
+- **La ventana se quedaba en blanco al abrir el AppImage.** `Footer.svelte`
+  seguía enlazando `onclick={sync_all}` a una función que el refactor del tema se
+  había llevado por delante. Como `<Footer />` se renderiza de forma
+  incondicional en la raíz de `App` (fuera de las ramas `{#if}`), el
+  `ReferenceError` salía en el primer render y tumbaba el árbol entero: el
+  servidor respondía, pero no se pintaba nada.
+- **El servidor no arrancaba dentro del AppImage.** `DATABASE_URL` y
+  `PACT_VAULT_PATH` tenían rutas relativas (`sqlite:pact.db`), y un AppImage se
+  ejecuta desde su montaje squashfs de solo lectura, así que el sidecar moría con
+  `Read-only file system (os error 30)` y dejaba la app sin API. Ahora ambas
+  rutas por defecto apuntan al directorio de datos del usuario (o a
+  `PACT_DATA_DIR`), igual que ya hacía el `machine-id` de reserva.
+- **El tema no se decidía antes del primer pintado**, lo que provocaba un
+  parpadeo claro→oscuro en el webview. La inicialización se movió a `main.js`
+  (antes de `mount()`) y `Footer` solo cambia el tema cuando el usuario pulsa el
+  conmutador.
+- **El servidor no podía usarse dentro del AppImage con la CSP de producción.**
+  El script en línea que fijaba el tema inicial estaba bloqueado por
+  `script-src 'self'`, así que se eliminó en lugar de relajar la CSP.
+
+### Added
+- **Reutilización de un `pact-server` ya en marcha.** `start_server` lanzaba el
+  sidecar sin mirar el puerto, así que con el 8002 ocupado moría con
+  `Address already in use`, la app no se enteraba y el frontend acababa hablando
+  con quien fuera que estuviera en ese puerto. Ahora se sondea `GET /status`
+  antes de lanzar: si hay un Pact, se reutiliza; si hay otro servicio, no se
+  lanza nada y se avisa. Además se comprueba que la API responde tras arrancar,
+  en lugar de dejar una ventana que falla en silencio.
+- La base de datos se crea con permisos `600` y se crea su directorio padre si
+  falta.
+
+### Known issues
+- Si la app se cierra con `SIGTERM`, el `pact-server` queda huérfano ocupando el
+  8002. Con la reutilización anterior es inofensivo, pero el proceso no termina.
+- `svelte-check` no detecta referencias a identificadores inexistentes en los
+  templates, porque el type-checking de los ficheros `.js` está desactivado.
+
 ## [0.3.0] - 2026-10-02
 
 Ciclo de preparación de producción: endurece el despliegue, habilita el cliente
@@ -67,6 +111,7 @@ el modelo Zero-Knowledge.
 - `@tailwindcss/vite` pasa a `devDependencies`; `dependencies` queda solo con lo
   que se usa en runtime.
 
+[0.3.1]: https://example.com/pact/releases/tag/v0.3.1
 [0.3.0]: https://example.com/pact/releases/tag/v0.3.0
 
 ## [0.2.0] - 2026-10-02
