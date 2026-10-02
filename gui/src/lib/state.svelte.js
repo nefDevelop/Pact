@@ -293,8 +293,9 @@ export const globalState = $state({
         const midData = await api.get('/system/machine-id', { silent: true });
         this.machineId = midData.machine_id;
 
+        // `null` significa "sin configuración remota guardada": no es un error.
         const data = await api.get('/sync/config', { silent: true });
-        if (data.preferred_mode) this.dbMode = data.preferred_mode;
+        if (data?.preferred_mode) this.dbMode = data.preferred_mode;
       }
     } catch (e) {
       if (e.message !== "Unauthorized") {

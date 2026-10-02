@@ -307,12 +307,12 @@
 {#if isOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6 lg:p-12 overflow-hidden">
   <button aria-label="Cerrar modal" class="absolute inset-0 bg-black/60 backdrop-blur-md border-none cursor-default w-full h-full" onclick={onClose}></button>
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface-2)] rounded-3xl sm:rounded-[48px] border border-border relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-elev-3 transition-colors duration-500">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface-2)] rounded-3xl sm:rounded-[48px] border border-border-window relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-elev-3 transition-colors duration-500">
     <!-- Sidebar -->
     <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-border p-2 sm:p-4 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
       <h3 class="text-xl font-display font-black mb-6 px-2 hidden lg:block">{i18n.t('settings.title')}</h3>
       {#each tabs as tab}
-        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><tab.icon size={18} /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
+        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><tab.icon size={18} class="md:!h-[22px] md:!w-[22px]" /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
       {/each}
     </div>
     <!-- Content Area -->
@@ -463,7 +463,7 @@
         <!-- Botones de Acción Fijos Abajo (Solo en Tab Database) -->
         {#if activeTab === 'database'}
           <div class="absolute bottom-0 left-0 right-0 pt-4 pb-4 px-4 md:pt-8 md:pb-8 md:px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20 pointer-events-none">
-            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--md-surface-variant)]/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl md:rounded-[32px] border border-border shadow-elev-2 gap-2 sm:gap-0 pointer-events-auto">
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--md-surface-variant)]/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl md:rounded-[32px] border border-border shadow-elev-1 gap-2 sm:gap-0 pointer-events-auto">
               <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-4 md:px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95 w-full sm:w-auto">{i18n.t('settings.unlinkAll')}</button>
               <button onclick={saveDatabaseSettings} disabled={isSavingDb} class="px-4 md:px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-elev-2 active:scale-95 transition-all disabled:opacity-40 w-full sm:w-auto" style="background-color: {globalState.userColor};">
                 {#if isSavingDb}

@@ -725,7 +725,11 @@ async fn test_get_sync_config_empty() {
     let resp = client.get(format!("{}/sync/config", base))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
-    assert_eq!(resp.status(), 404);
+    // Sin configuración remota es el estado inicial normal: 200 con `null`,
+    // no 404, para que el cliente no lo trate como error.
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert!(body.is_null());
 }
 
 #[tokio::test]

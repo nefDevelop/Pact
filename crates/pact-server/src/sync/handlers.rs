@@ -101,17 +101,19 @@ pub async fn get_sync_config(
     let user = local_db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    match local_db.get_sync_config(user.id).await? {
-        Some(cfg) => Ok(Json(SyncConfig {
-            host: cfg.remote_host,
-            user: cfg.remote_user,
-            password: String::new(),
-            db_name: cfg.remote_name,
-            port: Some(cfg.remote_port as u16),
-            preferred_mode: cfg.preferred_mode,
-        }).into_response()),
-        None => Err(AppError::NotFound),
-    }
+    // No tener configuración remota es el estado inicial normal, no un error.
+    // Devolvemos `200` con cuerpo `null` para que el cliente no trate la
+    // ausencia de config como un fallo (y no ensucie la consola con 404).
+    let config = local_db.get_sync_config(user.id).await?.map(|cfg| SyncConfig {
+        host: cfg.remote_host,
+        user: cfg.remote_user,
+        password: String::new(),
+        db_name: cfg.remote_name,
+        port: Some(cfg.remote_port as u16),
+        preferred_mode: cfg.preferred_mode,
+    });
+
+    Ok(Json(config).into_response())
 }
 
 pub async fn set_sync_config(

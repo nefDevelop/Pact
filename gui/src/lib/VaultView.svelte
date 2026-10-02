@@ -380,7 +380,10 @@
     </div>
   {:else}
     <!-- VISTA 2: GESTOR COMPLETO -->
-    <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
+    <!-- Envoltorio con aire vertical en pantallas pequeñas: sin él el panel
+         redondeado se pega al borde superior del área útil. -->
+    <div class="w-full h-full py-4 md:py-0">
+      <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
       
       <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-border flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
@@ -520,6 +523,7 @@
           {/if}
         {/if}
       </div>
+    </div>
     </div>
   {/if}
 </div>

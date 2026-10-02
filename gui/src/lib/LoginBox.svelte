@@ -64,7 +64,7 @@
   }
 </script>
 
-<div class="rounded-[48px] p-12 border border-border shadow-elev-3 transition-all duration-500 ease-in-out w-full max-w-[440px] relative z-10"
+<div class="rounded-[48px] p-12 border border-border-window shadow-elev-3 transition-all duration-500 ease-in-out w-full max-w-[440px] relative z-10"
      style="background-color: var(--md-surface-2); color: var(--md-on-surface);">
   
   <div class="flex items-center gap-6 mb-10">

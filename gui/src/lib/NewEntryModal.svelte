@@ -160,7 +160,7 @@
 <div class="fixed inset-0 z-[120] flex items-center justify-center p-6 lg:p-12">
   <button class="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in border-none w-full h-full cursor-default" onclick={onClose} aria-label="Cerrar modal"></button>
 
-  <div use:focusTrap role="dialog" aria-modal="true" aria-label={isEditing ? 'Editar entrada' : 'Nueva entrada'} class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] border border-border relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-elev-3">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label={isEditing ? 'Editar entrada' : 'Nueva entrada'} class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] border border-border-window relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-elev-3">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center shrink-0">
       <div class="flex flex-col">

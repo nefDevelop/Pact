@@ -408,7 +408,7 @@ Test connectivity with a remote database without persisting the configuration.
 `GET /sync/config`
 
 Retrieve the current synchronization settings (the password is never returned).
-- **Response**: `200 OK` with `SyncConfig` or `404 Not Found` if not configured.
+- **Response**: `200 OK` with `SyncConfig`, or `200 OK` with a `null` body if no remote configuration has been saved yet (the initial state, not an error).
 
 ### Set Sync Configuration
 `POST /sync/config`

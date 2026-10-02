@@ -80,6 +80,10 @@ export const applyM3Palette = (hex, isDark) => {
     // En oscuro la separación se consigue con tinte de superficie + borde,
     // porque la sombra negra es invisible sobre el fondo.
     root.style.setProperty('--md-border', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 34 : 80}%)`);
+    // Las superficies flotantes (modales, login, notificaciones) necesitan un
+    // filete algo más fuerte: su borde exterior convive con la sombra y en las
+    // esquinas redondeadas se lava si usa el mismo token que los separadores.
+    root.style.setProperty('--md-border-window', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 40 : 74}%)`);
     root.style.setProperty('--md-surface-1', `hsl(${h}, ${isDark ? 9 : 14}%, ${isDark ? 16 : 98.5}%)`);
     root.style.setProperty('--md-surface-2', `hsl(${h}, ${isDark ? 10 : 16}%, ${isDark ? 19 : 97.5}%)`);
     root.style.setProperty('--md-surface-3', `hsl(${h}, ${isDark ? 12 : 18}%, ${isDark ? 22 : 96}%)`);
