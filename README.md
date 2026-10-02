@@ -29,6 +29,46 @@ Servidor de alto rendimiento construido con **Axum** y **SQLx**.
 
 ---
 
+## Modelo de Seguridad y límites de Zero-Knowledge
+
+Pact aplica **cifrado E2E de los secretos**: todo lo sensible se cifra en el
+cliente con la `MasterKey` (AES-256-GCM) antes de salir del dispositivo. Sin
+embargo, **no es un sistema Zero-Knowledge completo**: el servidor todavía
+observa metadatos y parte de la configuración. Estos son los límites conocidos.
+
+### Datos que el servidor NO puede leer
+| Campo | Tratamiento |
+|---|---|
+| `accounts.title` / `url` / `username_site` / `encrypted_pass` | Cifrado E2E |
+| `folders.name` | Cifrado E2E |
+| `accounts.icon_data` | Cifrado E2E |
+| `totp_settings.encrypted_seed` | Cifrado E2E; el código TOTP se genera en el cliente |
+| `users.master_hash` | Verificador Argon2id de la `AuthKey` (no reversible a la `MasterKey`) |
+
+### Datos que el servidor SÍ observa (pendiente)
+| Dato | Riesgo | Mitigación propuesta |
+|---|---|---|
+| **Contenedor `.pcty` y BD SQLite sin cifrado de archivo** | Quien robe el `.pcty` obtiene todos los metadatos y los blobs E2E | Cifrado a nivel de archivo (SQLCipher o contenedor cifrado) |
+| **Metadatos estructurales** (`folder_id`, `is_favorite`, `deleted_at`, `version`, `created_at`/`updated_at`, `has_totp`) | Nº de cuentas, favoritos, papelera, horarios y qué cuentas tienen 2FA | Ocultar/agrupar metadatos |
+| **`sync_configs.remote_host` / `remote_user` / `remote_name`** | Infraestructura y usuario de la BD remota | Hacer la sincronización en cliente o documentarlo como decisión |
+| **`users.username` / `color` / `created_at`** | Identidad y número de usuarios | Cifrar el alias de presentación |
+| **`/auth/users` y `/auth/salt/:username` (pre-login)** | Enumeración de usuarios y ataques offline al `master_hash` | Limitar el listado o exigir un secreto local |
+| **`sync_configs.remote_pass` y `totp` antiguos cifrados con clave derivada de `/etc/machine-id`** | La clave vive en la misma máquina, así que es recuperable con acceso local | Derivar de la `MasterKey` lo que el servidor no necesite descifrar |
+
+### Modelo de amenaza
+- **Servidor/BD comprometidos**: no pueden descifrar secretos, nombres de carpeta,
+  iconos ni seeds TOTP sin la `MasterKey`. Sí ven la estructura y la config de sync.
+- **Robo del archivo `.pcty`**: expone metadatos; los secretos siguen protegidos
+  por la `MasterKey` (sujeta a la fortaleza de la contraseña maestra y Argon2id).
+- **Entrega del frontend**: en modo servidor (`make run-server`) el backend sirve
+  el JS, por lo que un servidor malicioso podría intentar robar la `MasterKey`.
+  En la app Tauri el bundle es local y hay CSP, lo que reduce este riesgo.
+
+> El desarrollo pendiente para cerrar estas brechas está en
+> [`roadmap.md`](roadmap.md) → *Próximos pasos*.
+
+---
+
 ## Guía de Inicio Rápido
 
 ### 1. Requisitos Previos

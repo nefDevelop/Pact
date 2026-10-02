@@ -7,6 +7,20 @@ The server runs by default on `http://127.0.0.1:8002`.
 
 ---
 
+## Zero-Knowledge model
+
+The server stores **E2E-encrypted blobs** for `title`, `url`, `username_site`,
+`encrypted_pass`, `folder.name`, `icon_data` and the TOTP seed. It never
+receives the `MasterKey` and cannot decrypt those fields or generate TOTP codes.
+
+It still observes **structural metadata** (`folder_id`, `is_favorite`,
+`deleted_at`, `version`, timestamps, `has_totp`), user names/colors and the
+remote sync configuration (`host`, `user`, `db_name`). The `.pcty` container is
+not file-level encrypted yet. See the README section *Modelo de Seguridad y
+límites de Zero-Knowledge* for details and the roadmap for pending work.
+
+---
+
 ## Index
 - [System / Health](#system--health)
 - [Authentication](#authentication)
