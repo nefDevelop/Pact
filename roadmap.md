@@ -51,12 +51,17 @@
 - [x] Rutas de la bóveda anonimizadas (`/auth/users` solo nombre de archivo) y `get_vault_path`/`machine-id` requieren sesión
 - [x] Documentación honesta del modelo ZK y sus límites
 
+### Fase 9: Cierre de release 🚧
+- [x] Empaquetar `pact-server` como sidecar de Tauri (`externalBin`)
+- [x] Retirar la bandeja de pendientes muerta (sin productor) y exigir auth en `/vault/pending-count`
+- [ ] Revisar el flujo de arranque del servidor empaquetado en un `.deb` (requiere `librsvg2-dev`)
+- [ ] CHANGELOG y bump de versión
+
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)
 - [ ] Cobertura de código (`cargo tarpaulin`) y testing de mutación (`cargo mutants`) en CI
 - [ ] Migraciones y cobertura de tests para MariaDB/MySQL remoto
-- [ ] Empaquetar `pact-server` como sidecar de Tauri (`externalBin`) para la app instalada
 - [ ] Fallback WebCrypto/WASM para el modo navegador
 - [ ] i18n (es/en) y tests E2E de UI
 

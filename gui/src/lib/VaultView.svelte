@@ -1,5 +1,5 @@
 <script>
-  import { LogOut, Search, Plus, Folder, Settings, Bell, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
+  import { LogOut, Search, Plus, Folder, Settings, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
   import { onMount } from 'svelte';
   
   import Sidebar from './vault/Sidebar.svelte';
@@ -34,48 +34,6 @@
   let isLoading = $state(true);
   let activeFilter = $state('all'); 
   let loadedIcons = $state({});
-  let isInboxOpen = $state(false);
-  let inboxItems = $state([]);
-  let isInboxLoading = $state(false);
-
-  async function openInbox() {
-    isInboxOpen = true;
-    isInboxLoading = true;
-    try {
-      const raw = await api.get('/vault/pending-entries', { silent: true });
-      inboxItems = await Promise.all((raw || []).map(async (item) => {
-        let label = `Entrada pendiente #${item.id}`;
-        if (globalState.masterKey && item.data_blob) {
-          const data = await decryptE2E(item.data_blob, globalState.masterKey);
-          if (typeof data === 'string' && data) label = data;
-          else if (data && typeof data === 'object') label = data.title || data.username_site || label;
-        }
-        return { id: item.id, label, username: item.username };
-      }));
-    } catch (e) {
-      inboxItems = [];
-    } finally {
-      isInboxLoading = false;
-    }
-  }
-
-  async function deleteInboxItem(id) {
-    try {
-      await api.delete(`/vault/pending-entries/${id}`);
-      inboxItems = inboxItems.filter(i => i.id !== id);
-      globalState.pendingCount = Math.max(0, globalState.pendingCount - 1);
-      globalState.notify('Bandeja', 'Elemento descartado.', 'success');
-    } catch (e) { /* api.js ya notifica */ }
-  }
-
-  // --- LÓGICA DE NOTIFICACIONES ---
-  let totalNotifications = $derived.by(() => {
-    let count = globalState.pendingCount;
-    if (globalState.trashCount > 10) count += 1;
-    const isSyncStale = Date.now() - globalState.lastSyncSuccess > 30 * 60 * 1000;
-    if (globalState.syncError || isSyncStale) count += 1;
-    return count;
-  });
 
   // --- LÓGICA DE CARGA ---
 
@@ -427,10 +385,6 @@
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button onclick={openInbox} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative" aria-label="Abrir bandeja de pendientes">
-            <Bell size={20} strokeWidth={1.5} />
-            {#if totalNotifications > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications}</span>{/if}
-          </button>
           <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity" aria-label="Abrir ajustes"><Settings size={20} strokeWidth={1.5} /></button>
         </div>
       </header>
@@ -554,39 +508,6 @@
             </div>
           {/if}
         {/if}
-      </div>
-    </div>
-  {/if}
-
-  <!-- BANDEJA DE PENDIENTES (SECURE INBOX) -->
-  {#if isInboxOpen}
-    <div class="fixed inset-0 z-[150] flex items-center justify-center p-6">
-      <button class="absolute inset-0 bg-black/50 backdrop-blur-sm border-none w-full h-full cursor-default" onclick={() => isInboxOpen = false} aria-label="Cerrar bandeja"></button>
-      <div class="w-full max-w-[440px] max-h-[80vh] bg-[var(--md-surface)] rounded-[32px] border border-black/10 dark:border-white/10 relative z-10 flex flex-col overflow-hidden shadow-2xl">
-        <div class="px-6 py-5 flex items-center justify-between border-b border-black/5 dark:border-white/10">
-          <h3 class="text-sm font-black uppercase tracking-[0.2em] opacity-40">Bandeja</h3>
-          <button onclick={() => isInboxOpen = false} class="p-2 rounded-xl hover:bg-black/5" aria-label="Cerrar"><X size={18} /></button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-          {#if isInboxLoading}
-            <div class="p-8 text-center text-xs opacity-40">Cargando...</div>
-          {:else if inboxItems.length === 0}
-            <div class="p-8 text-center opacity-40">
-              <Bell size={24} class="mx-auto mb-3 opacity-40" />
-              <p class="text-xs font-bold">No hay elementos pendientes.</p>
-            </div>
-          {:else}
-            {#each inboxItems as it (it.id)}
-              <div class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[var(--md-surface-variant)]">
-                <div class="flex flex-col min-w-0">
-                  <span class="text-xs font-bold truncate">{it.label}</span>
-                  <span class="text-[10px] opacity-30 truncate">{it.username}</span>
-                </div>
-                <button onclick={() => deleteInboxItem(it.id)} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 shrink-0" aria-label="Descartar elemento"><Trash2 size={16} /></button>
-              </div>
-            {/each}
-          {/if}
-        </div>
       </div>
     </div>
   {/if}

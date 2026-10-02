@@ -703,8 +703,10 @@ async fn test_pending_count() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "pending_user", "pass").await;
     let client = reqwest::Client::new();
     let resp = client.get(format!("{}/vault/pending-count/alice", base))
+        .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
@@ -779,6 +781,7 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("POST", format!("{}/vault/initialize", base)),
         ("POST", format!("{}/vault/upload", base)),
         ("GET", format!("{}/vault/config/path", base)),
+        ("GET", format!("{}/vault/pending-count/alice", base)),
     ];
 
     for (method, url) in endpoints {

@@ -473,6 +473,7 @@ pub async fn delete_pending_entry(
 
 pub async fn get_pending_count(
     State(db): State<Arc<dyn Database>>,
+    AuthenticatedUser(_user): AuthenticatedUser,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse> {
     let count = db.get_pending_count(&username).await?;

@@ -308,21 +308,22 @@ exist it requires authentication because it resets the local database.
 ### Get Pending Entries (Inbox)
 `GET /vault/pending-entries`
 
-Retrieve accounts shared with the user that are waiting to be accepted.
+> Reserved for a future sharing flow: nothing populates `pending_accounts` yet,
+> so this always returns an empty array. The GUI no longer shows an inbox.
+
 - **Response**: `200 OK`
 - **Body**: `Array<PendingAccount>`
 
 ### Delete Pending Entry
-`DELETE /vault/pending-entries/:id`
+`DELETE /vault/pending-entries/:id` *(authenticated)*
 
 Discard a pending entry. Only the owner can delete it (`404` otherwise).
 - **Response**: `200 OK`.
 
 ### Get Pending Count
-`GET /vault/pending-count/:username`
+`GET /vault/pending-count/:username` *(authenticated)*
 
-Get the number of pending entries for a user. Available before login so the lock
-screen can show the badge.
+Get the number of pending entries for a user.
 - **Response**: `200 OK` with `{ "count": number }`.
 
 ### Upload Vault

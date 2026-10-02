@@ -13,8 +13,6 @@
       globalState.selectedUser = { ...user, username };
       globalState.userColor = user.color;
     }
-    // El polling de pendientes se detiene al cerrar sesión (resetSessionState).
-    if (!globalState.pendingInterval) globalState.startPendingPolling();
   });
 
   async function handleLogin() {
@@ -69,7 +67,7 @@
   <div class="flex items-center gap-6 mb-10">
     <div class="w-20 h-20 rounded-full p-1 flex items-center justify-center shrink-0 relative">
       
-      <svg class="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100" style="--duration: {globalState.pendingCount > 0 ? '6s' : '60s'};">
+      <svg class="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100" style="--duration: 60s;">
         <circle 
           cx="50" cy="50" r="48" 
           fill="none" 
@@ -100,15 +98,8 @@
       <div class="flex items-center gap-3 mt-2">
         <div class="flex items-center gap-2">
           <Lock size={12} class="opacity-40" style="color: {user.color}" />
-      <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
+          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">Sesión Bloqueada</span>
         </div>
-        
-        {#if globalState.pendingCount > 0}
-          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 animate-pulse shadow-lg shadow-amber-500/10">
-            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></div>
-            <span class="text-[9px] font-ui font-medium text-[var(--md-primary)] uppercase tracking-tighter">{globalState.pendingCount} pendientes</span>
-          </div>
-        {/if}
       </div>
     </div>
   </div>

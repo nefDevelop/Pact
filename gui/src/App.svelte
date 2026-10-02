@@ -245,14 +245,12 @@
 
   onMount(() => {
     globalState.initialize().then(() => loadUsers());
-    const interval = setInterval(() => { if (isUnlocked) globalState.refreshPendingCount(); }, 30000);
-    
+
     const onRefresh = () => loadUsers();
     window.addEventListener('pact:refresh-users', onRefresh);
     window.addEventListener('pact:force-lock', handleLock);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('pact:refresh-users', onRefresh);
       window.removeEventListener('pact:force-lock', handleLock);
     };

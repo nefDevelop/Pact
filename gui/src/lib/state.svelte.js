@@ -29,7 +29,6 @@ export const globalState = $state({
   dbMode: 'local', // 'local' o 'remote'
   vaultPath: '',
   machineId: null,
-  pendingCount: 0,
   trashCount: 0,
   lastSyncSuccess: Date.now(),
   syncError: false,
@@ -52,8 +51,6 @@ export const globalState = $state({
   countdownInterval: null,
   /** @type {any} */
   syncInterval: null,
-  /** @type {any} */
-  pendingInterval: null,
   /** @type {any} */
   _activityHandler: null,
 
@@ -157,22 +154,6 @@ export const globalState = $state({
     this.isDesktop = hasPyWebView || hasTauri;
   },
 
-  async refreshPendingCount() {
-    const { api } = await import('./api.js');
-    const u = this.selectedUser;
-    if (!u || !u.username) {
-      this.pendingCount = 0;
-      return;
-    }
-    
-    try {
-      const data = await api.get(`/vault/pending-count/${u.username}`, { silent: true });
-      this.pendingCount = data.count || 0;
-    } catch (e) {
-      console.warn("Fallo al refrescar pendientes:", e);
-    }
-  },
-
   async performSync(showNotify = false) {
     if (this.isSyncing) return;
     if (!this.authToken) return; // Evitar llamadas si no hay sesión
@@ -274,19 +255,6 @@ export const globalState = $state({
     }, 30000);
   },
 
-  startPendingPolling() {
-    this.stopPendingPolling();
-    this.refreshPendingCount();
-    this.pendingInterval = setInterval(() => this.refreshPendingCount(), 5000);
-  },
-
-  stopPendingPolling() {
-    if (this.pendingInterval) {
-      clearInterval(this.pendingInterval);
-      this.pendingInterval = null;
-    }
-  },
-
   stopAutoSync() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
@@ -295,13 +263,11 @@ export const globalState = $state({
   },
 
   resetSessionState() {
-    this.pendingCount = 0;
     this.lastSaveError = false;
     this.hasConflicts = false;
     this.selectedUser = null;
     this.masterKey = null;
     this.authToken = null;
-    this.stopPendingPolling();
     this.stopAutoSync();
     this.stopInactivityWatch();
   },
