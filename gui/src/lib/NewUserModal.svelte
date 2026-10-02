@@ -235,7 +235,7 @@
             <img 
               src={`https://api.dicebear.com/9.x/notionists/svg?seed=${seed}`} 
               alt="Avatar preview" 
-              class="w-full h-full rounded-full object-cover bg-black/5"
+              class="w-full h-full rounded-full object-cover bg-[var(--md-surface-variant)]"
               onerror={handleAvatarError}
             />
             <div 

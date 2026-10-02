@@ -367,8 +367,8 @@
                 onclick={toggleDropdown}
                 class="flex-1 h-full px-3 flex items-center rounded-l-full active:scale-[0.98] transition-all min-w-0 cursor-pointer"
               >
-                <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-black/5 p-0.5 border-2 ml-1" style="border-color: {selectedUser.color}66">
-                  <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full" />
+                <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-[var(--md-primary-container)] p-1 border-2 ml-1" style="border-color: {selectedUser.color}66">
+                  <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-[var(--md-primary-container)]" />
                 </div>
                 <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
                   <span class="text-sm font-bold truncate text-[var(--md-on-surface)]">{selectedUser.name}</span>

@@ -309,12 +309,13 @@
   <button aria-label="Cerrar modal" class="absolute inset-0 bg-black/60 backdrop-blur-md border-none cursor-default w-full h-full" onclick={onClose}></button>
   <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface-2)] rounded-3xl sm:rounded-[48px] ring-window relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-elev-3 transition-colors duration-500">
     <!-- Sidebar -->
-    <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-border p-2 sm:p-4 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
+    <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-border p-2 sm:p-4 md:p-2 md:pt-8 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
       <h3 class="text-xl font-display font-black mb-6 px-2 hidden lg:block">{i18n.t('settings.title')}</h3>
       {#each tabs as tab}
-        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-4 py-3 lg:py-3 rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-40 hover:opacity-100 hover:bg-black/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><!-- 22px fijo: se mantiene el tamaño tanto con el rail colapsado como
-               expandido, para que no salte al redimensionar la ventana. -->
-          <tab.icon size={22} /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
+        <button onclick={() => activeTab = tab.id} class="flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-4 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl transition-colors font-ui font-black text-[10px] uppercase tracking-widest shrink-0 {activeTab === tab.id ? 'text-white shadow-elev-1' : 'opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5'}" style={activeTab === tab.id ? `background-color: ${globalState.userColor}` : ''} title={i18n.t(tab.labelKey)}><!-- 22px fijo en ambos estados. `shrink-0` es imprescindible: como flex
+               item, el <svg> se comprimía en horizontal (22x22 -> 15x22) al
+               colapsar el rail. -->
+          <tab.icon size={22} class="shrink-0 md:max-lg:h-5 md:max-lg:w-5" /><span class="hidden lg:block">{i18n.t(tab.labelKey)}</span></button>
       {/each}
     </div>
     <!-- Content Area -->
@@ -349,7 +350,7 @@
                   </div>
                   <div class="flex items-center justify-end gap-1 w-full sm:w-auto opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onclick={() => forceSync(u.name)} class="p-2 rounded-xl hover:bg-blue-500/10 text-blue-500 flex-1 sm:flex-none flex justify-center" aria-label="Forzar sincronización"><RefreshCw size={18} /></button>
-                    <button onclick={() => startEdit(u)} class="p-2 rounded-xl hover:bg-black/5 flex-1 sm:flex-none flex justify-center" aria-label="Editar usuario"><Edit2 size={18} /></button>
+                    <button onclick={() => startEdit(u)} class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex-1 sm:flex-none flex justify-center" aria-label="Editar usuario"><Edit2 size={18} /></button>
                     <button onclick={() => openSecureAction(u, 'export')} class="p-2 rounded-xl hover:bg-green-500/10 text-green-500 flex-1 sm:flex-none flex justify-center" aria-label="Exportar datos"><Download size={18} /></button>
                     <button onclick={() => openSecureAction(u, 'delete')} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 flex-1 sm:flex-none flex justify-center" aria-label="Eliminar usuario"><Trash2 size={18} /></button>
                   </div>
@@ -375,7 +376,7 @@
                       </div>
                       <div class="flex items-center gap-1 shrink-0">
                         <button onclick={saveFolderEdit} class="p-2 rounded-xl bg-green-500/10 text-green-600 hover:bg-green-500/20" aria-label="Guardar categoría"><Check size={16} strokeWidth={3} /></button>
-                        <button onclick={() => editingFolderId = null} class="p-2 rounded-xl hover:bg-black/5" aria-label="Cancelar edición"><X size={16} /></button>
+                        <button onclick={() => editingFolderId = null} class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5" aria-label="Cancelar edición"><X size={16} /></button>
                       </div>
                     {:else}
                       <div class="flex items-center gap-4 flex-1 min-w-0">
@@ -385,7 +386,7 @@
                         <span class="text-sm font-bold truncate">{f.name}</span>
                       </div>
                       <div class="flex items-center gap-1 shrink-0">
-                        <button onclick={() => { editingFolderId = f.id; editFolderName = f.name; editFolderColor = f.color || '#6750A4'; }} class="p-2 rounded-xl hover:bg-black/5" aria-label="Editar categoría"><Edit2 size={16} /></button>
+                        <button onclick={() => { editingFolderId = f.id; editFolderName = f.name; editFolderColor = f.color || '#6750A4'; }} class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5" aria-label="Editar categoría"><Edit2 size={16} /></button>
                         <button onclick={() => deleteFolder(f.id)} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500" aria-label="Eliminar categoría"><Trash2 size={16} /></button>
                       </div>
                     {/if}
@@ -442,7 +443,7 @@
                       {#if globalState.vaultPath}
                         <button onclick={unlinkVaultPath} class="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all whitespace-nowrap">{i18n.t('db.unlink')}</button>
                       {:else}
-                        <button onclick={() => selectVaultFile('open')} class="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-black/5 text-[10px] font-black uppercase tracking-widest hover:bg-black/10 transition-all whitespace-nowrap">{i18n.t('db.choose')}</button>
+                        <button onclick={() => selectVaultFile('open')} class="flex-1 sm:flex-none h-11 px-4 rounded-xl bg-[var(--md-surface)] border border-border text-[10px] font-black uppercase tracking-widest hover:bg-[var(--md-surface-3)] transition-all whitespace-nowrap">{i18n.t('db.choose')}</button>
                       {/if}
                     </div>
                   </div>

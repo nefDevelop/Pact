@@ -299,7 +299,7 @@
     <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
       <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border shadow-elev-1 mb-8 w-full max-w-2xl">
         <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
-          <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-black/5 dark:bg-white/[0.1]" />
+          <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-[var(--md-surface-variant)]" />
         </div>
         <div class="ml-4 flex flex-col flex-1 min-w-0 pr-4">
           <span class="text-sm font-bold truncate text-[var(--md-on-background)]">{user.name}</span>
@@ -391,7 +391,7 @@
           <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label={i18n.t('vault.back')}><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
-              <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-black/5 dark:bg-white/[0.1]" />
+              <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-[var(--md-surface-variant)]" />
             </div>
             <div class="flex flex-col">
               <h2 class="text-base font-bold leading-none text-[var(--md-on-background)]">{user.name}</h2>
