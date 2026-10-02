@@ -93,14 +93,23 @@ async fn main() {
     let limiter_cleanup_secs: u64 = std::env::var("PACT_LIMITER_CLEANUP_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
     let flush_interval_secs: u64 = std::env::var("PACT_FLUSH_INTERVAL_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
     
-    if db_url.starts_with("sqlite:") {
-        let path = db_url.trim_start_matches("sqlite:");
-        if !std::path::Path::new(path).exists() {
-            tracing::info!("Base de datos no encontrada, creando: {}", path);
-            if let Err(e) = std::fs::File::create(path) {
-                tracing::error!("No se pudo crear el archivo de DB: {}", e);
-                std::process::exit(1);
-            }
+    // Esta versión solo soporta SQLite como base local. MySQL/MariaDB se usa
+    // únicamente como destino de la sincronización remota.
+    if !db_url.starts_with("sqlite:") {
+        tracing::error!(
+            "DATABASE_URL solo admite SQLite (p. ej. 'sqlite:pact.db'); recibido '{}'. \
+             MySQL/MariaDB se configura como destino de sincronización, no como DB local.",
+            db_url
+        );
+        std::process::exit(1);
+    }
+
+    let path = db_url.trim_start_matches("sqlite:");
+    if !std::path::Path::new(path).exists() {
+        tracing::info!("Base de datos no encontrada, creando: {}", path);
+        if let Err(e) = std::fs::File::create(path) {
+            tracing::error!("No se pudo crear el archivo de DB: {}", e);
+            std::process::exit(1);
         }
     }
 
@@ -152,7 +161,7 @@ async fn main() {
         machine_id: machine_id.clone(),
         sync_crypto,
         auth_limiter,
-        db_type: if db_url.starts_with("sqlite:") { "SQLite".to_string() } else { "MySQL".to_string() },
+        db_type: "SQLite".to_string(),
     };
 
     let app = Router::new()
