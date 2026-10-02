@@ -47,8 +47,7 @@ pub async fn get_users(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
 ) -> Result<impl IntoResponse> {
-    let path = storage.get_path()
-        .map(|p| p.to_string_lossy().to_string());
+    let path = storage.get_path();
 
     if path.is_none() {
         tracing::debug!("[AUTH] get_users: No hay bóveda vinculada.");
@@ -59,6 +58,12 @@ pub async fn get_users(
             vault_status: "empty".to_string(),
         }));
     }
+
+    // Solo exponemos el nombre del archivo, no la ruta completa del sistema.
+    let vault_name = path.as_ref()
+        .and_then(|p| p.file_name())
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
 
     let users = db.get_all_users().await?;
     tracing::debug!("[AUTH] get_users: {} usuarios encontrados en DB local.", users.len());
@@ -73,7 +78,7 @@ pub async fn get_users(
     Ok(Json(UsersResponse {
         users: users_list,
         source: "local".to_string(),
-        vault_path: path.unwrap_or_default(),
+        vault_path: vault_name,
         vault_status: "ready".to_string(),
     }))
 }

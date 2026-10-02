@@ -108,6 +108,81 @@ export async function decryptE2E(blobJson, masterKey) {
 }
 
 /**
+ * Decodifica un string Base32 (RFC 4648, sin relleno) a bytes.
+ */
+function base32Decode(input) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = String(input).toUpperCase().replace(/[\s=]/g, '');
+  let bits = 0;
+  let value = 0;
+  const output = [];
+  for (const char of clean) {
+    const idx = alphabet.indexOf(char);
+    if (idx === -1) throw new Error('Base32 inválido');
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return new Uint8Array(output);
+}
+
+/**
+ * Extrae el seed de un URI `otpauth://` o lo devuelve tal cual.
+ */
+export function extractTOTPSeed(raw) {
+  const value = String(raw || '').trim();
+  if (/^otpauth:\/\//i.test(value)) {
+    try {
+      return new URL(value).searchParams.get('secret') || '';
+    } catch {
+      return '';
+    }
+  }
+  return value;
+}
+
+/**
+ * Genera un código TOTP (HMAC-SHA1) en el cliente. El seed nunca abandona el
+ * dispositivo, por lo que el servidor no puede generar códigos (Zero-Knowledge).
+ *
+ * @param {string} secretBase32 Seed en Base32 o URI otpauth://
+ * @param {{digits?: number, period?: number, timestamp?: number}} [options]
+ */
+export async function generateTOTP(secretBase32, options = {}) {
+  const { digits = 6, period = 30, timestamp = Date.now() } = options;
+  const seed = extractTOTPSeed(secretBase32);
+  if (!seed) throw new Error('Seed TOTP vacío');
+
+  const keyBytes = base32Decode(seed);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+
+  const counter = Math.floor(timestamp / 1000 / period);
+  const buffer = new ArrayBuffer(8);
+  const view = new DataView(buffer);
+  view.setUint32(0, Math.floor(counter / 0x100000000));
+  view.setUint32(4, counter >>> 0);
+
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, buffer));
+  const offset = signature[signature.length - 1] & 0x0f;
+  const binary =
+    ((signature[offset] & 0x7f) << 24) |
+    ((signature[offset + 1] & 0xff) << 16) |
+    ((signature[offset + 2] & 0xff) << 8) |
+    (signature[offset + 3] & 0xff);
+  const otp = binary % (10 ** digits);
+  return otp.toString().padStart(digits, '0');
+}
+
+/**
  * Genera la huella digital estable del dispositivo.
  * Usa el machine-id del servidor como fuente principal, complementado con
  * señales estables del navegador. Evita fuentes frágiles como canvas fingerprint

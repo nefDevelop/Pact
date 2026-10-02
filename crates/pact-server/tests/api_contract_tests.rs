@@ -64,7 +64,7 @@ fn build_router(state: AppState) -> axum::Router {
         .route("/vault/pending-count/:username", get(pact_server::vault::handlers::get_pending_count))
         .route("/vault/upload", post(pact_server::vault::handlers::upload_vault))
         .route("/vault/initialize", post(pact_server::vault::handlers::initialize_vault))
-        .route("/vault/totp/:id", get(pact_server::vault::handlers::get_totp_code))
+        .route("/vault/totp/:id", get(pact_server::vault::handlers::get_totp_seed))
         .route("/vault/accounts/:id/icon", axum::routing::patch(pact_server::vault::handlers::update_account_icon))
         .route("/vault/proxy-icon", get(pact_server::vault::handlers::proxy_icon))
         .route("/sync/run", post(pact_server::sync::handlers::run_sync))
@@ -689,8 +689,10 @@ async fn test_vault_path_get() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "path_user", "pass").await;
     let client = reqwest::Client::new();
     let resp = client.get(format!("{}/vault/config/path", base))
+        .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 }
@@ -776,6 +778,7 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("GET", format!("{}/vault/proxy-icon", base)),
         ("POST", format!("{}/vault/initialize", base)),
         ("POST", format!("{}/vault/upload", base)),
+        ("GET", format!("{}/vault/config/path", base)),
     ];
 
     for (method, url) in endpoints {
@@ -907,7 +910,7 @@ async fn test_register_rejects_unsafe_username() {
 }
 
 #[tokio::test]
-async fn test_totp_code_generation() {
+async fn test_totp_seed_is_stored_opaque() {
     let db = setup_test_db().await;
     let state = build_app_state(db);
     let base = start_test_server(state).await;
@@ -915,12 +918,15 @@ async fn test_totp_code_generation() {
     let token = register_and_login(&base, "totp_user", "pass").await;
     let client = reqwest::Client::new();
 
+    // El cliente envía el seed ya cifrado; el servidor debe devolverlo tal cual
+    // sin descifrarlo ni interpretarlo (Zero-Knowledge).
+    let opaque_seed = "{\"nonce\":\"aa\",\"ciphertext\":\"bb\",\"tag\":\"cc\"}";
     let resp = client.post(format!("{}/vault/accounts", base))
         .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({
             "title": "2FA",
             "encrypted_pass": "p",
-            "totp_seed": "JBSWY3DPEHPK3PXP"
+            "totp_seed": opaque_seed
         }))
         .send().await.unwrap();
     let acc_id: i32 = resp.json().await.unwrap();
@@ -930,9 +936,7 @@ async fn test_totp_code_generation() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
-    let code = body["code"].as_str().unwrap();
-    assert_eq!(code.len(), 6);
-    assert!(code.chars().all(|c| c.is_ascii_digit()), "código TOTP inesperado: {code:?}");
+    assert_eq!(body["seed"], opaque_seed);
 }
 
 #[tokio::test]

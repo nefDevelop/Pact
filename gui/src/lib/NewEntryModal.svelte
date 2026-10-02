@@ -114,6 +114,9 @@
       const encryptedUrl = await encryptE2E(websiteUrl, globalState.masterKey);
       const encryptedUser = await encryptE2E(username, globalState.masterKey);
       const encryptedPass = await encryptE2E(password, globalState.masterKey);
+      const encryptedTotp = totpSeed.trim()
+        ? await encryptE2E(totpSeed.trim(), globalState.masterKey)
+        : null;
 
       if (onSave) {
         const saved = await onSave({
@@ -123,8 +126,8 @@
           url: encryptedUrl,
           username_site: encryptedUser,
           encrypted_pass: encryptedPass,
-          // El seed TOTP se almacena tal cual lo entrega autenticador (Base32).
-          totp_seed: totpSeed.trim() || null,
+          // El seed TOTP se cifra E2E antes de salir del cliente.
+          totp_seed: encryptedTotp,
           is_favorite: entry ? entry.is_favorite : false,
           // Al editar se conserva el icono existente; al crear aún no hay.
           icon_data: entry?.icon_data ?? null

@@ -13,6 +13,7 @@
   import { fly, fade } from 'svelte/transition';
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
+  import { decryptE2E } from './lib/crypto_utils.js';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
   // Soporte para Tauri v2
@@ -47,7 +48,16 @@
 
   async function loadFolders() {
     try {
-      folders = await api.get('/vault/folders');
+      const raw = await api.get('/vault/folders');
+      // Los nombres de carpeta se cifran E2E; se descifran al cargarlos.
+      folders = await Promise.all((raw || []).map(async (f) => {
+        let name = f.name;
+        if (globalState.masterKey && f.name) {
+          const decrypted = await decryptE2E(f.name, globalState.masterKey);
+          if (typeof decrypted === 'string' && decrypted) name = decrypted;
+        }
+        return { ...f, name };
+      }));
     } catch (e) { /* Error manejado por api.js */ }
   }
 

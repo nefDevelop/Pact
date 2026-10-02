@@ -1,6 +1,12 @@
 # Pact: Unified Secure Password Manager (Rust + Tauri)
 
-Pact es un gestor de contraseñas y bóveda digital diseñado bajo el paradigma de **Conocimiento Cero (Zero-Knowledge)** y **Cifrado E2E Real**. El sistema garantiza que la soberanía de las claves criptográficas resida exclusivamente en el cliente, eliminando cualquier posibilidad de acceso a los datos por parte del servidor.
+Pact es un gestor de contraseñas y bóveda digital con **Cifrado E2E real** y un modelo de **conocimiento cero para los secretos**.
+
+- La **MasterKey** se deriva en el cliente con Argon2id y **nunca se envía** al servidor; el servidor solo guarda un verificador de la `AuthKey`.
+- Se cifran E2E en el cliente antes de salir del dispositivo: `title`, `url`, `username_site`, `encrypted_pass`, el **nombre de carpeta**, los **iconos** y la **semilla TOTP** (los códigos se generan en el cliente).
+- El servidor **no puede descifrar** ninguno de esos campos ni generar codes TOTP.
+
+**Límites actuales (no es ZK total):** el servidor todavía ve metadatos estructurales (número de cuentas, favoritos, papelera, versiones y marcas de tiempo) y la configuración de conexión remota (host, usuario y nombre de la BD). El cifrado del contenedor `.pcty` a nivel de archivo está pendiente.
 
 ## Arquitectura Técnica (v2.0)
 
@@ -15,7 +21,7 @@ El motor de seguridad reside en `crates/pact-core`, implementado en Rust para m�
 ### 2. Backend (Rust Server)
 Servidor de alto rendimiento construido con **Axum** y **SQLx**.
 - **Persistencia:** Soporte nativo para **SQLite** (Local) y **MariaDB/MySQL** (Sincronización Remota).
-- **Seguridad:** El servidor es "ciego" (Zero-Knowledge); solo almacena blobs cifrados y nunca ve las claves maestras.
+- **Seguridad:** El servidor no ve los secretos ni las claves maestras; solo almacena blobs cifrados E2E y metadatos estructurales.
 
 ### 3. Interfaz (Tauri + Svelte)
 - **Shell Nativa:** **Tauri v2** proporciona una ventana ligera y segura con acceso a APIs del sistema.

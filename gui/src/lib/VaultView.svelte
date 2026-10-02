@@ -6,7 +6,7 @@
   import AccountCard from './vault/AccountCard.svelte';
   import { globalState } from './state.svelte.js';
   import { api } from './api.js';
-  import { decryptE2E } from './crypto_utils.js';
+  import { decryptE2E, encryptE2E, generateTOTP } from './crypto_utils.js';
   import brandWhitelist from './brand_whitelist.json';
 
   let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onEditEntry, onDatabaseChange, showManager = $bindable() } = $props();
@@ -102,6 +102,8 @@
         const dUrl = acc.url ? await decryptE2E(acc.url, globalState.masterKey) : '';
         const dUser = acc.username_site ? await decryptE2E(acc.username_site, globalState.masterKey) : '';
         const dPass = await decryptE2E(acc.encrypted_pass, globalState.masterKey);
+        // El icono se guarda cifrado E2E; si falla, asumimos formato antiguo.
+        const dIcon = acc.icon_data ? await decryptE2E(acc.icon_data, globalState.masterKey) : null;
 
         return {
           id: acc.id,
@@ -116,7 +118,7 @@
           folder_icon: folder ? folder.icon : 'folder',
           is_favorite: acc.is_favorite,
           is_deleted: !!acc.deleted_at,
-          icon_data: acc.icon_data,
+          icon_data: dIcon || acc.icon_data,
           has_totp: acc.has_totp,
           totp: null 
         };
@@ -192,9 +194,15 @@
 
   async function fetchTOTP(accountId) {
     try {
+      // El servidor devuelve el seed cifrado; lo desciframos y generamos el
+      // código en local (Zero-Knowledge).
       const data = await api.get(`/vault/totp/${accountId}`, { silent: true });
-      items = items.map(item => item.id === accountId ? {...item, totp: data.code} : item);
-    } catch (e) {}
+      if (!data?.seed || !globalState.masterKey) return;
+      const seed = await decryptE2E(data.seed, globalState.masterKey);
+      if (!seed) return;
+      const code = await generateTOTP(String(seed).trim());
+      items = items.map(item => item.id === accountId ? {...item, totp: code} : item);
+    } catch (e) { /* seed ilegible o TOTP inválido */ }
   }
 
   async function updateAllTOTP() {
@@ -249,8 +257,10 @@
   async function saveIconToDB(id, url) {
     try {
       const data = await api.get(`/vault/proxy-icon?url=${encodeURIComponent(url)}`, { silent: true });
-      if (!data.base64) return;
-      await api.patch(`/vault/accounts/${id}/icon`, { icon_data: data.base64 });
+      if (!data.base64 || !globalState.masterKey) return;
+      // El icono se cifra E2E antes de persistirlo (no debe revelar el servicio).
+      const encryptedIcon = await encryptE2E(data.base64, globalState.masterKey);
+      await api.patch(`/vault/accounts/${id}/icon`, { icon_data: encryptedIcon });
       items = items.map(it => it.id === id ? {...it, icon_data: data.base64} : it);
     } catch (e) {}
   }

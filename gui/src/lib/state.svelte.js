@@ -233,6 +233,11 @@ export const globalState = $state({
     if (!this.authToken) return;
     const { api } = await import('./api.js');
     try {
+      // El machine-id ahora requiere sesión; lo obtenemos al autenticar.
+      if (!this.machineId) {
+        const mid = await api.get('/system/machine-id', { silent: true });
+        this.machineId = mid.machine_id;
+      }
       const data = await api.get('/sync/config', { silent: true });
       if (data?.preferred_mode) this.dbMode = data.preferred_mode;
     } catch (e) {

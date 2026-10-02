@@ -41,9 +41,10 @@ Get the current state of the server, including version and active sessions.
 ```
 
 ### Get Machine ID
-`GET /system/machine-id`
+`GET /system/machine-id` *(authenticated)*
 
-Get the unique identifier for the current device.
+Get the unique identifier for the current device. Requires a session so it
+cannot be used as an unauthenticated device fingerprint.
 - **Response**: `200 OK`
 - **Body**: `MachineIdResponse` (JSON)
 ```json
@@ -120,7 +121,9 @@ Terminate the current session.
 ### List Users
 `GET /auth/users`
 
-List all users registered in the local instance.
+List all users registered in the local instance. `vault_path` contains only the
+file name (not the full filesystem path). Available before login so the lock
+screen can list users.
 - **Response**: `200 OK` with `UsersResponse`.
 
 ### Update User
@@ -169,11 +172,12 @@ Retrieve all folders for the authenticated user.
 ### Create Folder
 `POST /vault/folders`
 
-Create a new folder in the vault.
+Create a new folder in the vault. `name` is an **E2E-encrypted blob** produced
+by the client with the MasterKey (the server cannot read it).
 - **Request Body**: `FolderCreate` (JSON)
 ```json
 {
-  "name": "Personal",
+  "name": "{\"nonce\":\"...\",\"ciphertext\":\"...\",\"tag\":\"...\"}",
   "color": "#3498db",
   "icon": "folder"
 }
@@ -206,18 +210,20 @@ default.
 ### Create Account
 `POST /vault/accounts`
 
-Create a new credential entry.
+Create a new credential entry. `title`, `url`, `username_site`,
+`encrypted_pass`, `totp_seed` and `icon_data` are **E2E-encrypted blobs** built
+by the client; the server stores them opaquely.
 - **Request Body**: `AccountCreate` (JSON)
 ```json
 {
   "folder_id": 1,
-  "title": "GitHub",
-  "url": "https://github.com",
-  "username_site": "alice",
-  "encrypted_pass": "...",
-  "totp_seed": null,
+  "title": "{...encrypted...}",
+  "url": "{...encrypted...}",
+  "username_site": "{...encrypted...}",
+  "encrypted_pass": "{...encrypted...}",
+  "totp_seed": "{...encrypted...}",
   "is_favorite": true,
-  "icon_data": "..."
+  "icon_data": "{...encrypted...}"
 }
 ```
 - **Response**: `201 Created` with the new account `ID`.
@@ -261,9 +267,9 @@ Export all user data (folders and accounts) in JSON format. Requires master pass
 - **Response**: `200 OK` with `VaultExport` (JSON).
 
 ### Get Vault Path
-`GET /vault/config/path`
+`GET /vault/config/path` *(authenticated)*
 
-Get the path to the current vault file (e.g., `pact.pcty`).
+Get the full path to the current vault file (e.g., `pact.pcty`).
 - **Response**: `200 OK`
 ```json
 {
@@ -320,12 +326,13 @@ spaces, `-`, `_`).
 - **Request Body**: `{ "name": "my_vault" }`
 - **Response**: `200 OK` with `{ "path": "..." }`.
 
-### Get TOTP Code
+### Get TOTP Seed
 `GET /vault/totp/:id` *(authenticated)*
 
-Generate the current 6-digit TOTP code for an account. The stored seed is
-encrypted at rest; returns `------` if it cannot be processed.
-- **Response**: `200 OK` with `{ "code": "123456" }`.
+Return the **E2E-encrypted** TOTP seed of an account. The client decrypts it
+with the MasterKey and generates the code locally; the server never sees the
+plaintext seed and cannot generate codes.
+- **Response**: `200 OK` with `{ "seed": "{...encrypted...}" }`.
 
 ### Update Account Icon
 `PATCH /vault/accounts/:id/icon` *(authenticated)*

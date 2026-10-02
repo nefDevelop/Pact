@@ -2,7 +2,7 @@
   import { X, User, Shield, Bell, Languages, Clock, Save, Trash2, Database, Download, Server, HardDrive, Settings, Lock, ShieldAlert, Edit2, RefreshCw, Check, Search, Folder, Globe, ChevronRight, Type, Ghost, Gamepad2, Tv, Music, Coffee, Heart, Star, ShoppingBag, Luggage, Wallet, Umbrella, ArrowRightLeft, Plus, Loader2 } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
   import { api } from './api.js';
-  import { encryptWithHardware, safeStorage } from './crypto_utils.js';
+  import { encryptWithHardware, encryptE2E, safeStorage } from './crypto_utils.js';
   import { untrack, tick } from 'svelte';
   import { fade, fly } from 'svelte/transition';
 
@@ -34,8 +34,11 @@
 
   async function saveFolderEdit() {
     if (!editFolderName) return;
+    if (!globalState.masterKey) return;
     try {
-      await api.put(`/vault/folders/${editingFolderId}`, { name: editFolderName, color: editFolderColor });
+      // El nombre se cifra E2E antes de persistirlo.
+      const encryptedName = await encryptE2E(editFolderName.trim(), globalState.masterKey);
+      await api.put(`/vault/folders/${editingFolderId}`, { name: encryptedName, color: editFolderColor });
       editingFolderId = null; 
       onRefreshFolders?.(); 
       globalState.performSync(true);

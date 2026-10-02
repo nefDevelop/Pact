@@ -44,7 +44,16 @@
 - [x] Pestaña de Categorías, bandeja de pendientes, tema persistente, CSP y accesibilidad
 - [x] CI (lint + tests) y tests de componentes Svelte
 
+### Fase 8: Zero-Knowledge real para secretos ✅
+- [x] Nombres de carpeta cifrados E2E (crear/editar/descifrar en cliente)
+- [x] Iconos cifrados E2E en reposo
+- [x] TOTP generado en el cliente; el servidor solo guarda el seed cifrado (`/vault/totp/:id` devuelve el blob)
+- [x] Rutas de la bóveda anonimizadas (`/auth/users` solo nombre de archivo) y `get_vault_path`/`machine-id` requieren sesión
+- [x] Documentación honesta del modelo ZK y sus límites
+
 ### Próximos pasos
+- [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
+- [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)
 - [ ] Cobertura de código (`cargo tarpaulin`) y testing de mutación (`cargo mutants`) en CI
 - [ ] Migraciones y cobertura de tests para MariaDB/MySQL remoto
 - [ ] Empaquetar `pact-server` como sidecar de Tauri (`externalBin`) para la app instalada

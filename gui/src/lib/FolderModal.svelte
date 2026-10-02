@@ -1,6 +1,8 @@
 <script>
   import { Folder, Shield, Lock, Ghost, Gamepad2, Tv, Music, Coffee, Heart, Star, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
   import { api } from './api.js';
+  import { globalState } from './state.svelte.js';
+  import { encryptE2E } from './crypto_utils.js';
   
   let { isOpen = $bindable(), userColor, onFolderCreated } = $props();
   
@@ -26,11 +28,17 @@
 
   async function confirmCreateFolder() {
     if (!newFolderName) return;
+    if (!globalState.masterKey) {
+      globalState.notify('Error de Seguridad', 'La bóveda está bloqueada.', 'error');
+      return;
+    }
     try {
-      await api.post('/vault/folders', { 
-        name: newFolderName, 
-        color: userColor || '#6750A4', 
-        icon: selectedIcon 
+      // El nombre de la carpeta se cifra E2E antes de enviarlo.
+      const encryptedName = await encryptE2E(newFolderName.trim(), globalState.masterKey);
+      await api.post('/vault/folders', {
+        name: encryptedName,
+        color: userColor || '#6750A4',
+        icon: selectedIcon
       });
       newFolderName = '';
       isOpen = false;

@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use crate::db::Database;
-use crate::crypto::SyncCrypto;
 use crate::storage::StorageManager;
 use crate::schemas::{FolderCreate, AccountCreate, AccountQuery, PendingAccount, VaultPath};
 use crate::models::{CreateFolder, CreateAccount};
@@ -15,7 +14,9 @@ use crate::auth::middleware::AuthenticatedUser;
 use crate::error::{AppError, Result};
 
 const MAX_TITLE_LEN: usize = 200;
-const MAX_NAME_LEN: usize = 100;
+// Los nombres de carpeta llegan cifrados E2E, por lo que el límite es holgado
+// (el servidor no puede medir la longitud del texto plano).
+const MAX_NAME_LEN: usize = 2048;
 const MAX_ICON_BYTES: usize = 1024 * 1024; // 1 MB
 
 /// Comprueba si una IP resuelta apunta a un rango privado, loopback o de
@@ -42,10 +43,11 @@ fn is_forbidden_ip(ip: IpAddr) -> bool {
 
 pub async fn get_vault_path(
     State(storage): State<Arc<StorageManager>>,
+    _user: AuthenticatedUser,
 ) -> impl IntoResponse {
     let path = storage.get_path();
-    Json(serde_json::json!({ 
-        "path": path.map(|p| p.to_string_lossy().to_string()) 
+    Json(serde_json::json!({
+        "path": path.map(|p| p.to_string_lossy().to_string())
     }))
 }
 
@@ -258,7 +260,6 @@ pub async fn get_accounts(
 pub async fn create_account(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
     Json(payload): Json<AccountCreate>,
 ) -> Result<impl IntoResponse> {
@@ -289,12 +290,10 @@ pub async fn create_account(
     let id = db.create_account(&new_acc).await?;
     storage.mark_dirty(&session.username);
 
-    // Solo persistimos un ajuste TOTP si el usuario aportó una semilla real.
-    // El seed se cifra en reposo con la clave del servidor (necesaria para
-    // generar los códigos TOTP).
+    // El seed TOTP llega ya cifrado E2E con la MasterKey del cliente. El
+    // servidor solo lo almacena como blob opaco y nunca puede generar códigos.
     if let Some(seed) = payload.totp_seed.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        let encrypted_seed = sync_crypto.encrypt(seed);
-        if let Err(e) = db.create_totp_setting(id, &encrypted_seed, None).await {
+        if let Err(e) = db.create_totp_setting(id, seed, None).await {
             tracing::warn!("[VAULT] No se pudo guardar el seed TOTP de la cuenta {}: {}", id, e);
         }
     }
@@ -536,9 +535,11 @@ pub async fn initialize_vault(
     Ok(Json(serde_json::json!({ "path": path.to_string_lossy().to_string() })))
 }
 
-pub async fn get_totp_code(
+/// Devuelve el seed TOTP **cifrado** de una cuenta. El cliente es el único que
+/// puede descifrarlo con su MasterKey y generar el código; el servidor nunca
+/// ve el seed en claro (Zero-Knowledge).
+pub async fn get_totp_seed(
     State(db): State<Arc<dyn Database>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
     Path(id): Path<i32>,
 ) -> Result<impl IntoResponse> {
@@ -553,11 +554,7 @@ pub async fn get_totp_code(
     let setting = db.get_totp_setting_by_account(id).await?
         .ok_or(AppError::NotFound)?;
 
-    // El seed se guarda cifrado. Fallback a texto plano para datos antiguos.
-    let decrypted = sync_crypto.decrypt(&setting.encrypted_seed);
-    let seed = if decrypted.is_empty() { setting.encrypted_seed.clone() } else { decrypted };
-    let code = crate::vault::totp::get_totp_code(&seed);
-    Ok(Json(serde_json::json!({ "code": code })))
+    Ok(Json(serde_json::json!({ "seed": setting.encrypted_seed })))
 }
 
 pub async fn update_account_icon(

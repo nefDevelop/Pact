@@ -11,6 +11,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use pact_server::{
     db::{Database, SqliteDatabase},
     auth::session::SessionManager,
+    auth::middleware::AuthenticatedUser,
     storage::StorageManager,
     AppState, auth, vault, sync
 };
@@ -179,7 +180,7 @@ async fn main() {
         .route("/vault/pending-count/:username", get(vault::handlers::get_pending_count))
         .route("/vault/upload", post(vault::handlers::upload_vault))
         .route("/vault/initialize", post(vault::handlers::initialize_vault))
-        .route("/vault/totp/:id", get(vault::handlers::get_totp_code))
+        .route("/vault/totp/:id", get(vault::handlers::get_totp_seed))
         .route("/vault/accounts/:id/icon", axum::routing::patch(vault::handlers::update_account_icon))
         .route("/vault/proxy-icon", get(vault::handlers::proxy_icon))
         .route("/sync/run", post(sync::handlers::run_sync))
@@ -234,6 +235,7 @@ async fn status_handler(State(state): State<AppState>) -> Json<StatusResponse> {
 
 async fn machine_id_handler(
     State(state): State<AppState>,
+    _user: AuthenticatedUser,
 ) -> Json<MachineIdResponse> {
     Json(MachineIdResponse {
         machine_id: state.machine_id.clone(),
