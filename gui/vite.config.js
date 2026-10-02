@@ -10,6 +10,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    port: 8088,
+    strictPort: true,
     proxy: {
       '/status': 'http://localhost:8002',
       '/auth': 'http://localhost:8002',

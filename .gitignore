@@ -3,17 +3,14 @@ target/
 target-container/
 **/target-container/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock se versiona: es una aplicación (binaria), no una librería.
 
 # --- NODE / JS ---
 node_modules/
 **/node_modules/
 dist/
-**/dist/
 .svelte-kit/
-**/ .svelte-kit/
 .vercel/
-**/ .vercel/
 .npm/
 .eslintcache
 
@@ -27,7 +24,7 @@ Thumbs.db
 *.sublime-workspace
 .env
 .env.*
-! .env.example
+!.env.example
 
 # --- PACT SPECIFIC ---
 *.db

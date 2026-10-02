@@ -6,10 +6,14 @@ struct ServerProcess(Mutex<Option<std::process::Child>>);
 
 impl Drop for ServerProcess {
     fn drop(&mut self) {
-        if let Some(mut child) = self.0.lock().unwrap().take() {
-            log::info!("Deteniendo pact-server...");
-            let _ = child.kill();
-            let _ = child.wait();
+        // Usamos `if let Ok` para no entrar en pánico si el mutex quedó envenenado
+        // (por ejemplo, si otro hilo panicó mientras lo tenía bloqueado).
+        if let Ok(mut guard) = self.0.lock() {
+            if let Some(mut child) = guard.take() {
+                log::info!("Deteniendo pact-server...");
+                let _ = child.kill();
+                let _ = child.wait();
+            }
         }
     }
 }

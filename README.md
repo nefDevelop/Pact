@@ -27,7 +27,7 @@ Servidor de alto rendimiento construido con **Axum** y **SQLx**.
 
 ### 1. Requisitos Previos
 - **Rust** (Cargo)
-- **Node.js 20+** y **npm**
+- **Node.js 20.19+** y **npm**
 - **Tauri Dependencies** (ver [tauri.app](https://tauri.app/v2/guide/prerequisites))
 
 ### 2. Instalación
@@ -56,9 +56,11 @@ make dev-tauri
 ```
 
 ### C. Compilación para Producción
-Genera el binario optimizado y los instaladores (.deb, AppImage, .exe):
+Genera el binario del servidor y el paquete de escritorio para Linux (`.deb`):
 ```bash
-make build-tauri
+make build          # Servidor + escritorio
+make build-server   # Solo el binario standalone del servidor
+make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
 ```
 
 ---
@@ -67,9 +69,11 @@ make build-tauri
 
 ### Ejecutar Tests
 ```bash
-make test         # Ejecuta todos los tests (Rust + Frontend)
-make test-rs      # Tests específicos del núcleo en Rust
-make test-gui     # Tests criptográficos del frontend (Vitest)
+make test             # Ejecuta todos los tests (Rust + Frontend)
+make test-unit        # Tests unitarios de Rust (cripto + session/ratelimit/db)
+make test-integration # Tests de integración (API, sync, storage, seguridad)
+make test-rs          # Todos los tests de Rust (Core + Server)
+make test-gui         # Tests del frontend (Vitest)
 ```
 
 ### Análisis de Código (Linting)
