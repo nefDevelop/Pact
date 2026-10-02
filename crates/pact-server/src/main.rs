@@ -142,6 +142,22 @@ fn data_dir() -> Option<std::path::PathBuf> {
     }
 }
 
+/// Directorio de datos con reserva: si no se puede determinar (ni por variable
+/// ni por el directorio del usuario), cae al actual en vez de fallar.
+///
+/// El directorio de trabajo solo sirve si es escribible: en el AppImage es el
+/// montaje squashfs de solo lectura.
+fn data_dir_or_cwd() -> std::path::PathBuf {
+    if let Some(dir) = data_dir() {
+        return dir;
+    }
+    tracing::warn!(
+        "No se pudo determinar el directorio de datos; se usa el actual. \
+         Define PACT_DATA_DIR si el proceso no puede escribir en él."
+    );
+    std::path::PathBuf::from(".")
+}
+
 fn read_machine_id() -> String {
     let paths = ["/etc/machine-id", "/var/lib/dbus/machine-id"];
     for path in &paths {
@@ -203,9 +219,19 @@ async fn main() {
     let machine_id = read_machine_id();
     tracing::info!("Machine ID: {}", machine_id);
 
-    // Configuración desde entorno
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:pact.db".to_string());
-    let vault_path = std::env::var("PACT_VAULT_PATH").unwrap_or_else(|_| "pact.pcty".to_string());
+    // Configuración desde entorno.
+    //
+    // Las rutas por defecto van al directorio de datos del usuario, NO al
+    // directorio de trabajo. En el AppImage el CWD es el punto de montaje
+    // squashfs de solo lectura, así que `sqlite:pact.db` relativo fallaba con
+    // "Read-only file system" y el servidor salía con código 1.
+    let default_dir = data_dir_or_cwd();
+    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        format!("sqlite:{}", default_dir.join("pact.db").to_string_lossy())
+    });
+    let vault_path = std::env::var("PACT_VAULT_PATH").unwrap_or_else(|_| {
+        default_dir.join("pact.pcty").to_string_lossy().to_string()
+    });
     let listen_addr = std::env::var("PACT_LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8002".to_string());
     let limiter_cleanup_secs: u64 = std::env::var("PACT_LIMITER_CLEANUP_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
     let flush_interval_secs: u64 = std::env::var("PACT_FLUSH_INTERVAL_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
@@ -222,11 +248,28 @@ async fn main() {
     }
 
     let path = db_url.trim_start_matches("sqlite:");
-    if !std::path::Path::new(path).exists() {
-        tracing::info!("Base de datos no encontrada, creando: {}", path);
-        if let Err(e) = std::fs::File::create(path) {
+    let db_path = std::path::Path::new(path);
+    if let Some(parent) = db_path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                tracing::error!("No se pudo crear el directorio de la DB ({}): {}", parent.display(), e);
+                std::process::exit(1);
+            }
+        }
+    }
+    if !db_path.exists() {
+        tracing::info!("Base de datos no encontrada, creando: {}", db_path.display());
+        if let Err(e) = std::fs::File::create(db_path) {
             tracing::error!("No se pudo crear el archivo de DB: {}", e);
             std::process::exit(1);
+        }
+        // Contiene metadatos de la bóveda: solo el usuario debe leerlo.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) = std::fs::set_permissions(db_path, std::fs::Permissions::from_mode(0o600)) {
+                tracing::warn!("No se pudieron restringir los permisos de {}: {}", db_path.display(), e);
+            }
         }
     }
 

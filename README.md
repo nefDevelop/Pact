@@ -145,11 +145,21 @@ make build-windows  # Instaladores Windows (NSIS + MSI); requiere ejecutarse en 
 ## Despliegue y Producción
 
 ### Datos y permisos
-| Qué | Dónde | Permisos |
-|---|---|---|
-| BD local (`pact.db`) | `$PACT_VAULT_PATH`/CWD o `DATABASE_URL` | `600` — contiene metadatos |
-| Contenedor `.pcty` | ruta elegida por el usuario | `600` |
-| `machine-id` de reserva | `PACT_DATA_DIR` o dir. de datos del usuario | `600` |
+Sin variables de entorno, Pact escribe en el **directorio de datos del usuario**:
+`$XDG_DATA_HOME/pact` (Linux), `%APPDATA%\pact` (Windows) o
+`~/Library/Application Support/pact` (macOS). Ahí van `pact.db`, `pact.pcty` y el
+`machine-id` de reserva.
+
+> Esto es necesario porque en el AppImage el directorio de trabajo es el montaje
+> squashfs de **solo lectura**: con rutas relativas (`sqlite:pact.db`) el
+> servidor fallaba con `Read-only file system` y la app no cargaba. Define
+> `PACT_DATA_DIR` para elegir otra ubicación.
+
+| Qué | Permisos |
+|---|---|
+| `pact.db` (metadatos) | `600`, creado por el servidor |
+| Contenedor `.pcty` | `600` |
+| `machine-id` de reserva | `600` |
 
 Ningún componente cifrado a nivel de disco: proteger el `.pcty` y el `pact.db`
 depende de los permisos del sistema de ficheros (y sigue pendiente el cifrado de
