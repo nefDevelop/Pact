@@ -49,7 +49,7 @@ test-unit: ## Ejecuta unitarias Rust (session, ratelimit, crypto, db)
 	$(CARGO) test -p pact-core
 
 test-integration: ## Ejecuta tests de integración (API, sync, use_cases, storage, security)
-	$(CARGO) test -p pact-server --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests --test mysql_tests
+	$(CARGO) test -p pact-server --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests --test coverage_gap_tests --test mysql_tests
 
 test-wasm: ## Tests de paridad WASM vs nativo (requiere wasm-pack)
 	@command -v wasm-pack >/dev/null 2>&1 || \
@@ -60,8 +60,8 @@ test-mysql: ## Tests de MySQL/MariaDB (requiere PACT_TEST_MYSQL_URL)
 	@test -n "$$PACT_TEST_MYSQL_URL" || (echo "Define PACT_TEST_MYSQL_URL (p. ej. mysql://user:pass@127.0.0.1:3306/pact_test)"; exit 1)
 	$(CARGO) test -p pact-server --test mysql_tests -- --nocapture
 
-coverage: ## Genera reporte de cobertura con tarpaulin (requiere: cargo install cargo-tarpaulin)
-	$(CARGO) tarpaulin --workspace --out Html --output-dir coverage
+coverage: ## Reporte de cobertura con tarpaulin; falla si baja del 80% (requiere: cargo install cargo-tarpaulin)
+	$(CARGO) tarpaulin -p pact-core -p pact-server --out Html --output-dir coverage --fail-under 80
 
 mutants: ## Ejecuta testing de mutación (requiere: cargo install cargo-mutants)
 	$(CARGO) mutants --check

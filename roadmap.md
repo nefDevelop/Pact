@@ -101,7 +101,7 @@ servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 - [x] `pact.machine` en el directorio de datos (no en el CWD)
 - [x] `cargo audit` en `make audit`
 - [x] `[profile.release]` con LTO, `codegen-units=1` y `strip`
-- [ ] Umbral de cobertura y tests de componentes (login, modales)
+- [x] Umbral de cobertura (80%) y tests de componentes (LoginBox, NewEntryModal, SettingsModal)
 
 **Modo web (WASM)**
 - [x] `wasm_derivar_claves_dual` devuelve `master_key`/`auth_key`/`sync_key` en hex, igual que Tauri

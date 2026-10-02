@@ -168,13 +168,48 @@ jobs:
         run: cargo install cargo-tarpaulin --locked
 
       - name: Generate coverage
-        run: cargo tarpaulin -p pact-core -p pact-server --out Xml --output-dir coverage
+        run: cargo tarpaulin -p pact-core -p pact-server --out Xml --output-dir coverage --fail-under 80
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage/
+
+  wasm:
+    name: WASM build & parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
+
+      - name: Install cargo-wasm-pack
+        run: cargo install wasm-pack --locked
+
+      # El cliente web depende de este módulo: si falla el build, el navegador
+      # no puede derivar las claves y el registro/desbloqueo quedan rotos.
+      - name: Build WASM
+        run: make build-wasm
+
+      # Comprueba que el WASM y el código nativo derivan las mismas claves.
+      - name: WASM parity tests
+        run: make test-wasm
 
   mutants:
     name: Mutation testing (cargo-mutants)
