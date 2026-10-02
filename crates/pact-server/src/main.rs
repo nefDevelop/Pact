@@ -290,6 +290,32 @@ async fn main() {
     let session_mgr = Arc::new(SessionManager::new());
     let storage = Arc::new(StorageManager::new(Some(std::path::PathBuf::from(&vault_path))));
 
+    // Bóveda por defecto en el primer arranque. `init_vault` solo se llamaba
+    // desde `POST /vault/config/path`, que usa el flujo de Ajustes, así que tras
+    // crear el primer usuario la app se quedaba con una bóveda "ready" que en
+    // disco no existía: `get_path()` devuelve la ruta configurada sin comprobar
+    // el archivo. Solo se autocrea la ruta por defecto; si `PACT_VAULT_PATH` la
+    // eligió el usuario, no se toca (así una bóveda borrada a mano no reaparece
+    // vacía sin avisar).
+    let uses_default_vault = std::env::var("PACT_VAULT_PATH").is_err();
+    if uses_default_vault && !std::path::Path::new(&vault_path).exists() {
+        match storage.init_vault(std::path::Path::new(&vault_path)) {
+            Ok(()) => {
+                // `File::create` respeta el umask y deja la bóveda en 644,
+                // legible por cualquier usuario del sistema.
+                #[cfg(unix)]
+                if let Err(e) = std::fs::set_permissions(
+                    &vault_path,
+                    <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
+                ) {
+                    tracing::warn!("No se pudo ajustar el permiso de {}: {}", vault_path, e);
+                }
+                tracing::info!("Bóveda creada en {}", vault_path)
+            }
+            Err(e) => tracing::warn!("No se pudo crear la bóveda en {}: {}", vault_path, e),
+        }
+    }
+
     let auth_limiter = pact_server::auth::ratelimit::auth_rate_limiter();
     let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();
 
