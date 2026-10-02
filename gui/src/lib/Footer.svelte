@@ -1,6 +1,7 @@
 <script>
   import { Loader2, Sun, Moon, ArrowRightLeft, HardDrive, Cloud } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
+  import { safeStorage } from './crypto_utils.js';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicInOut } from 'svelte/easing';
@@ -16,6 +17,8 @@
 
   function toggleTheme() {
     globalState.isDark = !globalState.isDark;
+    // Persistimos la preferencia para mantenerla entre sesiones.
+    safeStorage.setItem('pact_theme', globalState.isDark ? 'dark' : 'light');
   }
 
   $effect(() => {
@@ -27,8 +30,11 @@
 
   onMount(() => {
     if (typeof document !== 'undefined') {
-      globalState.isDark = document.documentElement.classList.contains('dark') || 
-                           window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const saved = safeStorage.getItem('pact_theme');
+      if (saved === 'dark') globalState.isDark = true;
+      else if (saved === 'light') globalState.isDark = false;
+      else globalState.isDark = document.documentElement.classList.contains('dark') ||
+                                window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
   });
 

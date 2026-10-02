@@ -35,6 +35,38 @@
   let activeFilter = $state('all'); 
   let loadedIcons = $state({});
   let isInboxOpen = $state(false);
+  let inboxItems = $state([]);
+  let isInboxLoading = $state(false);
+
+  async function openInbox() {
+    isInboxOpen = true;
+    isInboxLoading = true;
+    try {
+      const raw = await api.get('/vault/pending-entries', { silent: true });
+      inboxItems = await Promise.all((raw || []).map(async (item) => {
+        let label = `Entrada pendiente #${item.id}`;
+        if (globalState.masterKey && item.data_blob) {
+          const data = await decryptE2E(item.data_blob, globalState.masterKey);
+          if (typeof data === 'string' && data) label = data;
+          else if (data && typeof data === 'object') label = data.title || data.username_site || label;
+        }
+        return { id: item.id, label, username: item.username };
+      }));
+    } catch (e) {
+      inboxItems = [];
+    } finally {
+      isInboxLoading = false;
+    }
+  }
+
+  async function deleteInboxItem(id) {
+    try {
+      await api.delete(`/vault/pending-entries/${id}`);
+      inboxItems = inboxItems.filter(i => i.id !== id);
+      globalState.pendingCount = Math.max(0, globalState.pendingCount - 1);
+      globalState.notify('Bandeja', 'Elemento descartado.', 'success');
+    } catch (e) { /* api.js ya notifica */ }
+  }
 
   // --- LÓGICA DE NOTIFICACIONES ---
   let totalNotifications = $derived.by(() => {
@@ -298,8 +330,8 @@
           </div>
         </div>
         <div class="flex items-center gap-1 mr-2">
-          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title="Agregar Credencial"><Plus size={18}/></button>
-          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear"><LogOut size={18}/></button>
+          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title="Agregar Credencial" aria-label="Agregar credencial"><Plus size={18}/></button>
+          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear" aria-label="Bloquear sesión"><LogOut size={18}/></button>
         </div>
       </div>
 
@@ -312,7 +344,7 @@
           class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-black/[0.1] dark:border-white/[0.15] outline-none text-[var(--md-on-background)] transition-all" 
         />
         {#if searchQuery.length > 0}
-          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
+          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label="Limpiar búsqueda"><X size={18} /></button>
         {/if}
       </div>
 
@@ -362,7 +394,7 @@
 
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
-        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}">
+        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label="Abrir gestor de bóveda">
           <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
         </button>
       </div>
@@ -373,7 +405,7 @@
       
       <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
-          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2"><ArrowLeft size={20} /></button>
+          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label="Volver al acceso rápido"><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
               <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-black/5 dark:bg-white/[0.1]" />
@@ -385,11 +417,11 @@
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button onclick={() => isInboxOpen = true} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative">
+          <button onclick={openInbox} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative" aria-label="Abrir bandeja de pendientes">
             <Bell size={20} strokeWidth={1.5} />
             {#if totalNotifications > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications}</span>{/if}
           </button>
-          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity"><Settings size={20} strokeWidth={1.5} /></button>
+          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity" aria-label="Abrir ajustes"><Settings size={20} strokeWidth={1.5} /></button>
         </div>
       </header>
 
@@ -512,6 +544,39 @@
             </div>
           {/if}
         {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- BANDEJA DE PENDIENTES (SECURE INBOX) -->
+  {#if isInboxOpen}
+    <div class="fixed inset-0 z-[150] flex items-center justify-center p-6">
+      <button class="absolute inset-0 bg-black/50 backdrop-blur-sm border-none w-full h-full cursor-default" onclick={() => isInboxOpen = false} aria-label="Cerrar bandeja"></button>
+      <div class="w-full max-w-[440px] max-h-[80vh] bg-[var(--md-surface)] rounded-[32px] border border-black/10 dark:border-white/10 relative z-10 flex flex-col overflow-hidden shadow-2xl">
+        <div class="px-6 py-5 flex items-center justify-between border-b border-black/5 dark:border-white/10">
+          <h3 class="text-sm font-black uppercase tracking-[0.2em] opacity-40">Bandeja</h3>
+          <button onclick={() => isInboxOpen = false} class="p-2 rounded-xl hover:bg-black/5" aria-label="Cerrar"><X size={18} /></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+          {#if isInboxLoading}
+            <div class="p-8 text-center text-xs opacity-40">Cargando...</div>
+          {:else if inboxItems.length === 0}
+            <div class="p-8 text-center opacity-40">
+              <Bell size={24} class="mx-auto mb-3 opacity-40" />
+              <p class="text-xs font-bold">No hay elementos pendientes.</p>
+            </div>
+          {:else}
+            {#each inboxItems as it (it.id)}
+              <div class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[var(--md-surface-variant)]">
+                <div class="flex flex-col min-w-0">
+                  <span class="text-xs font-bold truncate">{it.label}</span>
+                  <span class="text-[10px] opacity-30 truncate">{it.username}</span>
+                </div>
+                <button onclick={() => deleteInboxItem(it.id)} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 shrink-0" aria-label="Descartar elemento"><Trash2 size={16} /></button>
+              </div>
+            {/each}
+          {/if}
+        </div>
       </div>
     </div>
   {/if}

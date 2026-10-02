@@ -5,9 +5,6 @@
   import { encryptWithHardware, safeStorage } from './crypto_utils.js';
   import { untrack, tick } from 'svelte';
   import { fade, fly } from 'svelte/transition';
-  import brandWhitelist from './brand_whitelist.json';
-
-  const brandSet = new Set(brandWhitelist);
 
   const iconMap = {
     'folder': Folder, 'shield': Shield, 'lock': Lock, 'ghost': Ghost, 'gamepad2': Gamepad2,
@@ -18,14 +15,6 @@
   let { isOpen = $bindable(), isUnlocked, folders = [], onRefreshFolders, onClose, users = $bindable() } = $props();
 
   let activeTab = $state('users');
-  let language = $state('Español');
-  let autoLock = $state('5 minutos');
-  let isFetching = false;
-
-  export async function refreshConfig() {
-    if (isFetching) return;
-    await loadSyncConfig();
-  }
 
   let isSecureModalOpen = $state(false);
   let secureActionType = $state('delete');
@@ -99,51 +88,6 @@
     await globalState.performSync(true);
   }
 
-  let isWizardActive = $state(false);
-  let accountsForWizard = $state([]);
-  let wizardIndex = $state(0);
-  let wizardUrl = $state('');
-  let isWizardIconLoaded = $state(false);
-
-  async function startIconWizard() {
-    globalState.isSyncing = true;
-    try {
-      const allAccs = await api.get('/vault/accounts?include_deleted=false');
-      accountsForWizard = allAccs.filter(acc => {
-        if (!acc.url) return true;
-        const domain = acc.url.toLowerCase().trim().replace('https://', '').replace('http://', '').split('/')[0];
-        return !brandSet.has(domain);
-      });
-      if (accountsForWizard.length > 0) {
-        wizardIndex = 0;
-        wizardUrl = accountsForWizard[0].url || '';
-        isWizardActive = true;
-      } else {
-        globalState.notify('Identidad', 'Todas tus cuentas ya tienen identidades visuales optimizadas.', 'success');
-      }
-    } catch (error) { console.error('Error cargando cuentas para asistente:', error); }
-    finally { globalState.isSyncing = false; }
-  }
-
-  async function applyWizardUpdate(useLogo) {
-    const acc = accountsForWizard[wizardIndex];
-    globalState.isSyncing = true;
-    try {
-      const finalUrl = useLogo ? (wizardUrl || acc.title).toLowerCase().trim() : 'none';
-      await api.put(`/vault/accounts/${acc.id}`, { url: finalUrl });
-      isWizardIconLoaded = false;
-      if (wizardIndex < accountsForWizard.length - 1) {
-        wizardIndex++;
-        wizardUrl = accountsForWizard[wizardIndex].url === 'none' ? '' : (accountsForWizard[wizardIndex].url || '');
-      } else {
-        isWizardActive = false;
-        globalState.notify('Éxito', '¡Revisión de identidad completada!', 'success');
-      }
-    } catch (error) { console.error('Error en asistente:', error); }
-    finally { globalState.isSyncing = false; }
-  }
-
-  function handleWizardIconLoad() { isWizardIconLoaded = true; }
   function handleAvatarError(e) {
     const img = e.currentTarget;
     img.style.display = 'none';
@@ -310,6 +254,12 @@
     finally { isSavingDb = false; }
   }
 
+  function handleAutoLockChange() {
+    // Persistimos la preferencia y reiniciamos el temporizador de inactividad.
+    safeStorage.setItem('pact_autoLockMinutes', String(globalState.autoLockMinutes));
+    globalState.resetInactivityTimer();
+  }
+
   async function handleSecureAction() {
     if (!masterPasswordConfirm || !targetUser) return;
     globalState.isSyncing = true;
@@ -321,23 +271,21 @@
         isSecureModalOpen = false;
         if (globalState.selectedUser?.name === targetUser.name) { globalState.resetSessionState(); window.dispatchEvent(new CustomEvent('pact:force-lock')); }
       } else {
-        const response = await fetch('/vault/export', { 
-            method: 'POST', 
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${globalState.authToken}`
-            }, 
-            body: JSON.stringify({ username: targetUser.name, master_password: masterPasswordConfirm }) 
+        // Usamos el cliente API (respeta API_BASE y el token Bearer) en lugar
+        // de un fetch relativo que fallaba bajo el esquema tauri://.
+        const data = await api.post('/vault/export', {
+          username: targetUser.name,
+          master_password: masterPasswordConfirm
         });
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url;
-          a.download = `pact_export_${targetUser.name}.json`;
-          document.body.appendChild(a); a.click(); a.remove();
-          isSecureModalOpen = false;
-          globalState.notify('Exportar', 'Copia descargada.', 'success');
-        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pact_export_${targetUser.name}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+        isSecureModalOpen = false;
+        globalState.notify('Exportar', 'Copia descargada.', 'success');
       }
     } catch (error) { console.error(error); }
     finally { globalState.isSyncing = false; }
@@ -394,6 +342,43 @@
                 </div>
               {/each}
             </div>
+          {:else if activeTab === 'categories'}
+            <div class="space-y-4 pb-32">
+              {#if folders.filter(f => f.uid !== 'system-trash').length === 0}
+                <div class="p-8 rounded-[32px] border border-dashed border-black/10 dark:border-white/10 text-center opacity-40">
+                  <Folder size={28} class="mx-auto mb-3 opacity-40" />
+                  <p class="text-xs font-bold">Aún no hay categorías.</p>
+                  <p class="text-[10px] opacity-60 mt-1">Créalas desde la barra lateral de la bóveda.</p>
+                </div>
+              {:else}
+                {#each folders.filter(f => f.uid !== 'system-trash') as f (f.id)}
+                  {@const FolderIcon = iconMap[f.icon] || Folder}
+                  <div class="w-full min-h-[4.5rem] py-3 bg-[var(--md-surface-variant)] rounded-3xl px-4 md:px-6 flex items-center justify-between gap-4 border border-black/[0.02] dark:border-white/[0.05] hover:border-[var(--md-primary)]/20 transition-all">
+                    {#if editingFolderId === f.id}
+                      <div class="flex items-center gap-3 flex-1">
+                        <input bind:value={editFolderName} class="flex-1 h-11 bg-[var(--md-surface)] rounded-xl px-4 text-sm font-bold outline-none" placeholder="Nombre" aria-label="Nombre de la categoría" />
+                        <input type="color" bind:value={editFolderColor} class="w-8 h-8 rounded-full cursor-pointer border-none bg-transparent" aria-label="Color de la categoría" />
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button onclick={saveFolderEdit} class="p-2 rounded-xl bg-green-500/10 text-green-600 hover:bg-green-500/20" aria-label="Guardar categoría"><Check size={16} strokeWidth={3} /></button>
+                        <button onclick={() => editingFolderId = null} class="p-2 rounded-xl hover:bg-black/5" aria-label="Cancelar edición"><X size={16} /></button>
+                      </div>
+                    {:else}
+                      <div class="flex items-center gap-4 flex-1 min-w-0">
+                        <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white" style="background-color: {f.color || globalState.userColor}">
+                          <FolderIcon size={18} />
+                        </div>
+                        <span class="text-sm font-bold truncate">{f.name}</span>
+                      </div>
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button onclick={() => { editingFolderId = f.id; editFolderName = f.name; editFolderColor = f.color || '#6750A4'; }} class="p-2 rounded-xl hover:bg-black/5" aria-label="Editar categoría"><Edit2 size={16} /></button>
+                        <button onclick={() => deleteFolder(f.id)} class="p-2 rounded-xl hover:bg-red-500/10 text-red-500" aria-label="Eliminar categoría"><Trash2 size={16} /></button>
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              {/if}
+            </div>
           {:else if activeTab === 'general'}
             <div class="space-y-8 pb-32">
               <div class="p-6 md:p-8 rounded-3xl md:rounded-[32px] border border-[var(--md-outline-variant)]/50 dark:border-white/10 bg-[var(--md-surface-variant)] space-y-4 md:space-y-6">
@@ -403,7 +388,7 @@
                     <span class="text-sm font-bold">Bloqueo Automático</span>
                     <span class="text-[9px] opacity-30 uppercase font-black">Cerrar sesión por inactividad</span>
                   </div>
-                  <select bind:value={globalState.autoLockMinutes} class="h-11 px-4 rounded-xl bg-[var(--md-surface)] text-xs font-bold border border-[var(--md-outline-variant)]/30 outline-none focus:border-[var(--md-primary)]/30 focus:ring-2 focus:ring-[var(--md-primary)]/10 transition-all appearance-none cursor-pointer" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%23666%22><path d=%22M5 8l5 5 5-5%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
+                  <select bind:value={globalState.autoLockMinutes} onchange={handleAutoLockChange} class="h-11 px-4 rounded-xl bg-[var(--md-surface)] text-xs font-bold border border-[var(--md-outline-variant)]/30 outline-none focus:border-[var(--md-primary)]/30 focus:ring-2 focus:ring-[var(--md-primary)]/10 transition-all appearance-none cursor-pointer" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%23666%22><path d=%22M5 8l5 5 5-5%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
                     <option value={0}>Nunca</option>
                     <option value={1}>1 minuto</option>
                     <option value={2}>2 minutos</option>
