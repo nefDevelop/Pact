@@ -39,7 +39,7 @@
 </script>
 
 <div 
-  class="bg-[var(--md-surface)] rounded-[32px] p-6 border border-border flex flex-col gap-4 animate-in slide-in-from-bottom-4 text-left w-full transition-[background-color,border-color,opacity]"
+  class="bg-[var(--md-surface-1)] rounded-[32px] p-6 border border-border flex flex-col gap-4 animate-in slide-in-from-bottom-4 text-left w-full shadow-elev-1 transition-[background-color,border-color,opacity]"
   style="--hover-border: {userColor}1a; {expanded ? `background-color: ${userColor}0d; border-color: ${userColor}1a;` : ''}"
   onmouseenter={(e) => !expanded && (e.currentTarget.style.borderColor = 'var(--hover-border)')}
   onmouseleave={(e) => !expanded && (e.currentTarget.style.borderColor = '')}
@@ -82,9 +82,9 @@
         </div>
         <div class="flex items-center gap-2">
           {#if item.folder_id && item.folder_id > 1}
-            <FolderIcon size={10} class="opacity-30" />
+            <FolderIcon size={10} class="opacity-40" />
           {/if}
-          <span class="text-[10px] opacity-30 font-medium truncate">{item.website}</span>
+          <span class="text-[10px] text-[var(--md-on-surface-variant)] font-medium truncate">{item.website}</span>
         </div>
       </div>
     </div>
@@ -159,7 +159,7 @@
             <span class="text-xs font-mono font-black tracking-[0.3em] opacity-60">{item.totp}</span>
           </div>
           <div class="flex items-center gap-3 relative z-10">
-            <span class="text-[9px] font-black opacity-20 font-mono">{totpSeconds}s</span>
+            <span class="text-[9px] font-black text-[var(--md-on-surface-variant)] font-mono">{totpSeconds}s</span>
             <button onclick={() => copyToClipboard(item.totp, i18n.t('common.copyTotp'))} class="p-2 opacity-20 hover:opacity-100 transition-opacity" title={i18n.t('common.copyTotp')} aria-label={i18n.t('common.copyTotp')}><Copy size={14}/></button>
           </div>
           <div class="absolute bottom-0 left-0 h-[2px] transition-all" style="width: {totpProgress}%; background-color: {userColor}; opacity: 0.3;"></div>

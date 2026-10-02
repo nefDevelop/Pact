@@ -60,35 +60,42 @@ export const applyM3Palette = (hex, isDark) => {
     setProp('on-secondary-container', isDark ? 90 : 10, sOffset);
 
     // Background & Surface
-    root.style.setProperty('--md-background', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 6 : 98}%)`);
+    // Canvas: en claro queda claramente por debajo de las superficies (91%), de
+    // modo que el blanco de paneles y tarjetas recorta sobre el fondo. El tinte
+    // es bajo a propósito (10%) para que el lienzo sea un gris roto, no lavanda.
+    root.style.setProperty('--md-background', `hsl(${h}, ${isDark ? 12 : 10}%, ${isDark ? 9 : 91}%)`);
     root.style.setProperty('--md-on-background', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 90 : 10}%)`);
     
-    root.style.setProperty('--md-surface', `hsl(${h}, ${isDark ? 8 : 10}%, ${isDark ? 10 : 100}%)`);
+    root.style.setProperty('--md-surface', `hsl(${h}, ${isDark ? 8 : 10}%, ${isDark ? 13 : 100}%)`);
     root.style.setProperty('--md-on-surface', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 90 : 10}%)`);
     
-    root.style.setProperty('--md-surface-variant', `hsl(${h}, ${isDark ? 12 : 14}%, ${isDark ? 20 : 92}%)`);
+    root.style.setProperty('--md-surface-variant', `hsl(${h}, ${isDark ? 12 : 14}%, ${isDark ? 25 : 88}%)`);
     root.style.setProperty('--md-on-surface-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 80 : 30}%)`);
 
     // Outline
-    root.style.setProperty('--md-outline', `hsl(${h}, ${isDark ? 10 : 12}%, 50%)`);
-    root.style.setProperty('--md-outline-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 30 : 84}%)`);
+    root.style.setProperty('--md-outline', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 55 : 55}%)`);
+    root.style.setProperty('--md-outline-variant', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 32 : 76}%)`);
 
     // Borde semántico (estilo mixto, sutil) y superficies de elevación M3.
-    root.style.setProperty('--md-border', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 26 : 90}%)`);
-    root.style.setProperty('--md-surface-1', `hsl(${h}, ${isDark ? 9 : 14}%, ${isDark ? 12 : 99}%)`);
-    root.style.setProperty('--md-surface-2', `hsl(${h}, ${isDark ? 10 : 16}%, ${isDark ? 14 : 98}%)`);
-    root.style.setProperty('--md-surface-3', `hsl(${h}, ${isDark ? 12 : 18}%, ${isDark ? 17 : 97}%)`);
+    // En oscuro la separación se consigue con tinte de superficie + borde,
+    // porque la sombra negra es invisible sobre el fondo.
+    root.style.setProperty('--md-border', `hsl(${h}, ${isDark ? 10 : 12}%, ${isDark ? 34 : 80}%)`);
+    root.style.setProperty('--md-surface-1', `hsl(${h}, ${isDark ? 9 : 14}%, ${isDark ? 16 : 98.5}%)`);
+    root.style.setProperty('--md-surface-2', `hsl(${h}, ${isDark ? 10 : 16}%, ${isDark ? 19 : 97.5}%)`);
+    root.style.setProperty('--md-surface-3', `hsl(${h}, ${isDark ? 12 : 18}%, ${isDark ? 22 : 96}%)`);
 
-    // Elevación: en claro, sombras tenues; en oscuro, sombras muy suaves (la
-    // superficie tintada hace el trabajo principal).
+    // Elevación: en oscuro, sombra suave + realce superior (inset) que hace legible
+    // el nivel de altura; en claro, sombras tintadas con el hue de la semilla.
+    // Escala contenida a propósito: con el lienzo ya separado por tinte, una
+    // sombra fuerte se acumula y ensucia los elementos grandes.
     if (isDark) {
-        root.style.setProperty('--elev-1', '0 1px 2px rgba(0, 0, 0, 0.35)');
-        root.style.setProperty('--elev-2', '0 2px 8px rgba(0, 0, 0, 0.40)');
-        root.style.setProperty('--elev-3', '0 8px 24px rgba(0, 0, 0, 0.45)');
+        root.style.setProperty('--elev-1', 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35)');
+        root.style.setProperty('--elev-2', 'inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 3px 10px rgba(0, 0, 0, 0.40)');
+        root.style.setProperty('--elev-3', 'inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 26px rgba(0, 0, 0, 0.50)');
     } else {
-        root.style.setProperty('--elev-1', `0 1px 2px hsl(${h} 30% 20% / 0.04), 0 1px 3px hsl(${h} 30% 20% / 0.04)`);
-        root.style.setProperty('--elev-2', `0 2px 6px hsl(${h} 30% 20% / 0.05), 0 1px 2px hsl(${h} 30% 20% / 0.04)`);
-        root.style.setProperty('--elev-3', `0 6px 16px hsl(${h} 30% 20% / 0.07), 0 2px 4px hsl(${h} 30% 20% / 0.04)`);
+        root.style.setProperty('--elev-1', `0 1px 2px hsl(${h} 30% 18% / 0.05), 0 1px 3px hsl(${h} 30% 18% / 0.04)`);
+        root.style.setProperty('--elev-2', `0 3px 8px hsl(${h} 30% 18% / 0.07), 0 1px 3px hsl(${h} 30% 18% / 0.04)`);
+        root.style.setProperty('--elev-3', `0 10px 26px hsl(${h} 30% 18% / 0.10), 0 3px 6px hsl(${h} 30% 18% / 0.05)`);
     }
 
     // Error

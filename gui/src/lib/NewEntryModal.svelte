@@ -166,9 +166,9 @@
       <div class="flex flex-col">
         <div class="flex items-center gap-3">
           <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{isEditing ? i18n.t('entry.edit') : i18n.t('entry.new')}</h3>
-          {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[#6750A4]/10 text-[#6750A4] text-[7px] font-black uppercase tracking-tighter border border-[var(--md-primary)]/20 animate-pulse">Rápida</span>{/if}
+          {#if !isEditing && mode === 'quick'}<span class="px-2 py-0.5 rounded-md bg-[var(--md-primary)]/10 text-[var(--md-primary)] text-[7px] font-black uppercase tracking-tighter border border-[var(--md-primary)]/20 animate-pulse">Rápida</span>{/if}
         </div>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{isEditing ? i18n.t('entry.editSubtitle') : i18n.t('entry.addSubtitle')}</p>
+        <p class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{isEditing ? i18n.t('entry.editSubtitle') : i18n.t('entry.addSubtitle')}</p>
       </div>
       <button onclick={onClose} class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors opacity-40 hover:opacity-100" aria-label="Cerrar">
         <X size={20} />
@@ -182,19 +182,19 @@
             {title ? title.substring(0, 2).toUpperCase() : '?'}
           </div>
           <div class="flex-1 space-y-1.5">
-            <label for="e-title" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2">{i18n.t('entry.service')}</label>
+            <label for="e-title" class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] px-2">{i18n.t('entry.service')}</label>
             <input id="e-title" bind:value={title} placeholder="Ej. GitHub" class="w-full h-11 bg-[var(--md-surface-variant)] rounded-xl px-4 outline-none font-bold text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] transition-all" />
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <label for="e-user" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><User size={10}/> {i18n.t('entry.user')}</label>
+          <label for="e-user" class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] px-2 flex items-center gap-2"><User size={10}/> {i18n.t('entry.user')}</label>
           <input id="e-user" bind:value={username} placeholder="nombre@ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] transition-all" />
         </div>
 
         <div class="space-y-3">
           <div class="flex justify-between items-center px-2">
-            <label for="e-pass" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Lock size={10}/> {i18n.t('entry.password')}</label>
+            <label for="e-pass" class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] flex items-center gap-2"><Lock size={10}/> {i18n.t('entry.password')}</label>
             {#if password}
               <span class="text-[8px] font-black uppercase tracking-tighter {isCriticallyWeak ? 'text-red-600 animate-pulse' : (passwordStrength >= 4 ? 'text-blue-500' : 'opacity-40')}">
                 {strengthText[passwordStrength]}
@@ -204,7 +204,7 @@
           <div class="relative">
             <input id="e-pass" type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="••••••••" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-24 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30 text-[var(--md-on-background)] {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.generate')} aria-label={i18n.t('entry.generate')}><Dice5 size={16}/></button>
+              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[var(--md-primary)]/10 text-[var(--md-primary)] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.generate')} aria-label={i18n.t('entry.generate')}><Dice5 size={16}/></button>
               <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all" aria-label={showPassword ? i18n.t('entry.hidePassword') : i18n.t('entry.showPassword')}>
                 {#if showPassword} <EyeOff size={16} /> {:else} <Eye size={16} /> {/if}
               </button>
@@ -219,7 +219,7 @@
           {:else}
             <div class="flex gap-1.5 h-1 px-2">
               {#each Array(4) as _, i}
-                <div class="flex-1 rounded-full transition-all {i < passwordStrength && password ? strengthColors[passwordStrength] : 'bg-black/5 dark:bg-white/5'}"></div>
+                <div class="flex-1 rounded-full transition-all {i < passwordStrength && password ? strengthColors[passwordStrength] : 'bg-[var(--md-surface-variant)]'}"></div>
               {/each}
             </div>
             <div class="grid grid-cols-4 gap-1 px-2">
@@ -239,7 +239,7 @@
 
         <div class="space-y-1.5">
           <div class="flex justify-between items-center px-2">
-            <label for="e-2fa" class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><KeyRound size={10}/> {i18n.t('entry.totpLabel')}</label>
+            <label for="e-2fa" class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] flex items-center gap-2"><KeyRound size={10}/> {i18n.t('entry.totpLabel')}</label>
             {#if totpSeed && !isSeedValid}
               <span class="text-[8px] font-black uppercase tracking-tighter text-red-600 animate-pulse">{i18n.t('entry.totpInvalid')}</span>
             {:else if totpSeed && isSeedValid}
@@ -261,7 +261,7 @@
           {/if}
           <div class="relative">
             <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[var(--md-primary)]/30 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
-            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.paste')} aria-label={i18n.t('entry.paste')}>
+            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[var(--md-primary)]/10 text-[var(--md-primary)] opacity-60 hover:opacity-100 transition-all" title={i18n.t('entry.paste')} aria-label={i18n.t('entry.paste')}>
               <ClipboardPaste size={16} />
             </button>
           </div>
@@ -290,33 +290,33 @@
         {#if showAdvanced}
           <div class="space-y-6 animate-in slide-in-from-top-2">
             <div class="space-y-1.5">
-              <label for="e-web" class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Globe size={10}/> {i18n.t('entry.website')}</label>
+              <label for="e-web" class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] px-2 flex items-center gap-2"><Globe size={10}/> {i18n.t('entry.website')}</label>
               <input id="e-web" bind:value={website} placeholder="https://ejemplo.com" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl px-5 outline-none text-sm border border-transparent focus:border-[var(--md-primary)]/30" />
             </div>
 
             <div class="space-y-3">
-              <span class="text-[9px] font-black uppercase tracking-widest opacity-30 px-2 flex items-center gap-2"><Palette size={10}/> {i18n.t('entry.color')}</span>
+              <span class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] px-2 flex items-center gap-2"><Palette size={10}/> {i18n.t('entry.color')}</span>
               <div class="flex flex-wrap gap-3 px-2">
                 {#each colors as c}
-                  <button aria-label="Elegir color {c}" onclick={() => color = c} class="w-7 h-7 rounded-full transition-all hover:scale-110 {color === c ? 'ring-2 ring-[#6750A4] ring-offset-4 dark:ring-offset-[#16151a]' : ''}" style="background-color: {c}"></button>
+                  <button aria-label="Elegir color {c}" onclick={() => color = c} class="w-7 h-7 rounded-full transition-all hover:scale-110 {color === c ? 'ring-2 ring-[var(--md-primary)] ring-offset-4 dark:ring-offset-[#16151a]' : ''}" style="background-color: {c}"></button>
                 {/each}
               </div>
             </div>
 
             <div class="space-y-3">
               <div class="flex justify-between items-center px-2">
-                <span class="text-[9px] font-black uppercase tracking-widest opacity-30 flex items-center gap-2"><Folder size={10}/> {i18n.t('entry.category')}</span>
-                <button onclick={onOpenNewFolder} class="text-[8px] font-black uppercase tracking-widest text-[#6750A4] hover:opacity-100 transition-opacity flex items-center gap-1">
+                <span class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] flex items-center gap-2"><Folder size={10}/> {i18n.t('entry.category')}</span>
+                <button onclick={onOpenNewFolder} class="text-[8px] font-black uppercase tracking-widest text-[var(--md-primary)] hover:opacity-100 transition-opacity flex items-center gap-1">
                   <Plus size={10}/> {i18n.t('entry.newCategory')}
                 </button>
               </div>
 
               <div class="grid grid-cols-2 gap-2">
-                <button onclick={() => folderId = null} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === null ? 'bg-[#6750A4] text-white border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
+                <button onclick={() => folderId = null} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === null ? 'bg-[var(--md-primary)] text-[var(--md-on-primary)] border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
                   {i18n.t('common.none')}
                 </button>
                 {#each folders.filter(f => f.uid !== 'system-trash') as f}
-                  <button onclick={() => folderId = f.id} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === f.id ? 'bg-[#6750A4] text-white border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
+                  <button onclick={() => folderId = f.id} class="h-10 rounded-xl border transition-all text-[9px] font-bold uppercase tracking-widest {folderId === f.id ? 'bg-[var(--md-primary)] text-[var(--md-on-primary)] border-[var(--md-primary)] shadow-elev-1 ' : 'border-border opacity-40 hover:opacity-100'}">
                     {f.name}
                   </button>
                 {/each}

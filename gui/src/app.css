@@ -41,18 +41,27 @@
   --font-ui: 'Outfit', sans-serif;
   
   /* Fallbacks por si no hay paleta generada aún */
-  --md-background: #f6f8fb;
+  --md-background: #e4e2e8;
+  --md-on-background: #1c1b1f;
   --md-surface: #ffffff;
-  --md-surface-1: #fdfdfe;
-  --md-surface-2: #fbfbfd;
-  --md-surface-3: #f8f8fb;
+  --md-on-surface: #1c1b1f;
+  --md-surface-1: #fcfbfd;
+  --md-surface-2: #faf9fb;
+  --md-surface-3: #f5f4f6;
+  --md-surface-variant: #e0dee4;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #8a8590;
+  --md-outline-variant: #c8c5cc;
   --md-primary: #6750A4;
-  --md-border: rgba(0, 0, 0, 0.07);
+  --md-on-primary: #ffffff;
+  --md-primary-container: #eaddff;
+  --md-on-primary-container: #21005d;
+  --md-border: rgba(0, 0, 0, 0.16);
 
-  /* Elevación sutil (se recalcula en theme.js por tema) */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.04);
-  --elev-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --elev-3: 0 6px 16px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  /* Elevación (se recalcula en theme.js por tema) */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elev-2: 0 3px 8px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elev-3: 0 10px 26px rgba(0, 0, 0, 0.10), 0 3px 6px rgba(0, 0, 0, 0.05);
 }
 
 /* Base Tonal */

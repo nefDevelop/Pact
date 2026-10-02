@@ -53,7 +53,7 @@
     <div class="w-px md:w-auto h-8 md:h-px bg-black/[0.1] dark:bg-white/[0.1] my-auto md:my-4 mx-2 shrink-0"></div>
     
     <div class="hidden lg:flex items-center justify-between px-4 mb-2 shrink-0">
-      <p class="text-[8px] font-black uppercase tracking-[0.2em] opacity-20">{i18n.t('sidebar.folders')}</p>
+      <p class="text-[8px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)]">{i18n.t('sidebar.folders')}</p>
       <button 
         onclick={onOpenNewFolder} 
         class="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 opacity-20 hover:opacity-100 transition-colors" 
@@ -84,7 +84,7 @@
     {#if activeFilter === 'trash'}
       <button 
         onclick={onEmptyTrash}
-        class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all bg-red-600 text-white shadow-elev-2 shadow-red-500/20 active:scale-95 group shrink-0"
+        class="w-12 md:w-full h-11 rounded-xl flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-4 transition-all bg-red-600 text-white shadow-elev-1 shadow-red-500/20 active:scale-95 group shrink-0"
       >
         <Trash2 size={16} class="group-hover:scale-110 transition-transform" />
         <span class="hidden lg:block font-ui font-bold text-[9px] uppercase tracking-widest">{i18n.t('sidebar.emptyTrash')}</span>

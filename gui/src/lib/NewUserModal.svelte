@@ -216,7 +216,7 @@
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">
         <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{i18n.t('userModal.title')}</h3>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">{i18n.t('userModal.subtitle')}</p>
+        <p class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{i18n.t('userModal.subtitle')}</p>
       </div>
       <button 
         onclick={onClose}
@@ -260,7 +260,7 @@
             type="text" 
             bind:value={name}
             placeholder="Ej. Neftali"
-            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
+            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
           />
         </div>
       </div>
@@ -268,7 +268,7 @@
       <!-- Master Password Section -->
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
-          <label for="master-pass" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">
+          <label for="master-pass" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
             <Lock size={10} /> {i18n.t('userModal.masterPassword')}
           </label>
           {#if password}
@@ -284,12 +284,12 @@
             type={showPassword ? 'text' : 'password'}
             bind:value={password}
             placeholder="Introduce una clave fuerte..."
-            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
+            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
           />
           <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button 
               onclick={generatePassphrase}
-              class="p-2.5 rounded-xl hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all"
+              class="p-2.5 rounded-xl hover:bg-[var(--md-primary)]/10 text-[var(--md-primary)] opacity-60 hover:opacity-100 transition-all"
               title="Generar frase segura"
               aria-label="Generar frase segura"
             >
@@ -332,7 +332,7 @@
 
         <div class="flex gap-1 h-1 px-2">
           {#each Array(4) as _, i}
-            <div class="flex-1 rounded-full transition-all  {i < passwordStrength && password && !isCriticallyWeak ? strengthColors[passwordStrength] : (isCriticallyWeak && i === 0 ? strengthColors[0] : 'bg-black/5 dark:bg-white/5')}"></div>
+            <div class="flex-1 rounded-full transition-all  {i < passwordStrength && password && !isCriticallyWeak ? strengthColors[passwordStrength] : (isCriticallyWeak && i === 0 ? strengthColors[0] : 'bg-[var(--md-surface-variant)]')}"></div>
           {/each}
         </div>
       </div>
@@ -340,7 +340,7 @@
       <!-- Visual Customization -->
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
-          <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30">
+          <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
             <Palette size={10} /> {i18n.t('userModal.identify')}
           </span>
           <button 
@@ -375,8 +375,8 @@
       {#if isRegistering}
         <div class="flex items-center gap-4 pr-4 animate-in fade-in slide-in-from-right-4">
           <div class="flex flex-col items-end">
-            <span class="text-[10px] font-black uppercase tracking-widest text-[#6750A4]">Cifrado de Grado Militar</span>
-            <span class="text-[9px] opacity-40 font-bold uppercase">Procesando Argon2id...</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-[var(--md-primary)]">Cifrado de Grado Militar</span>
+            <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase">Procesando Argon2id...</span>
           </div>
           <div class="w-10 h-10 rounded-full border-4 border-[var(--md-primary)] border-t-[var(--md-primary)] animate-spin"></div>
         </div>

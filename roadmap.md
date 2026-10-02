@@ -75,11 +75,18 @@
 - [x] Cobertura (tarpaulin) y testing de mutación (cargo-mutants) en CI
 - [x] Tests de endpoints pendientes (`/vault/initialize`, etc.)
 
+### Fase 13: Sistema de color y jerarquía visual ✅
+- [x] Tokens semánticos de borde (`border-border`), superficies (`--md-surface-*`) y elevación (`shadow-elev-1/2/3`) en `theme.js` + `app.css`
+- [x] Escalera tonal correcta: lienzo fuera de la escalera de superficies (claro 91% / oscuro 9%) para que nada se pise
+- [x] Elevación visible pero contenida: sombras tintadas con el hue de la semilla en claro; realce `inset` en oscuro
+- [x] Contraste de textos secundarios con `--md-on-surface-variant` (sustituye `opacity-20/30/40` que desaparecía en oscuro)
+- [x] Acento unificado a `var(--md-primary)`/`--md-on-primary` (fin de los `#6750A4` hardcodeados)
+- [x] Eliminación de colores sueltos (`bg-white`, `bg-black/5`) a favor de tokens
+
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)
-- [ ] Cobertura de código (`cargo tarpaulin`) y testing de mutación (`cargo mutants`) en CI
 - [ ] Migraciones y cobertura de tests para MariaDB/MySQL remoto
 - [ ] Fallback WebCrypto/WASM para el modo navegador
-- [ ] i18n (es/en) y tests E2E de UI
+- [ ] Tests E2E de UI
 

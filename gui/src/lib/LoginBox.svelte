@@ -101,7 +101,7 @@
       <div class="flex items-center gap-3 mt-2">
         <div class="flex items-center gap-2">
           <Lock size={12} class="opacity-40" style="color: {user.color}" />
-          <span class="text-[10px] font-ui font-medium uppercase tracking-widest opacity-40" style="color: var(--md-on-surface)">{i18n.t('login.locked')}</span>
+          <span class="text-[10px] font-ui font-medium uppercase tracking-widest" style="color: var(--md-on-surface-variant)">{i18n.t('login.locked')}</span>
         </div>
       </div>
     </div>

@@ -26,6 +26,7 @@ Servidor de alto rendimiento construido con **Axum** y **SQLx**.
 ### 3. Interfaz (Tauri + Svelte)
 - **Shell Nativa:** **Tauri v2** proporciona una ventana ligera y segura con acceso a APIs del sistema.
 - **Frontend:** Construido con **Svelte 5** y **Tailwind CSS**, siguiendo los principios de **Material Design 3 (M3)**.
+- **Tema/color:** la paleta tonal se deriva del color del usuario (`theme.js`); bordes, superficies y elevaciones usan tokens semánticos (`border-border`, `shadow-elev-*`, `--md-surface-*`) en vez de valores sueltos, y todo el acento respeta la semilla (`var(--md-primary)`).
 - **i18n:** interfaz bilingüe (español/inglés) con un store propio sin dependencias y conmutador en Ajustes.
 - **Iconos:** se sirven desde el backend mediante una allowlist de proveedores; el webview no contacta con terceros.
 

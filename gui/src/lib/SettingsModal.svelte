@@ -318,7 +318,7 @@
     <!-- Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <div class="p-6 md:p-8 pb-2 md:pb-4 flex justify-between items-center shrink-0">
-        <h4 class="text-[10px] font-ui font-black uppercase tracking-[0.2em] opacity-30">{tabs.find(t => t.id === activeTab) ? i18n.t(tabs.find(t => t.id === activeTab).labelKey) : i18n.t('settings.title')}</h4>
+        <h4 class="text-[10px] font-ui font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)]">{tabs.find(t => t.id === activeTab) ? i18n.t(tabs.find(t => t.id === activeTab).labelKey) : i18n.t('settings.title')}</h4>
         <button onclick={onClose} class="opacity-40 hover:opacity-100 p-2 -mr-2" aria-label="Cerrar"><X size={20} /></button>
       </div>
 
@@ -341,7 +341,7 @@
                         </div>
                       {:else}
                         <span class="text-sm font-bold tracking-tight">{u.name}</span>
-                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {u.color};"></div><span class="text-[9px] opacity-30 uppercase font-black truncate">{i18n.t('settings.protected')}</span></div>
+                        <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {u.color};"></div><span class="text-[9px] text-[var(--md-on-surface-variant)] uppercase font-black truncate">{i18n.t('settings.protected')}</span></div>
                       {/if}
                     </div>
                   </div>
@@ -394,11 +394,11 @@
           {:else if activeTab === 'general'}
             <div class="space-y-8 pb-32">
               <div class="p-6 md:p-8 rounded-3xl md:rounded-[32px] border border-border bg-[var(--md-surface-variant)] space-y-4 md:space-y-6">
-                <span class="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">{i18n.t('settings.security')}</span>
+                <span class="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)]">{i18n.t('settings.security')}</span>
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                   <div class="flex flex-col">
                     <span class="text-sm font-bold">{i18n.t('settings.autoLock')}</span>
-                    <span class="text-[9px] opacity-30 uppercase font-black">{i18n.t('settings.autoLockHint')}</span>
+                    <span class="text-[9px] text-[var(--md-on-surface-variant)] uppercase font-black">{i18n.t('settings.autoLockHint')}</span>
                   </div>
                   <select bind:value={globalState.autoLockMinutes} onchange={handleAutoLockChange} class="h-11 px-4 rounded-xl bg-[var(--md-surface)] text-xs font-bold border border-border outline-none focus:border-[var(--md-primary)]/30 focus:ring-2 focus:ring-[var(--md-primary)]/10 transition-all appearance-none cursor-pointer" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 20 20%22 fill=%22%23666%22><path d=%22M5 8l5 5 5-5%22/></svg>'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 36px;">
                     <option value={0}>{i18n.t('settings.never')}</option>
@@ -410,7 +410,7 @@
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                   <div class="flex flex-col">
                     <span class="text-sm font-bold">{i18n.t('settings.language')}</span>
-                    <span class="text-[9px] opacity-30 uppercase font-black">Español / English</span>
+                    <span class="text-[9px] text-[var(--md-on-surface-variant)] uppercase font-black">Español / English</span>
                   </div>
                   <div class="flex gap-2">
                     <button onclick={() => i18n.setLang('es')} class="h-11 px-4 rounded-xl text-xs font-bold transition-all {i18n.lang === 'es' ? 'bg-[var(--md-primary)] text-[var(--md-on-primary)]' : 'bg-[var(--md-surface)] opacity-60 hover:opacity-100'}">{i18n.t('settings.spanish')}</button>
@@ -433,7 +433,7 @@
               </div>
               {#if isLocalEnabled}
                 <div class="p-4 md:p-8 rounded-3xl md:rounded-[32px] border border-border bg-[var(--md-surface-variant)] space-y-4">
-                  <span class="text-[9px] font-black uppercase opacity-30 flex justify-between items-center mb-1">{i18n.t('db.path')}</span>
+                  <span class="text-[9px] font-black uppercase text-[var(--md-on-surface-variant)] flex justify-between items-center mb-1">{i18n.t('db.path')}</span>
                   <div class="flex flex-col sm:flex-row gap-2">
                     <input readonly value={globalState.vaultPath || i18n.t('db.notLinked')} class="flex-1 w-full h-11 bg-[var(--md-surface)] rounded-xl px-4 text-xs font-mono opacity-60 truncate" aria-label={i18n.t('db.path')} />
                     <div class="flex gap-2 sm:w-auto w-full">
@@ -451,7 +451,7 @@
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><input bind:value={syncConfig.host} placeholder={i18n.t('db.server')} class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label={i18n.t('db.server')} /><input bind:value={syncConfig.db_name} placeholder={i18n.t('db.name')} class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label={i18n.t('db.name')} /></div>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><input bind:value={syncConfig.user} placeholder={i18n.t('db.user')} class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label={i18n.t('db.user')} /><input type="password" bind:value={syncConfig.password} placeholder={i18n.t('db.password')} class="h-11 w-full bg-[var(--md-surface)] rounded-xl px-4 text-xs" aria-label={i18n.t('db.password')} /></div>
                   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-2 gap-4 sm:gap-0">
-                    <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full {isConnectionVerified ? 'bg-green-500' : 'bg-red-500'}"></div><span class="text-[9px] font-black uppercase opacity-40">{isConnectionVerified ? i18n.t('db.connected') : i18n.t('db.disconnected')}</span></div>
+                    <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full {isConnectionVerified ? 'bg-green-500' : 'bg-red-500'}"></div><span class="text-[9px] font-black uppercase text-[var(--md-on-surface-variant)]">{isConnectionVerified ? i18n.t('db.connected') : i18n.t('db.disconnected')}</span></div>
                     <button onclick={() => verifyConnection(true)} class="w-full sm:w-auto text-[9px] font-black uppercase tracking-widest text-[var(--md-primary)] bg-[var(--md-primary)]/10 hover:bg-[var(--md-primary)]/20 px-4 py-3 sm:py-2 rounded-xl transition-all active:scale-95">{i18n.t('db.test')}</button>
                   </div>
                 </div>
@@ -463,7 +463,7 @@
         <!-- Botones de Acción Fijos Abajo (Solo en Tab Database) -->
         {#if activeTab === 'database'}
           <div class="absolute bottom-0 left-0 right-0 pt-4 pb-4 px-4 md:pt-8 md:pb-8 md:px-8 bg-gradient-to-t from-[var(--md-surface)] via-[var(--md-surface)] to-transparent z-20 pointer-events-none">
-            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--md-surface-variant)]/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl md:rounded-[32px] border border-border shadow-elev-3 gap-2 sm:gap-0 pointer-events-auto">
+            <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-[var(--md-surface-variant)]/80 backdrop-blur-xl p-3 md:p-4 rounded-3xl md:rounded-[32px] border border-border shadow-elev-2 gap-2 sm:gap-0 pointer-events-auto">
               <button onclick={() => unlinkAll(true)} class="text-[10px] font-black uppercase text-red-500 px-4 md:px-6 h-12 rounded-2xl hover:bg-red-500/10 transition-all active:scale-95 w-full sm:w-auto">{i18n.t('settings.unlinkAll')}</button>
               <button onclick={saveDatabaseSettings} disabled={isSavingDb} class="px-4 md:px-8 h-12 rounded-2xl text-white font-bold text-[10px] uppercase tracking-[0.2em] shadow-elev-2 active:scale-95 transition-all disabled:opacity-40 w-full sm:w-auto" style="background-color: {globalState.userColor};">
                 {#if isSavingDb}
@@ -484,7 +484,7 @@
       <div use:focusTrap role="dialog" aria-modal="true" aria-label={secureActionType === 'delete' ? 'Eliminar usuario' : 'Exportar usuario'} class="w-full max-w-[400px] bg-[var(--md-surface-2)] rounded-[40px] p-8 border {secureActionType === 'delete' ? 'border-red-500/20' : 'border-green-500/20'} relative z-10">
         <h5 class="text-xl font-bold mb-6 text-center">{secureActionType === 'delete' ? i18n.t('secure.deleteUser') : i18n.t('secure.exportUser')}</h5>
         <div class="space-y-6">
-          <input type="password" bind:value={masterPasswordConfirm} class="w-full h-14 bg-black/5 rounded-2xl px-6 outline-none" placeholder={i18n.t('secure.masterKey')} aria-label={i18n.t('secure.masterKey')} />
+          <input type="password" bind:value={masterPasswordConfirm} class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl px-6 outline-none" placeholder={i18n.t('secure.masterKey')} aria-label={i18n.t('secure.masterKey')} />
           <div class="flex gap-3">
             <button onclick={() => isSecureModalOpen = false} class="flex-1 h-14 rounded-full text-[10px] font-black uppercase opacity-40">{i18n.t('common.cancel')}</button>
             <button onclick={handleSecureAction} class="flex-1 h-14 rounded-full text-white font-bold text-[10px] uppercase {secureActionType === 'delete' ? 'bg-red-500' : 'bg-green-600'}">{i18n.t('secure.confirm')}</button>

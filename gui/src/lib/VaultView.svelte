@@ -297,7 +297,7 @@
   {#if !showManager}
     <!-- VISTA 1: ACCESO RÁPIDO -->
     <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
-      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border mb-8 w-full max-w-2xl">
+      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border shadow-elev-1 mb-8 w-full max-w-2xl">
         <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
           <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-black/5 dark:bg-white/[0.1]" />
         </div>
@@ -305,7 +305,7 @@
           <span class="text-sm font-bold truncate text-[var(--md-on-background)]">{user.name}</span>
           <div class="flex items-center gap-1.5 mt-0.5">
             <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
-            <span class="text-[9px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">{i18n.t('vault.quickAccess')}</span>
+            <span class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{i18n.t('vault.quickAccess')}</span>
           </div>
         </div>
         <div class="flex items-center gap-1 mr-2">
@@ -315,12 +315,12 @@
       </div>
 
       <div class="w-full max-w-2xl relative mb-12">
-        <Search class="absolute left-6 top-1/2 -translate-y-1/2 opacity-20 text-[var(--md-on-background)]" size={24} />
+        <Search class="absolute left-6 top-1/2 -translate-y-1/2 opacity-40 text-[var(--md-on-background)]" size={24} />
         <input 
           type="text" 
           bind:value={searchQuery} 
           placeholder={i18n.t('vault.searchQuick')} 
-          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-border outline-none text-[var(--md-on-background)] transition-all" 
+          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-border shadow-elev-1 outline-none text-[var(--md-on-background)] transition-all" 
         />
         {#if searchQuery.length > 0}
           <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.clearSearch')}><X size={18} /></button>
@@ -338,9 +338,9 @@
           <div class="flex items-center justify-between mb-6 px-4">
             <div class="flex items-center gap-3">
               <div class="w-1.5 h-1.5 rounded-full bg-[var(--md-primary)]"></div>
-              <span class="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Mostrando: {activeFilter}</span>
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)]">Mostrando: {activeFilter}</span>
             </div>
-            <button onclick={() => activeFilter = 'all'} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#6750A4]">Ver todo</button>
+            <button onclick={() => activeFilter = 'all'} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[var(--md-primary)]">Ver todo</button>
           </div>
         {/if}
 
@@ -372,7 +372,7 @@
       </div>
 
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
+        <span class="text-[8px] font-black uppercase tracking-[0.3em] text-[var(--md-on-surface-variant)]">Gestión Avanzada</span>
         <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-border flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label={i18n.t('vault.openManager')}>
           <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
         </button>
@@ -391,7 +391,7 @@
             </div>
             <div class="flex flex-col">
               <h2 class="text-base font-bold leading-none text-[var(--md-on-background)]">{user.name}</h2>
-              <span class="text-[8px] font-black uppercase tracking-widest opacity-20 mt-1.5 text-[var(--md-on-background)]">{i18n.t('vault.manager')}</span>
+              <span class="text-[8px] font-black uppercase tracking-widest mt-1.5 text-[var(--md-on-surface-variant)]">{i18n.t('vault.manager')}</span>
             </div>
           </div>
         </div>
@@ -414,12 +414,12 @@
         <section class="flex-1 md:border-r border-border flex flex-col bg-[var(--md-surface)] overflow-hidden">
           <div class="p-4 md:p-6 border-b border-border">
             <div class="relative">
-              <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-20" size={16} />
+              <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-40" size={16} />
               <input 
                 type="text" 
                 bind:value={searchQuery} 
                 placeholder={i18n.t('vault.filterPlaceholder')} 
-                class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-border" 
+                class="h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-border" 
               />
             </div>
           </div>
@@ -449,7 +449,7 @@
                 </div>
                 <div class="flex flex-col flex-1 min-w-0">
                   <span class="text-xs font-bold truncate text-[var(--md-on-background)]">{item.title}</span>
-                  <span class="text-[10px] opacity-30 truncate text-[var(--md-on-background)]">{item.username}</span>
+                  <span class="text-[10px] truncate text-[var(--md-on-surface-variant)]">{item.username}</span>
                 </div>
                 {#if item.is_favorite}
                   <Star size={12} fill="currentColor" class="text-yellow-500 shrink-0" />

@@ -139,7 +139,7 @@
         {#if globalState.isSyncing}
           <span in:fly={{ y: 5, duration: 300 }} class="text-[8px] font-black uppercase tracking-widest text-[var(--md-primary)]">{i18n.t('footer.syncing')}</span>
         {:else}
-          <span in:fade class="text-[9px] font-black uppercase tracking-widest opacity-40">
+          <span in:fade class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
             {globalState.dbMode === 'hybrid' ? i18n.t('footer.hybrid') : (globalState.dbMode === 'remote' ? i18n.t('footer.online') : i18n.t('footer.local'))}
           </span>
         {/if}

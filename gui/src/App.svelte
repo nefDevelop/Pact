@@ -301,14 +301,14 @@
   class="h-screen bg-[var(--md-background)] text-[var(--md-on-background)] font-sans flex flex-col relative transition-colors duration-700 overflow-hidden { !isUnlocked ? 'items-center justify-center' : '' }">
   
   {#if isDragging}
-    <div class="fixed inset-0 z-[100] bg-[#6750A4]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[var(--md-primary)]/40 m-8 rounded-[64px]">
+    <div class="fixed inset-0 z-[100] bg-[var(--md-primary)]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[var(--md-primary)]/40 m-8 rounded-[64px]">
       <div class="flex flex-col items-center gap-6 scale-110">
-        <div class="w-32 h-32 rounded-[48px] bg-[#6750A4] text-white flex items-center justify-center shadow-elev-3  animate-bounce">
+        <div class="w-32 h-32 rounded-[48px] bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shadow-elev-2  animate-bounce">
           <File size={64} strokeWidth={2.5} />
         </div>
         <div class="text-center">
-          <h2 class="text-4xl font-black tracking-tight text-[#6750A4]">{i18n.t('app.dropVault')}</h2>
-          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[#6750A4]">{i18n.t('app.dropVaultHint')}</p>
+          <h2 class="text-4xl font-black tracking-tight text-[var(--md-primary)]">{i18n.t('app.dropVault')}</h2>
+          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[var(--md-primary)]">{i18n.t('app.dropVaultHint')}</p>
         </div>
       </div>
     </div>
@@ -340,7 +340,7 @@
     <div class="fixed top-8 right-8 flex gap-3 z-50">
       <button 
         onclick={() => isSettingsOpen = true}
-        class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-border opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
+        class="p-3 rounded-2xl bg-[var(--md-surface)]/60 backdrop-blur-md border border-border opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
         title={i18n.t('app.settings')}
         aria-label={i18n.t('app.settings')}
       >
@@ -371,12 +371,12 @@
                   <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full" />
                 </div>
                 <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
-                  <span class="text-sm font-bold truncate">{selectedUser.name}</span>
-                  <span class="text-[10px] font-black uppercase tracking-widest opacity-30">
+                  <span class="text-sm font-bold truncate text-[var(--md-on-surface)]">{selectedUser.name}</span>
+                  <span class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
                     {isDropdownOpen ? i18n.t('common.close') : i18n.t('app.change')}
                   </span>
                 </div>
-                <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
+                <ChevronDown size={20} class="opacity-50 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
               </button>
             </div>
           </div>
@@ -412,21 +412,21 @@
             </div>
             
             <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-border rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
-              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><File size={24} /></div>
+              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><File size={24} /></div>
                 <div class="flex flex-col text-left">
                   <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.openVault')}</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.openVaultHint')}</span>
+                  <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase tracking-widest">{i18n.t('app.openVaultHint')}</span>
                 </div>
               </button>
 
               <div class="h-px w-12 bg-black/10 dark:bg-white/10 mx-auto"></div>
 
-              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[var(--md-primary)]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[var(--md-primary)]/10 text-[var(--md-primary)] flex items-center justify-center shrink-0 border border-[var(--md-primary)]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
                 <div class="flex flex-col text-left">
                   <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.createVault')}</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
+                  <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
                 </div>
               </button>
             </div>
@@ -437,7 +437,7 @@
       {#if !isUnlocked && users.length > 0}
         <div class="hidden lg:flex flex-col justify-center h-full animate-in fade-in slide-in-from-right duration-1000">
           <div class="p-2">
-            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-6 ml-4">{i18n.t('app.users')}</h2>
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)] mb-6 ml-4">{i18n.t('app.users')}</h2>
             <UserList onSelect={handleUserSelect} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
           </div>
         </div>

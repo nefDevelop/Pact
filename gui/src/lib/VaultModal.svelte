@@ -33,7 +33,7 @@
       <div class="flex justify-between items-start mb-2">
         <div>
           <h3 class="text-xl font-bold">{i18n.t('vaultModal.title')}</h3>
-          <p class="text-[10px] font-black uppercase tracking-widest opacity-30">{i18n.t('vaultModal.subtitle')}</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{i18n.t('vaultModal.subtitle')}</p>
         </div>
         <button onclick={() => isOpen = false} class="p-2 opacity-20 hover:opacity-100 transition-opacity" aria-label="Cerrar">
           <X size={20} />
@@ -45,13 +45,13 @@
           type="text" 
           bind:value={newVaultName} 
           placeholder={i18n.t('vaultModal.placeholder')} 
-          class="w-full h-12 bg-black/5 dark:bg-white/5 rounded-2xl px-5 focus:outline-none font-bold border border-transparent focus:border-[var(--md-primary)]/30 transition-colors" 
+          class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none font-bold border border-transparent focus:border-[var(--md-primary)]/30 transition-colors" 
         />
         <div class="flex justify-end gap-3 pt-4">
           <button onclick={() => isOpen = false} class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-opacity">{i18n.t('common.cancel')}</button>
           <button 
             onclick={confirmNamingVault} 
-            class="px-8 h-12 rounded-full bg-[#6750A4] text-white text-[10px] font-black uppercase tracking-widest shadow-elev-2 active:scale-95 transition-all disabled:opacity-30"
+            class="px-8 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] text-[10px] font-black uppercase tracking-widest shadow-elev-2 active:scale-95 transition-all disabled:opacity-30"
             disabled={!newVaultName}
           >
             {i18n.t('common.create')}

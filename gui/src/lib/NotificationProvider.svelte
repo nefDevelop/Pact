@@ -7,7 +7,7 @@
     success: { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
     error: { icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
     warning: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    info: { icon: Info, color: 'text-[#6750A4]', bg: 'bg-[#6750A4]/10' }
+    info: { icon: Info, color: 'text-[var(--md-primary)]', bg: 'bg-[var(--md-primary)]/10' }
   };
 </script>
 
