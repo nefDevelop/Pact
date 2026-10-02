@@ -62,17 +62,9 @@
     } catch (e) { /* Error manejado por api.js */ }
   }
 
-  async function loadVaultPath() {
-    try {
-      const data = await api.get('/vault/config/path', { silent: true });
-      globalState.vaultPath = data.path || '';
-    } catch (e) { console.error(e); }
-  }
-
   async function loadUsers(showToast = false) {
     globalState.isSyncing = true;
     users = [];
-    await loadVaultPath();
     try {
       const data = await api.get('/auth/users');
       const userList = data.users || [];
