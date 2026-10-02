@@ -122,7 +122,7 @@ build-desktop: build-gui prepare-sidecar ## Empaqueta el escritorio en $(BUNDLES
 		\( -name "*.rpm" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} build/desktop/ \;
 	@echo "✓ Paquetes en build/desktop/ ($(BUNDLES)) y binario en pact-desktop-raw"
 
-build-appimage: build-gui prepare-sidecar ## Empaqueta AppImage (opt-in; usa linuxdeploy y puede fallar por EMFILE)
+build-appimage: build-gui prepare-sidecar ## Empaqueta AppImage. Requiere fs.inotify.max_user_instances > 128 (ver README)
 	@echo "Construyendo Pact Desktop (AppImage)..."
 	cd crates/pact-desktop && $(TAURI) build --verbose --bundles appimage
 	@mkdir -p build/desktop

@@ -112,7 +112,7 @@ servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 
 **Release**
 - [x] Paquete RPM verificado en Fedora (8.27 MiB: `pact-desktop` + `pact-server` + `.desktop` + iconos)
-- [ ] AppImage: target `build-appimage` añadido, **construcción sin verificar** (el empaquetado requiere `linuxdeploy` y agota `fs.inotify.max_user_instances`)
+- [x] AppImage verificado (116 MiB: binarios + 206 librerías; el sidecar arranca y sirve con la allowlist CORS). Requiere `fs.inotify.max_user_instances` por encima del valor por defecto
 - [ ] Windows (NSIS/MSI): target `build-windows` añadido, **sin runner Windows disponible**
 - [x] Formatos seleccionables: `make build-desktop [BUNDLES=deb|rpm]`
 - [x] Documentación de producción (instalación, datos, permisos, backup, servicio)
@@ -123,6 +123,5 @@ servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)
 - [ ] Migraciones y cobertura de tests para MariaDB/MySQL remoto
 - [ ] Tests E2E de UI
-- [ ] Verificar el empaquetado AppImage (requiere subir `fs.inotify.max_user_instances`)
 - [ ] Runner Windows para construir y verificar los instaladores NSIS/MSI
 

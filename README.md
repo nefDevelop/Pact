@@ -116,10 +116,10 @@ make dev-tauri
 ### C. Compilación para Producción
 Genera el binario del servidor y el paquete de escritorio:
 ```bash
-make build          # Servidor + escritorio (.deb en Linux)
+make build          # Servidor + escritorio (rpm por defecto)
 make build-server   # Solo el binario standalone del servidor
 make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
-make build-appimage # AppImage de Linux (opt-in: usa linuxdeploy, necesita libfuse2 y red)
+make build-appimage # AppImage de Linux (116 MiB, incluye WebKit y GTK)
 make build-windows  # Instaladores Windows (NSIS + MSI); requiere ejecutarse en Windows
 ```
 
