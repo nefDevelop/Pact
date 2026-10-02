@@ -132,9 +132,10 @@ make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
 ```bash
 make test             # Ejecuta todos los tests (Rust + Frontend)
 make test-unit        # Tests unitarios de Rust (cripto + session/ratelimit/db)
-make test-integration # Tests de integración (API, sync, storage, seguridad)
+make test-integration # Tests de integración (API, sync, storage, seguridad, MySQL)
 make test-rs          # Todos los tests de Rust (Core + Server)
 make test-gui         # Tests del frontend (Vitest)
+make test-mysql       # Tests de MariaDB (requiere PACT_TEST_MYSQL_URL)
 ```
 
 ### Análisis de Código (Linting)
@@ -144,8 +145,11 @@ make check        # Comprueba compilación de Rust y tipos de la GUI
 ```
 
 ### Integración Continua
-El workflow de GitHub Actions (`.github/workflows/ci.yml`) ejecuta `make lint`,
-`make test-unit`, `make test-integration` y `make test-gui` en cada push/PR.
+El workflow de GitHub Actions (`.github/workflows/ci.yml`) ejecuta en cada push/PR:
+- **Lint & tests**: `make lint`, `make test-unit`, `make test-integration` y `make test-gui`.
+- **Desktop**: instala las dependencias de Tauri, prepara el sidecar y comprueba `pact-desktop`.
+- **MariaDB**: levanta un servicio MariaDB y ejecuta `make test-mysql`.
+- **Coverage / mutación**: genera cobertura con tarpaulin y publica el reporte de mutantes.
 
 ## Estructura del Proyecto
 

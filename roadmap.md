@@ -69,6 +69,12 @@
 - [x] Iconos de marca servidos por el backend (allowlist; el webview no contacta con terceros)
 - [x] Accesibilidad: focus-trap en modales y `aria-label` en botones de solo icono
 
+### Fase 12: Completar tests y CI (Fase 4) ✅
+- [x] Esquema MySQL/MariaDB (`ensure_schema`) + tests de `MysqlDatabase` (target `make test-mysql`)
+- [x] Job de CI con servicio MariaDB
+- [x] Cobertura (tarpaulin) y testing de mutación (cargo-mutants) en CI
+- [x] Tests de endpoints pendientes (`/vault/initialize`, etc.)
+
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)

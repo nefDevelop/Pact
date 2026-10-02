@@ -374,7 +374,83 @@ pub struct MysqlDatabase {
 impl MysqlDatabase {
     pub async fn new(url: &str) -> Result<Self, Error> {
         let pool = MySqlPool::connect(url).await?;
-        Ok(Self { pool })
+        let db = Self { pool };
+        // El esquema remoto se crea de forma idempotente; las migraciones de
+        // `migrations/` son SQLite y no aplican a MariaDB/MySQL.
+        db.ensure_schema().await?;
+        Ok(db)
+    }
+
+    /// Crea las tablas necesarias en la base remota si no existen.
+    pub async fn ensure_schema(&self) -> Result<(), Error> {
+        let statements = [
+            "CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                master_hash VARCHAR(255) NOT NULL,
+                salt VARCHAR(255) NOT NULL,
+                color VARCHAR(20) DEFAULT '#6750A4',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS folders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                uid VARCHAR(36) NOT NULL UNIQUE,
+                user_id INT NOT NULL,
+                name VARCHAR(2048) NOT NULL,
+                color VARCHAR(20) DEFAULT '#000000',
+                icon VARCHAR(50) DEFAULT 'folder',
+                version INT DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS accounts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                uid VARCHAR(36) NOT NULL UNIQUE,
+                user_id INT NOT NULL,
+                folder_id INT,
+                is_favorite BOOLEAN DEFAULT 0,
+                title VARCHAR(512) NOT NULL,
+                url VARCHAR(1024),
+                username_site VARCHAR(512),
+                encrypted_pass VARCHAR(1024) NOT NULL,
+                icon_data MEDIUMTEXT,
+                version INT DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                deleted_at DATETIME,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS totp_settings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                account_id INT NOT NULL UNIQUE,
+                encrypted_seed VARCHAR(1024) NOT NULL,
+                issuer VARCHAR(100),
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS pending_accounts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                data_blob MEDIUMTEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS sync_configs (
+                user_id INT PRIMARY KEY,
+                remote_host VARCHAR(255) NOT NULL,
+                remote_port INT NOT NULL DEFAULT 3306,
+                remote_user VARCHAR(100) NOT NULL,
+                remote_pass VARCHAR(1024) NOT NULL,
+                remote_name VARCHAR(100) NOT NULL,
+                preferred_mode VARCHAR(20) DEFAULT 'local',
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ];
+
+        for stmt in statements {
+            sqlx::query(stmt).execute(&self.pool).await?;
+        }
+        Ok(())
     }
 }
 

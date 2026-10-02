@@ -1063,6 +1063,26 @@ async fn test_update_account_icon() {
 }
 
 #[tokio::test]
+async fn test_initialize_vault_creates_file() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "init_vault_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/initialize", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "name": "pact_ci_test" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["path"], "pact_ci_test.pcty");
+
+    let _ = std::fs::remove_file("pact_ci_test.pcty");
+}
+
+#[tokio::test]
 async fn test_icon_endpoint_rejects_invalid_domain() {
     let db = setup_test_db().await;
     let state = build_app_state(db);
