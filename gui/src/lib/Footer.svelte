@@ -20,6 +20,10 @@
   function toggleTheme() {
     setTheme(!globalState.isDark);
   }
+
+  async function sync_all() {
+    await globalState.performSync(true);
+  }
 </script>
 
 <footer class="w-full flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)] px-10 lg:px-16 transition-all duration-500 ease-in-out bg-transparent border-none">
