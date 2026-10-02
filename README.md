@@ -26,6 +26,7 @@ Servidor de alto rendimiento construido con **Axum** y **SQLx**.
 ### 3. Interfaz (Tauri + Svelte)
 - **Shell Nativa:** **Tauri v2** proporciona una ventana ligera y segura con acceso a APIs del sistema.
 - **Frontend:** Construido con **Svelte 5** y **Tailwind CSS**, siguiendo los principios de **Material Design 3 (M3)**.
+- **KDF en ambos clientes:** el escritorio deriva las claves con un comando nativo (Argon2id en Rust); el navegador usa el mismo código compilado a **WASM** (`make build-wasm`), porque WebCrypto no implementa Argon2id. Ambas rutas devuelven el mismo contrato, así que una bóveda creada en un cliente se abre en el otro.
 - **Tema/color:** la paleta tonal se deriva del color del usuario (`theme.js`); bordes, superficies y elevaciones usan tokens semánticos (`border-border`, `shadow-elev-*`, `--md-surface-*`) en vez de valores sueltos, y todo el acento respeta la semilla (`var(--md-primary)`).
 - **i18n:** interfaz bilingüe (español/inglés) con un store propio sin dependencias y conmutador en Ajustes.
 - **Iconos:** se sirven desde el backend mediante una allowlist de proveedores; el webview no contacta con terceros.
@@ -100,9 +101,11 @@ make dev
 - **Backend API:** [http://localhost:8002](http://localhost:8002)
 
 > [!NOTE]
-> La derivación de claves (Argon2id) se ejecuta vía Tauri, por lo que el registro
-> y el desbloqueo solo funcionan en el shell nativo (`make dev-tauri`). El modo
-> navegador sirve para trabajar en la interfaz.
+> El navegador deriva las claves con el WASM de `pact-core`. Como es un
+> artefacto generado, **hay que compilarlo una vez** antes de `make dev`:
+> `make build-wasm`. Si no, el registro y el desbloqueo fallarán al no encontrar
+> el módulo. El escritorio no lo necesita (usa el comando nativo) y nunca lo
+> descarga.
 
 ### B. Modo Desktop Nativo (Tauri)
 Lanza la aplicación con su ventana nativa y backend integrado:
@@ -111,12 +114,18 @@ make dev-tauri
 ```
 
 ### C. Compilación para Producción
-Genera el binario del servidor y el paquete de escritorio para Linux (`.deb`):
+Genera el binario del servidor y el paquete de escritorio:
 ```bash
-make build          # Servidor + escritorio
+make build          # Servidor + escritorio (.deb en Linux)
 make build-server   # Solo el binario standalone del servidor
 make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
+make build-appimage # AppImage de Linux (opt-in: usa linuxdeploy, necesita libfuse2 y red)
+make build-windows  # Instaladores Windows (NSIS + MSI); requiere ejecutarse en Windows
 ```
+
+> Requiere **wasm-pack** (`cargo install wasm-pack`) y el target
+> `wasm32-unknown-unknown` (`rustup target add wasm32-unknown-unknown`).
+> `make build` los invoca vía `build-wasm` antes de compilar la GUI.
 
 > El escritorio empaqueta `pact-server` como **sidecar** de Tauri
 > (`externalBin`). Por eso `build-desktop` y `dev-tauri` ejecutan antes
@@ -124,6 +133,64 @@ make build-desktop  # Solo el paquete de escritorio (alias: make build-tauri)
 > `crates/pact-desktop/binaries/pact-server-<triple>`. Si compilas
 > `pact-desktop` manualmente (`cargo build -p pact-desktop`) necesitas haber
 > generado el sidecar primero.
+
+---
+
+## Despliegue y Producción
+
+### Datos y permisos
+| Qué | Dónde | Permisos |
+|---|---|---|
+| BD local (`pact.db`) | `$PACT_VAULT_PATH`/CWD o `DATABASE_URL` | `600` — contiene metadatos |
+| Contenedor `.pcty` | ruta elegida por el usuario | `600` |
+| `machine-id` de reserva | `PACT_DATA_DIR` o dir. de datos del usuario | `600` |
+
+Ningún componente cifrado a nivel de disco: proteger el `.pcty` y el `pact.db`
+depende de los permisos del sistema de ficheros (y sigue pendiente el cifrado de
+archivo, ver `roadmap.md`).
+
+### Backup
+El estado completo es el `.pcty` más la `pact.db`. Copia ambos de forma
+consistente con la app cerrada; los secretos dentro del `.pcty` ya están
+cifrados con la `MasterKey`, pero los metadatos no.
+
+### Servidor web (modo remoto)
+`pact-server` habla **HTTP plano** y está pensado para `127.0.0.1` (loopback).
+Si quieres exponerlo en red:
+
+1. **No abras el puerto directamente.** El servidor guarda una bóveda de
+   contraseñas y sirve el frontend; exponiéndolo sin cifrar regalarías la
+   `MasterKey` en tránsito.
+2. Pon un **reverse proxy con TLS** delante (nginx, Caddy, Caddy sirve
+   certificado Let's Encrypt automáticamente) y termina ahí el TLS.
+3. El servidor valida los orígenes por allowlist; si el frontend se sirve desde
+   otro dominio, exporta `PACT_CORS_ORIGIN=https://tu-dominio`. **Nunca uses
+   `*`** (se rechaza y no habilita CORS permisivo).
+4. `/auth/users` y `/auth/salt/:username` son públicos por diseño (login
+   previo) y tienen rate limit por IP; para una exposición en red, considera
+   añadirles límites en el proxy.
+
+Consulta `.env.example` para el resto de variables (`PACT_LISTEN_ADDR`,
+`PACT_DATA_DIR`, `PACT_FLUSH_INTERVAL_SECS`…).
+
+### Servicio systemd (ejemplo)
+```ini
+[Unit]
+Description=Pact Server
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/pact/pact.env
+ExecStart=/usr/bin/pact-server
+Restart=on-failure
+User=pact
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ---
 
@@ -136,6 +203,7 @@ make test-unit        # Tests unitarios de Rust (cripto + session/ratelimit/db)
 make test-integration # Tests de integración (API, sync, storage, seguridad, MySQL)
 make test-rs          # Todos los tests de Rust (Core + Server)
 make test-gui         # Tests del frontend (Vitest)
+make test-wasm        # Paridad WASM vs nativo (requiere wasm-pack)
 make test-mysql       # Tests de MariaDB (requiere PACT_TEST_MYSQL_URL)
 ```
 

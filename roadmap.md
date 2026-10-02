@@ -88,31 +88,31 @@ Objetivo: poder desplegar Pact como app de escritorio (Linux/Windows) **y** como
 servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 
 **Seguridad y operación**
-- [ ] CORS por allowlist (orígenes Tauri, dev y web de producción); nunca permisivo
-- [ ] El sidecar de escritorio deja de arrancar con `PACT_CORS_ORIGIN=*` y con logs en `debug`
-- [ ] `/status` deja de exponer sesiones activas
-- [ ] `unwrap` en `unlock` sustituido por error explícito
-- [ ] TLS documentado para el modo web remoto (reverse proxy y alternativa nativa)
-- [ ] Revisar `/auth/users` y `/auth/salt` de cara a una exposición en red
+- [x] CORS por allowlist (orígenes Tauri, dev y web de producción); nunca permisivo
+- [x] El sidecar de escritorio deja de arrancar con `PACT_CORS_ORIGIN=*` y con logs en `debug`
+- [x] `/status` deja de exponer sesiones activas
+- [x] `unwrap` en `unlock` sustituido por error explícito
+- [x] TLS documentado para el modo web remoto (reverse proxy y alternativa nativa)
+- [x] Revisar `/auth/users` y `/auth/salt` de cara a una exposición en red
 
 **Calidad**
-- [ ] `console.*` del frontend acotados al modo desarrollo
-- [ ] `.env.example` y documentación de variables de entorno
-- [ ] `pact.machine` en el directorio de datos (no en el CWD)
-- [ ] `cargo audit` en `make audit`
-- [ ] `[profile.release]` con LTO, `codegen-units=1` y `strip`
+- [x] `console.*` del frontend acotados al modo desarrollo
+- [x] `.env.example` y documentación de variables de entorno
+- [x] `pact.machine` en el directorio de datos (no en el CWD)
+- [x] `cargo audit` en `make audit`
+- [x] `[profile.release]` con LTO, `codegen-units=1` y `strip`
 - [ ] Umbral de cobertura y tests de componentes (login, modales)
 
 **Modo web (WASM)**
-- [ ] `wasm_derivar_claves_dual` devuelve `master_key`/`auth_key`/`sync_key` en hex, igual que Tauri
-- [ ] `make build-wasm` encadenado en el build y en CI
-- [ ] Carga condicional en `crypto_utils.js` (`invoke` en Tauri, WASM en navegador)
-- [ ] Test de paridad WASM vs nativo con el mismo `password+salt`
-- [ ] README: el modo navegador deja de estar limitado a interfaz
+- [x] `wasm_derivar_claves_dual` devuelve `master_key`/`auth_key`/`sync_key` en hex, igual que Tauri
+- [x] `make build-wasm` encadenado en el build
+- [x] Carga condicional en `crypto_utils.js` (`invoke` en Tauri, WASM en navegador)
+- [x] Test de paridad WASM vs nativo con el mismo `password+salt` (`make test-wasm`)
+- [x] README: el modo navegador deja de estar limitado a interfaz
 
 **Release**
 - [ ] Empaquetado Linux (AppImage) y Windows (NSIS/MSI)
-- [ ] Documentación de producción (instalación, datos, permisos, backup, servicio)
+- [x] Documentación de producción (instalación, datos, permisos, backup, servicio)
 - [ ] Bump a 0.3.0 y tag
 
 ### Próximos pasos

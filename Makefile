@@ -20,7 +20,7 @@ SIDECAR_DIR = crates/pact-desktop/binaries
 SIDECAR = $(SIDECAR_DIR)/pact-server-$(TARGET_TRIPLE)$(EXEEXT)
 
 .PHONY: help install install-gui deps test test-rs test-gui test-unit test-integration coverage mutants lint format run-server dev clean dev-tauri \
-	build build-gui build-server build-desktop build-tauri build-wasm prepare-sidecar check check-rs check-gui audit test-mysql test-wasm
+	build build-gui build-server build-desktop build-appimage build-windows build-tauri build-wasm prepare-sidecar check check-rs check-gui audit test-mysql test-wasm
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -111,7 +111,9 @@ prepare-sidecar: ## Genera el binario del servidor que Tauri empaqueta como side
 
 build-desktop: build-gui prepare-sidecar ## Genera la aplicación de escritorio nativa (DEB y Binario)
 	@echo "Construyendo Pact Desktop (Tauri)..."
-	# Desactivamos AppImage para evitar problemas de FUSE/linuxdeploy
+	# AppImage va en un target aparte (`build-appimage`): su empaquetado usa
+	# linuxdeploy, que descarga herramientas y necesita libfuse2, y puede fallar
+	# en entornos sin FUSE. No lo mezclamos con el build por defecto.
 	cd crates/pact-desktop && $(TAURI) build --verbose --bundles deb
 	@mkdir -p build/desktop
 	@echo "Copiando binario nativo y paquete DEB..."
@@ -119,7 +121,21 @@ build-desktop: build-gui prepare-sidecar ## Genera la aplicación de escritorio 
 	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f -name "*.deb" -exec cp {} build/desktop/ \;
 	@echo "✓ Versiones generadas en build/desktop/ (DEB y pact-desktop-raw)"
 
+build-appimage: build-gui prepare-sidecar ## Genera además el AppImage (requiere libfuse2 y red para linuxdeploy)
+	@echo "Construyendo Pact Desktop (AppImage)..."
+	cd crates/pact-desktop && $(TAURI) build --verbose --bundles appimage
+	@mkdir -p build/desktop
+	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f -name "*.AppImage" -exec cp {} build/desktop/ \;
+	@echo "✓ AppImage generado en build/desktop/"
+
 build-tauri: build-desktop ## Alias de build-desktop (compatibilidad con el README)
+
+build-windows: build-gui prepare-sidecar ## Empaqueta Windows (NSIS + MSI). Requiere ejecutarse en Windows
+	@echo "Construyendo Pact Desktop (Windows)..."
+	cd crates/pact-desktop && $(TAURI) build --verbose --bundles nsis,msi
+	@mkdir -p build/desktop
+	@find $(CARGO_TARGET_DIR)/release/bundle -maxdepth 2 -type f \( -name "*.exe" -o -name "*.msi" \) -exec cp {} build/desktop/ \;
+	@echo "✓ Instaladores Windows generados en build/desktop/"
 
 # --- PODMAN BUILD ---
 
