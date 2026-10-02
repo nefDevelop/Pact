@@ -349,6 +349,7 @@
         onclick={() => isSettingsOpen = true}
         class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
         title="Configuración"
+        aria-label="Abrir configuración"
       >
         <Settings size={20} strokeWidth={2.5} />
       </button>

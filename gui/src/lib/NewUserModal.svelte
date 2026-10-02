@@ -4,6 +4,7 @@
   import { globalState } from './state.svelte.js';
   import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
+  import { focusTrap } from './focusTrap.js';
   
   let { isOpen, onSave, onClose, users = [] } = $props();
   
@@ -209,7 +210,7 @@
     role="presentation"
   ></div>
 
-  <div class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-2xl">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-2xl">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">
@@ -289,12 +290,14 @@
               onclick={generatePassphrase}
               class="p-2.5 rounded-xl hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all"
               title="Generar frase segura"
+              aria-label="Generar frase segura"
             >
               <Dice5 size={18} />
             </button>
             <button 
               onclick={() => showPassword = !showPassword}
               class="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               {#if showPassword} <EyeOff size={18} /> {:else} <Eye size={18} /> {/if}
             </button>
@@ -342,6 +345,7 @@
           <button 
             onclick={refreshColors}
             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all group/refresh"
+            aria-label="Cambiar paleta de colores"
           >
             <RefreshCw size={12} class="group-active/refresh:rotate-180 transition-transform " />
           </button>
@@ -353,6 +357,7 @@
                 onclick={() => (color = c)}
                 class="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center hover:scale-110 cursor-pointer {color === c ? 'scale-110' : 'border-transparent'}"
                 style="background-color: {c}; border-color: {color === c ? c : 'transparent'}; box-shadow: {color === c ? `0 0 0 4px ${c}33` : 'none'};"
+                aria-label="Elegir color {c}"
               >
                 {#if color === c}
                   <Check size={12} class="text-white" />

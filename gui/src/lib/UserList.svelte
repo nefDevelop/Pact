@@ -102,6 +102,7 @@
         onmouseenter={(e) => e.currentTarget.style.backgroundColor = 'var(--hover-bg)'}
         onmouseleave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         title="Agregar Credencial Rápida"
+        aria-label="Agregar credencial rápida"
       >
         <Plus size={16} />
       </button>

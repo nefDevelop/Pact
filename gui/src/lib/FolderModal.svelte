@@ -3,6 +3,7 @@
   import { api } from './api.js';
   import { globalState } from './state.svelte.js';
   import { encryptE2E } from './crypto_utils.js';
+  import { focusTrap } from './focusTrap.js';
   
   let { isOpen = $bindable(), userColor, onFolderCreated } = $props();
   
@@ -57,7 +58,7 @@
       tabindex="-1"
       aria-label="Cerrar modal"
     ></div>
-    <div class="w-full max-w-[400px] bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 p-8 shadow-2xl animate-in zoom-in duration-300">
+    <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nueva carpeta" class="w-full max-w-[400px] bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 p-8 shadow-2xl animate-in zoom-in duration-300">
       <div class="flex justify-between items-start mb-2">
         <div>
           <h3 class="text-xl font-bold">Nueva Carpeta</h3>

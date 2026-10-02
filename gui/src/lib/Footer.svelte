@@ -99,6 +99,7 @@
       disabled={globalState.isSyncing}
       class="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95 disabled:opacity-50 relative group"
       title="Estado de sincronización"
+      aria-label="Sincronizar ahora"
     >
       <div class="relative flex items-center justify-center w-8 h-8">
         <!-- Anillo de Tiempo Restante (SVG) -->
@@ -149,6 +150,7 @@
       onclick={toggleTheme}
       class="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-500 ease-in-out active:scale-95"
       title="Cambiar tema"
+      aria-label="Cambiar tema claro/oscuro"
     >
       <div class="relative w-4 h-4 shrink-0">
         {#if globalState.isDark}

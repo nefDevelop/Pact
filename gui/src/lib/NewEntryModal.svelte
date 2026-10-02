@@ -2,6 +2,7 @@
   import { X, User, Lock, Save, Dice5, Eye, EyeOff, Folder, Palette, ChevronDown, ChevronUp, KeyRound, ClipboardPaste, Globe, Plus, AlertTriangle, Check, Circle, ShieldCheck, Loader2 } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
   import { encryptE2E } from './crypto_utils.js';
+  import { focusTrap } from './focusTrap.js';
   import bip39 from './bip39_es.json';
 
   let { isOpen, onSave, onClose, onOpenNewFolder, folders = [], mode = 'normal', entry = null, isUnlocked } = $props();
@@ -158,7 +159,7 @@
 <div class="fixed inset-0 z-[120] flex items-center justify-center p-6 lg:p-12">
   <button class="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in border-none w-full h-full cursor-default" onclick={onClose} aria-label="Cerrar modal"></button>
 
-  <div class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-2xl">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label={isEditing ? 'Editar entrada' : 'Nueva entrada'} class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden flex flex-col transition-colors duration-500 ease-in-out max-h-[90vh] shadow-2xl">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center shrink-0">
       <div class="flex flex-col">
@@ -202,8 +203,8 @@
           <div class="relative">
             <input id="e-pass" type={showPassword ? 'text' : 'password'} bind:value={password} placeholder="••••••••" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-24 outline-none text-sm border border-transparent focus:border-[#6750A4]/20 text-[var(--md-on-background)] {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Generar frase segura"><Dice5 size={16}/></button>
-              <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all">
+              <button onclick={generatePassphrase} class="p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Generar frase segura" aria-label="Generar frase segura"><Dice5 size={16}/></button>
+              <button onclick={() => showPassword = !showPassword} class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                 {#if showPassword} <EyeOff size={16} /> {:else} <Eye size={16} /> {/if}
               </button>
             </div>
@@ -259,7 +260,7 @@
           {/if}
           <div class="relative">
             <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[#6750A4]/20 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
-            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Pegar desde portapapeles">
+            <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Pegar desde portapapeles" aria-label="Pegar seed desde el portapapeles">
               <ClipboardPaste size={16} />
             </button>
           </div>

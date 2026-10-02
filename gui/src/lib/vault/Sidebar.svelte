@@ -23,6 +23,7 @@
       class="w-12 md:w-full h-12 rounded-2xl text-white flex items-center justify-center lg:justify-start lg:px-4 gap-0 lg:gap-3 hover:scale-[1.02] transition-all shrink-0" 
       style="background-color: var(--md-primary); color: var(--md-on-primary);" 
       title="Nuevo Ítem"
+      aria-label="Nueva entrada"
     >
       <Plus size={18} />
       <span class="hidden lg:block font-bold text-[10px] uppercase tracking-widest">Nuevo Ítem</span>
@@ -59,6 +60,7 @@
         onmouseenter={(e) => applyStyle(e, 'color', 'var(--hover-color)')} 
         onmouseleave={(e) => applyStyle(e, 'color', '')} 
         title="Nueva Carpeta"
+        aria-label="Nueva carpeta"
       >
         <Plus size={12} />
       </button>

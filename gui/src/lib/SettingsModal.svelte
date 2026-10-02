@@ -5,6 +5,7 @@
   import { encryptWithHardware, encryptE2E, safeStorage } from './crypto_utils.js';
   import { untrack, tick } from 'svelte';
   import { fade, fly } from 'svelte/transition';
+  import { focusTrap } from './focusTrap.js';
 
   const iconMap = {
     'folder': Folder, 'shield': Shield, 'lock': Lock, 'ghost': Ghost, 'gamepad2': Gamepad2,
@@ -305,7 +306,7 @@
 {#if isOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6 lg:p-12 overflow-hidden">
   <button aria-label="Cerrar modal" class="absolute inset-0 bg-black/60 backdrop-blur-md border-none cursor-default w-full h-full" onclick={onClose}></button>
-  <div class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface)] rounded-3xl sm:rounded-[48px] border border-black/[0.05] dark:border-white/[0.05] relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-2xl transition-colors duration-500">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Ajustes" class="w-full max-w-[900px] h-[95vh] md:h-[85vh] lg:h-[600px] bg-[var(--md-surface)] rounded-3xl sm:rounded-[48px] border border-black/[0.05] dark:border-white/[0.05] relative z-10 flex flex-col-reverse md:flex-row overflow-hidden shadow-2xl transition-colors duration-500">
     <!-- Sidebar -->
     <div class="w-full md:w-20 lg:w-64 bg-[var(--md-surface-variant)] border-t md:border-t-0 md:border-r border-black/[0.02] dark:border-white/[0.05] p-2 sm:p-4 lg:p-8 flex flex-row md:flex-col justify-around md:justify-start gap-2 overflow-x-auto shrink-0 z-20">
       <h3 class="text-xl font-display font-black mb-6 px-2 hidden lg:block">Ajustes</h3>
@@ -472,7 +473,7 @@
   {#if isSecureModalOpen}
     <div class="absolute inset-0 z-[110] flex items-center justify-center p-8">
       <button aria-label="Cerrar modal de seguridad" class="absolute inset-0 bg-white/80 dark:bg-[#0b0a0d]/80 backdrop-blur-md w-full h-full border-none cursor-default" onclick={() => isSecureModalOpen = false}></button>
-      <div class="w-full max-w-[400px] bg-white dark:bg-[#1f1e24] rounded-[40px] p-8 border {secureActionType === 'delete' ? 'border-red-500/20' : 'border-green-500/20'} relative z-10">
+      <div use:focusTrap role="dialog" aria-modal="true" aria-label={secureActionType === 'delete' ? 'Eliminar usuario' : 'Exportar usuario'} class="w-full max-w-[400px] bg-white dark:bg-[#1f1e24] rounded-[40px] p-8 border {secureActionType === 'delete' ? 'border-red-500/20' : 'border-green-500/20'} relative z-10">
         <h5 class="text-xl font-bold mb-6 text-center">{secureActionType === 'delete' ? 'Eliminar Usuario' : 'Exportar Usuario'}</h5>
         <div class="space-y-6">
           <input type="password" bind:value={masterPasswordConfirm} class="w-full h-14 bg-black/5 rounded-2xl px-6 outline-none" placeholder="Clave Maestra" aria-label="Introduce tu clave maestra para confirmar" />
