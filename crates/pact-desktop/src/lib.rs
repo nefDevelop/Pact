@@ -43,6 +43,7 @@ async fn browse_file(app: tauri::AppHandle, mode: String) -> Result<Option<Strin
 struct DerivedKeys {
     master_key: String,
     auth_key: String,
+    sync_key: String,
 }
 
 #[tauri::command]
@@ -52,6 +53,10 @@ async fn derive_keys(password: String, salt_hex: String) -> Result<DerivedKeys, 
     
     let (m, a) = pact_core::crypto::derivar_claves_dual(&password, &salt)
         .map_err(|e| format!("{:?}", e))?;
+
+    // Subclave para envolver la contraseña de la BD remota (no sale del cliente
+    // salvo en tránsito durante una sincronización).
+    let s = pact_core::crypto::derivar_subclave(&m, b"sync");
     
     let duration = t0.elapsed();
     log::info!("[🏎️ PERFORMANCE] derive_keys (Rust/Argon2id) completado en {:?}", duration);
@@ -59,6 +64,7 @@ async fn derive_keys(password: String, salt_hex: String) -> Result<DerivedKeys, 
     Ok(DerivedKeys {
         master_key: hex::encode(m),
         auth_key: hex::encode(a),
+        sync_key: hex::encode(s),
     })
 }
 

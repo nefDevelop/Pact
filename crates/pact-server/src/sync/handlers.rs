@@ -1,16 +1,31 @@
 use axum::{
     extract::{State, Json},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use std::sync::Arc;
-use crate::crypto::SyncCrypto;
 use crate::db::{Database, MysqlDatabase};
 use crate::auth::middleware::AuthenticatedUser;
 use crate::schemas::SyncConfig;
 use crate::sync::engine::SyncEngine;
 use crate::models::SyncConfigModel;
 use crate::error::AppError;
+
+/// Extrae la subclave de sincronización del cliente (hex, 32 bytes).
+fn sync_key_from_headers(headers: &HeaderMap) -> Result<Vec<u8>, AppError> {
+    let hex_key = headers
+        .get("x-pact-sync-key")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| AppError::BadRequest("Falta la clave de sincronización".to_string()))?;
+
+    let key = hex::decode(hex_key)
+        .map_err(|_| AppError::BadRequest("Clave de sincronización inválida".to_string()))?;
+
+    if key.len() != 32 {
+        return Err(AppError::BadRequest("Clave de sincronización inválida".to_string()));
+    }
+    Ok(key)
+}
 
 /// Conecta con la base de datos remota sin exponer la URL (que contiene la
 /// contraseña) en los mensajes de error hacia el cliente.
@@ -29,29 +44,44 @@ async fn connect_remote(config: &SyncConfig) -> Result<MysqlDatabase, AppError> 
     })
 }
 
+/// Carga la configuración remota de la DB y descifra la contraseña con la clave
+/// aportada por el cliente en la cabecera `X-Pact-Sync-Key`.
+async fn load_remote_config(
+    local_db: &dyn Database,
+    user_id: i32,
+    headers: &HeaderMap,
+) -> Result<SyncConfig, AppError> {
+    let cfg = local_db.get_sync_config(user_id).await?
+        .ok_or_else(|| AppError::BadRequest("Configuración de sincronización faltante".to_string()))?;
+
+    let key = sync_key_from_headers(headers)?;
+    let password = crate::crypto::decrypt_with_key(&cfg.remote_pass, &key)
+        .map_err(|_| AppError::BadRequest("No se pudo descifrar la configuración remota".to_string()))?;
+
+    Ok(SyncConfig {
+        host: cfg.remote_host,
+        user: cfg.remote_user,
+        password,
+        db_name: cfg.remote_name,
+        port: Some(cfg.remote_port as u16),
+        preferred_mode: cfg.preferred_mode,
+    })
+}
+
 pub async fn run_sync(
     State(local_db): State<Arc<dyn Database>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
+    headers: HeaderMap,
     payload: Option<Json<SyncConfig>>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = local_db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    // Obtener config de la DB si no se proporcionó en el payload
-    let config = if let Some(Json(c)) = payload {
-        c
-    } else {
-        let cfg = local_db.get_sync_config(user.id).await?
-            .ok_or_else(|| AppError::BadRequest("Configuración de sincronización faltante".to_string()))?;
-        SyncConfig {
-            host: cfg.remote_host,
-            user: cfg.remote_user,
-            password: sync_crypto.decrypt(&cfg.remote_pass),
-            db_name: cfg.remote_name,
-            port: Some(cfg.remote_port as u16),
-            preferred_mode: cfg.preferred_mode,
-        }
+    // Si el cliente envía la config explícita, se usa tal cual; si no, se lee de
+    // la DB y se descifra con la clave en tránsito.
+    let config = match payload {
+        Some(Json(c)) => c,
+        None => load_remote_config(local_db.as_ref(), user.id, &headers).await?,
     };
 
     let remote_db = connect_remote(&config).await?;
@@ -86,19 +116,31 @@ pub async fn get_sync_config(
 
 pub async fn set_sync_config(
     State(local_db): State<Arc<dyn Database>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
     Json(payload): Json<SyncConfig>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = local_db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
+    let existing = local_db.get_sync_config(user.id).await?;
+
+    // El cliente envía la contraseña ya cifrada E2E. Si viene vacía, se conserva
+    // la existente (no se borra al guardar sin reescribirla). Si no hay host, se
+    // limpia (desvinculación).
+    let remote_pass = if payload.host.trim().is_empty() {
+        String::new()
+    } else if payload.password.trim().is_empty() {
+        existing.map(|c| c.remote_pass).unwrap_or_default()
+    } else {
+        payload.password
+    };
+
     let model = SyncConfigModel {
         user_id: user.id,
         remote_host: payload.host,
         remote_port: payload.port.unwrap_or(3306) as i32,
         remote_user: payload.user,
-        remote_pass: sync_crypto.encrypt(&payload.password),
+        remote_pass,
         remote_name: payload.db_name,
         preferred_mode: payload.preferred_mode,
     };
@@ -109,24 +151,14 @@ pub async fn set_sync_config(
 
 pub async fn apply_sync(
     State(local_db): State<Arc<dyn Database>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
+    headers: HeaderMap,
     Json(plan): Json<crate::schemas::SyncPlan>,
 ) -> Result<impl IntoResponse, AppError> {
     let user = local_db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    let cfg = local_db.get_sync_config(user.id).await?
-        .ok_or_else(|| AppError::BadRequest("Configuración de sincronización faltante".to_string()))?;
-
-    let config = SyncConfig {
-        host: cfg.remote_host,
-        user: cfg.remote_user,
-        password: sync_crypto.decrypt(&cfg.remote_pass),
-        db_name: cfg.remote_name,
-        port: Some(cfg.remote_port as u16),
-        preferred_mode: cfg.preferred_mode,
-    };
+    let config = load_remote_config(local_db.as_ref(), user.id, &headers).await?;
     let remote_db = connect_remote(&config).await?;
 
     let engine = SyncEngine::new(local_db.as_ref(), &remote_db, user.id);
@@ -138,33 +170,24 @@ pub async fn test_sync_connection(
     AuthenticatedUser(_session): AuthenticatedUser,
     Json(payload): Json<SyncConfig>,
 ) -> Result<StatusCode, AppError> {
+    // Prueba efímera: la contraseña llega en claro y no se persiste.
     connect_remote(&payload).await?;
     Ok(StatusCode::OK)
 }
 
 pub async fn check_sync(
     State(local_db): State<Arc<dyn Database>>,
-    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let user = match local_db.get_user_by_username(&session.username).await {
         Ok(Some(u)) => u,
         _ => return Json(serde_json::json!({ "has_changes": false })),
     };
 
-    // Obtener config
-    let cfg = match local_db.get_sync_config(user.id).await {
-        Ok(Some(c)) => c,
-        _ => return Json(serde_json::json!({ "has_changes": false })),
-    };
-
-    let config = SyncConfig {
-        host: cfg.remote_host,
-        user: cfg.remote_user,
-        password: sync_crypto.decrypt(&cfg.remote_pass),
-        db_name: cfg.remote_name,
-        port: Some(cfg.remote_port as u16),
-        preferred_mode: cfg.preferred_mode,
+    let config = match load_remote_config(local_db.as_ref(), user.id, &headers).await {
+        Ok(c) => c,
+        Err(_) => return Json(serde_json::json!({ "has_changes": false })),
     };
     let remote_db = match connect_remote(&config).await {
         Ok(db) => db,

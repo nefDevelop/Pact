@@ -24,7 +24,7 @@
       
       const { salt } = await api.get(`/auth/salt/${username}`);
 
-      const { masterKey, authKey } = await deriveKeys(password, salt);
+      const { masterKey, authKey, syncKey, syncKeyHex } = await deriveKeys(password, salt);
 
       const data = await api.post('/auth/unlock', {
         username: username,
@@ -32,6 +32,8 @@
       });
 
       globalState.masterKey = masterKey;
+      globalState.syncKey = syncKey;
+      globalState.syncKeyHex = syncKeyHex;
       globalState.authToken = data.token;
       globalState.userColor = user.color;
 

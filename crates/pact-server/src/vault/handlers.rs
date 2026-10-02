@@ -80,6 +80,16 @@ pub async fn set_vault_path(
             _ => return Err(AppError::BadRequest("La bóveda debe tener extensión .pcty".to_string())),
         }
 
+        // La ruta no puede ser un directorio y su carpeta contenedora debe existir.
+        if p.exists() && p.is_dir() {
+            return Err(AppError::BadRequest("La ruta de la bóveda no puede ser un directorio".to_string()));
+        }
+        if let Some(parent) = p.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                return Err(AppError::BadRequest("El directorio de la bóveda no existe".to_string()));
+            }
+        }
+
         if !p.exists() || force_init {
             tracing::info!("[VAULT] Creando nueva bóveda en: {:?}", p);
             storage.init_vault(p).map_err(|e| AppError::BadRequest(format!("No se pudo inicializar la bóveda: {}", e)))?;
@@ -334,6 +344,21 @@ pub async fn update_account(
     };
 
     db.update_account(id, &updated, account.version + 1).await?;
+
+    // Gestión del TOTP: `""` lo elimina, un blob lo crea/actualiza y `None`
+    // (campo ausente) mantiene el valor actual.
+    match payload.totp_seed.as_deref() {
+        Some("") => {
+            db.delete_totp_setting_by_account(id).await?;
+        }
+        Some(seed) if !seed.trim().is_empty() => {
+            if let Err(e) = db.set_totp_setting(id, seed, None).await {
+                tracing::warn!("[VAULT] No se pudo actualizar el seed TOTP de la cuenta {}: {}", id, e);
+            }
+        }
+        _ => {}
+    }
+
     storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
 }

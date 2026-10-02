@@ -130,15 +130,17 @@ async fn main() {
     let session_mgr = Arc::new(SessionManager::new());
     let storage = Arc::new(StorageManager::new(Some(std::path::PathBuf::from(&vault_path))));
 
-    let sync_crypto = Arc::new(pact_server::crypto::SyncCrypto::new(&machine_id));
     let auth_limiter = pact_server::auth::ratelimit::auth_rate_limiter();
+    let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();
 
-    // Limpieza periódica del rate limiter
+    // Limpieza periódica de los rate limiters
     let limiter_cleanup = auth_limiter.clone();
+    let public_limiter_cleanup = public_limiter.clone();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(limiter_cleanup_secs)).await;
             limiter_cleanup.cleanup_expired();
+            public_limiter_cleanup.cleanup_expired();
         }
     });
 
@@ -159,8 +161,8 @@ async fn main() {
         session_mgr,
         storage,
         machine_id: machine_id.clone(),
-        sync_crypto,
         auth_limiter,
+        public_limiter,
         db_type: "SQLite".to_string(),
     };
 

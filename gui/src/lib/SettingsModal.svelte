@@ -247,6 +247,13 @@
 
     const payload = { ...syncConfig, preferred_mode: mode };
     try {
+      // La contraseña remota se cifra E2E con la subclave de sync antes de salir.
+      if (payload.password) {
+        if (!globalState.syncKey) {
+          throw new Error('La bóveda no está desbloqueada');
+        }
+        payload.password = await encryptE2E(payload.password, globalState.syncKey);
+      }
       await api.post('/sync/config', payload);
       globalState.notify('Bóveda', 'Guardado correctamente.', 'success');
       globalState.dbMode = mode;

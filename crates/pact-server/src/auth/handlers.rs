@@ -6,7 +6,10 @@ use axum::{
 use std::sync::Arc;
 use std::net::SocketAddr;
 use rand::{RngCore, rngs::OsRng};
+use blake2::Blake2bMac512;
+use blake2::digest::{KeyInit, Mac};
 
+use crate::AppState;
 use crate::db::Database;
 use crate::auth::ratelimit::SharedRateLimiter;
 use crate::auth::session::SharedSessionManager;
@@ -43,10 +46,35 @@ fn rate_key(prefix: &str, username: &str, connect_info: &Option<ConnectInfo<Sock
     }
 }
 
+/// Clave de rate limit por IP para endpoints pre-login.
+fn ip_rate_key(prefix: &str, connect_info: &Option<ConnectInfo<SocketAddr>>) -> String {
+    match connect_info {
+        Some(ConnectInfo(addr)) => format!("{}:{}", prefix, addr.ip()),
+        None => format!("{}:unknown", prefix),
+    }
+}
+
+/// Salt determinista para usuarios inexistentes. Evita que `get_salt` revele la
+/// existencia de una cuenta (anti-enumeración): siempre responde 200 con un
+/// salt con el mismo formato que uno real.
+fn fake_salt(secret: &str, username: &str) -> String {
+    let mut mac = <Blake2bMac512 as KeyInit>::new_from_slice(secret.as_bytes())
+        .expect("Blake2b acepta claves de 1 a 64 bytes");
+    mac.update(username.as_bytes());
+    let digest = mac.finalize().into_bytes();
+    hex::encode(&digest[..16])
+}
+
 pub async fn get_users(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
+    State(app): State<AppState>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
 ) -> Result<impl IntoResponse> {
+    if !app.public_limiter.check(&ip_rate_key("users", &connect_info)) {
+        return Err(AppError::BadRequest("Demasiadas peticiones. Espera un momento.".to_string()));
+    }
+
     let path = storage.get_path();
 
     if path.is_none() {
@@ -85,12 +113,22 @@ pub async fn get_users(
 
 pub async fn get_salt(
     State(db): State<Arc<dyn Database>>,
+    State(app): State<AppState>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse> {
-    let user = db.get_user_by_username(&username).await?
-        .ok_or(AppError::NotFound)?;
-    
-    Ok(Json(serde_json::json!({ "salt": user.salt.clone() })))
+    if !app.public_limiter.check(&ip_rate_key("salt", &connect_info)) {
+        return Err(AppError::BadRequest("Demasiadas peticiones. Espera un momento.".to_string()));
+    }
+
+    // Anti-enumeración: un usuario inexistente devuelve un salt determinista
+    // falso (200) indistinguible de uno real, en lugar de 404.
+    let salt = match db.get_user_by_username(&username).await? {
+        Some(user) => user.salt.clone(),
+        None => fake_salt(&app.machine_id, &username),
+    };
+
+    Ok(Json(serde_json::json!({ "salt": salt })))
 }
 
 pub async fn register(

@@ -11,7 +11,8 @@ vi.mock('@tauri-apps/api/core', () => ({
       const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
       return {
         master_key: hex,
-        auth_key: hex
+        auth_key: hex,
+        sync_key: hex
       };
     }
   })

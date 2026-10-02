@@ -21,8 +21,8 @@ pub struct AppState {
     pub session_mgr: SharedSessionManager,
     pub storage: Arc<StorageManager>,
     pub machine_id: String,
-    pub sync_crypto: Arc<crate::crypto::SyncCrypto>,
     pub auth_limiter: crate::auth::ratelimit::SharedRateLimiter,
+    pub public_limiter: crate::auth::ratelimit::SharedRateLimiter,
     pub db_type: String,
 }
 
@@ -42,12 +42,6 @@ impl FromRef<AppState> for SharedSessionManager {
 impl FromRef<AppState> for Arc<StorageManager> {
     fn from_ref(state: &AppState) -> Self {
         state.storage.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<crate::crypto::SyncCrypto> {
-    fn from_ref(state: &AppState) -> Self {
-        state.sync_crypto.clone()
     }
 }
 

@@ -11,6 +11,12 @@ class ApiClient {
         if (globalState.authToken) {
             headers.set('Authorization', `Bearer ${globalState.authToken}`);
         }
+
+        // La clave de sync viaja solo en las llamadas de sincronización para que
+        // el servidor descifre la config remota en tránsito.
+        if (globalState.syncKeyHex && endpoint.startsWith('/sync/')) {
+            headers.set('X-Pact-Sync-Key', globalState.syncKeyHex);
+        }
         
         if (options.body && !(options.body instanceof FormData)) {
             headers.set('Content-Type', 'application/json');

@@ -10,8 +10,11 @@ The server runs by default on `http://127.0.0.1:8002`.
 ## Zero-Knowledge model
 
 The server stores **E2E-encrypted blobs** for `title`, `url`, `username_site`,
-`encrypted_pass`, `folder.name`, `icon_data` and the TOTP seed. It never
-receives the `MasterKey` and cannot decrypt those fields or generate TOTP codes.
+`encrypted_pass`, `folder.name`, `icon_data`, the TOTP seed and the remote DB
+password (`sync_configs.remote_pass`, wrapped with a subkey derived from the
+`MasterKey`). It never receives the `MasterKey` and cannot decrypt those fields
+or generate TOTP codes. The remote DB password is decrypted only in transit
+during a sync request, using the `X-Pact-Sync-Key` header.
 
 It still observes **structural metadata** (`folder_id`, `is_favorite`,
 `deleted_at`, `version`, timestamps, `has_totp`), user names/colors and the
@@ -113,6 +116,8 @@ Authenticate a user and create a session.
 `GET /auth/salt/:username`
 
 Retrieve the salt for a specific user to perform hashing on the client.
+Anti-enumeration: unknown users receive a deterministic fake salt (same format)
+so existence cannot be inferred. Rate limited per IP.
 - **Response**: `200 OK`
 - **Body**: JSON
 ```json
@@ -137,7 +142,7 @@ Terminate the current session.
 
 List all users registered in the local instance. `vault_path` contains only the
 file name (not the full filesystem path). Available before login so the lock
-screen can list users.
+screen can list users. Rate limited per IP.
 - **Response**: `200 OK` with `UsersResponse`.
 
 ### Update User
@@ -365,6 +370,11 @@ the response at 1 MB.
 ---
 
 ## Sync Management
+
+> Sync endpoints that read the stored configuration (`/sync/run` without a body,
+> `/sync/apply`, `/sync/check`) require the header `X-Pact-Sync-Key: <hex32>`.
+> It is a subkey derived from the `MasterKey` that lets the server decrypt the
+> remote DB password **in transit only**; without it they return `400`.
 
 ### Run Sync
 `POST /sync/run`

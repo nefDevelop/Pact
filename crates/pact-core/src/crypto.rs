@@ -63,6 +63,19 @@ pub fn derivar_claves_dual(password: &str, salt: &[u8]) -> Result<(Vec<u8>, Vec<
     Ok((master_key, auth_key))
 }
 
+/// Deriva una subclave de 32 bytes a partir de la MasterKey y un contexto.
+/// Se usa para separar dominios (p. ej. la envoltura de la config de sync) sin
+/// volver a ejecutar Argon2id. Si la MasterKey se ve comprometida, todas las
+/// subclaves también, por eso el contexto solo separa usos, no sustituye a KDF.
+pub fn derivar_subclave(master: &[u8], contexto: &[u8]) -> Vec<u8> {
+    let mut hasher = Blake2b512::new();
+    hasher.update(b"pact_subkey_v1");
+    hasher.update(master);
+    hasher.update(contexto);
+    let result = hasher.finalize();
+    result[..KEY_LEN].to_vec()
+}
+
 /// Cifrado Autenticado AES-256-GCM.
 /// Retorna [nonce(12b)] + [ciphertext] + [tag(16b)]
 pub fn sellar_dato(texto_plano: &[u8], llave: &[u8]) -> Result<Vec<u8>, CryptoError> {

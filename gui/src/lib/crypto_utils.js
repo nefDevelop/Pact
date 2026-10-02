@@ -39,19 +39,29 @@ export async function deriveKeys(password, saltHex) {
   const keys = await invoke('derive_keys', { password, saltHex });
 
   const authKey = keys.auth_key;
+  const syncKeyHex = keys.sync_key;
+
+  const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 
   // Importamos la masterKey (hex) como un CryptoKey de AES-GCM para usar con la Web Crypto API
-  const masterKeyBytes = new Uint8Array(keys.master_key.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-
   const masterKey = await crypto.subtle.importKey(
     'raw',
-    masterKeyBytes,
+    hexToBytes(keys.master_key),
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']
   );
 
-  return { masterKey, authKey };
+  // Subclave para envolver la contraseña de la BD remota (solo vive en RAM).
+  const syncKey = await crypto.subtle.importKey(
+    'raw',
+    hexToBytes(syncKeyHex),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  return { masterKey, authKey, syncKey, syncKeyHex };
 }
 
 /**

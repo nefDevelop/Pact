@@ -19,6 +19,7 @@
   let clipboardError = $state(false);
   let folderId = $state(null);
   let isSaving = $state(false);
+  let removeTotp = $state(false);
 
   const colors = [
     '#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4', '#00BCD4',
@@ -70,6 +71,7 @@
       title = ''; username = ''; password = ''; totpSeed = ''; website = '';
       folderId = null; showAdvanced = false;
     }
+    removeTotp = false;
     clipboardError = false;
   });
 
@@ -117,6 +119,8 @@
       const encryptedTotp = totpSeed.trim()
         ? await encryptE2E(totpSeed.trim(), globalState.masterKey)
         : null;
+      // "" indica al backend que elimine el TOTP; null mantiene el actual.
+      const totpPayload = removeTotp ? '' : encryptedTotp;
 
       if (onSave) {
         const saved = await onSave({
@@ -127,7 +131,7 @@
           username_site: encryptedUser,
           encrypted_pass: encryptedPass,
           // El seed TOTP se cifra E2E antes de salir del cliente.
-          totp_seed: encryptedTotp,
+          totp_seed: totpPayload,
           is_favorite: entry ? entry.is_favorite : false,
           // Al editar se conserva el icono existente; al crear aún no hay.
           icon_data: entry?.icon_data ?? null
@@ -146,7 +150,7 @@
   }
 
   function resetForm() {
-    title = ''; username = ''; password = ''; totpSeed = ''; website = ''; showAdvanced = false; clipboardError = false; folderId = null;
+    title = ''; username = ''; password = ''; totpSeed = ''; website = ''; showAdvanced = false; clipboardError = false; folderId = null; removeTotp = false;
   }
 </script>
 
@@ -243,6 +247,16 @@
               </div>
             {/if}
           </div>
+          {#if isEditing && entry?.has_totp}
+            <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--md-surface-variant)]">
+              <span class="text-[9px] font-black uppercase tracking-widest {removeTotp ? 'text-red-500' : 'text-green-600'}">
+                {removeTotp ? 'Se eliminará al guardar' : '2FA activado'}
+              </span>
+              <button onclick={() => { removeTotp = !removeTotp; if (removeTotp) totpSeed = ''; }} class="text-[9px] font-black uppercase tracking-widest {removeTotp ? 'text-green-600' : 'text-red-500'} hover:opacity-70 transition-opacity">
+                {removeTotp ? 'Conservar' : 'Quitar 2FA'}
+              </button>
+            </div>
+          {/if}
           <div class="relative">
             <input id="e-2fa" bind:value={totpSeed} placeholder="JBSWY3DPEHPK3PXP" class="w-full h-12 bg-[var(--md-surface-variant)] rounded-xl pl-5 pr-12 outline-none text-xs font-mono border border-transparent focus:border-[#6750A4]/20 uppercase {totpSeed && !isSeedValid ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}" />
             <button onclick={pasteSeed} class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all" title="Pegar desde portapapeles">

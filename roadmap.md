@@ -58,6 +58,12 @@
 - [x] CHANGELOG y bump de versión a 0.2.0
 - [x] CI valida el build del escritorio (deps de Tauri + sidecar)
 
+### Fase 10: Completar seguridad (Fase 2) ✅
+- [x] Anti-enumeración en `/auth/salt` (salt determinista falso) + rate limit por IP en `/auth/salt` y `/auth/users`
+- [x] Endurecimiento de `set_vault_path` (rechaza directorios y carpetas inexistentes)
+- [x] `remote_pass` cifrada con una subclave derivada de la `MasterKey` (elimina el uso de `machine-id`); se descifra solo en tránsito con `X-Pact-Sync-Key`
+- [x] Editar/borrar TOTP (residual de Fase 1)
+
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)

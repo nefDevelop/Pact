@@ -39,6 +39,8 @@ pub trait Database: Send + Sync {
 
     // TOTP
     async fn create_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error>;
+    async fn set_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error>;
+    async fn delete_totp_setting_by_account(&self, account_id: i32) -> Result<(), Error>;
     async fn get_totp_setting_by_account(&self, account_id: i32) -> Result<Option<TOTPSetting>, Error>;
 
     // Sistema
@@ -53,6 +55,7 @@ macro_rules! impl_database {
         $result_ty:ty,
         timestamp: $timestamp:expr,
         upsert_clause: $upsert:expr,
+        totp_upsert: $totp_upsert:expr,
         count_ty: $count_ty:ty,
     ) => {
         #[async_trait]
@@ -305,6 +308,28 @@ macro_rules! impl_database {
                 Ok(())
             }
 
+            async fn set_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error> {
+                let sql = format!(
+                    "INSERT INTO totp_settings (account_id, encrypted_seed, issuer) VALUES (?, ?, ?) {}",
+                    $totp_upsert
+                );
+                sqlx::query(&sql)
+                    .bind(account_id)
+                    .bind(encrypted_seed)
+                    .bind(issuer)
+                    .execute(&self.pool)
+                    .await?;
+                Ok(())
+            }
+
+            async fn delete_totp_setting_by_account(&self, account_id: i32) -> Result<(), Error> {
+                sqlx::query("DELETE FROM totp_settings WHERE account_id = ?")
+                    .bind(account_id)
+                    .execute(&self.pool)
+                    .await?;
+                Ok(())
+            }
+
             async fn get_totp_setting_by_account(&self, account_id: i32) -> Result<Option<TOTPSetting>, Error> {
                 sqlx::query_as::<_, TOTPSetting>("SELECT * FROM totp_settings WHERE account_id = ?")
                     .bind(account_id)
@@ -338,6 +363,7 @@ impl_database!(
     sqlx::sqlite::SqliteQueryResult,
     timestamp: "CURRENT_TIMESTAMP",
     upsert_clause: "ON CONFLICT(user_id) DO UPDATE SET remote_host = excluded.remote_host, remote_port = excluded.remote_port, remote_user = excluded.remote_user, remote_pass = excluded.remote_pass, remote_name = excluded.remote_name, preferred_mode = excluded.preferred_mode",
+    totp_upsert: "ON CONFLICT(account_id) DO UPDATE SET encrypted_seed = excluded.encrypted_seed, issuer = excluded.issuer",
     count_ty: i32,
 );
 
@@ -359,5 +385,6 @@ impl_database!(
     sqlx::mysql::MySqlQueryResult,
     timestamp: "NOW()",
     upsert_clause: "ON DUPLICATE KEY UPDATE remote_host = VALUES(remote_host), remote_port = VALUES(remote_port), remote_user = VALUES(remote_user), remote_pass = VALUES(remote_pass), remote_name = VALUES(remote_name), preferred_mode = VALUES(preferred_mode)",
+    totp_upsert: "ON DUPLICATE KEY UPDATE encrypted_seed = VALUES(encrypted_seed), issuer = VALUES(issuer)",
     count_ty: i64,
 );

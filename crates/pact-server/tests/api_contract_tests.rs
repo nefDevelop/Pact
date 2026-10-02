@@ -3,7 +3,7 @@ use pact_server::{
     db::{Database, SqliteDatabase},
     auth::session::SessionManager,
     storage::StorageManager,
-    AppState, crypto::SyncCrypto,
+    AppState,
     auth::ratelimit::auth_rate_limiter,
 };
 use pact_server::models::CreateUser;
@@ -21,16 +21,16 @@ async fn setup_test_db() -> Arc<dyn Database> {
 fn build_app_state(db: Arc<dyn Database>) -> AppState {
     let session_mgr = Arc::new(SessionManager::new());
     let storage = Arc::new(StorageManager::new(None));
-    let sync_crypto = Arc::new(SyncCrypto::new("test-machine-id"));
     let auth_limiter = auth_rate_limiter();
+    let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();
 
     AppState {
         db,
         session_mgr,
         storage,
         machine_id: "test-machine-id".to_string(),
-        sync_crypto,
         auth_limiter,
+        public_limiter,
         db_type: "SQLite".to_string(),
     }
 }
@@ -843,13 +843,64 @@ async fn test_update_user() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/auth/salt/new_name", base))
+    // El nuevo nombre permite iniciar sesión; el antiguo ya no.
+    let resp = client.post(format!("{}/auth/login", base))
+        .json(&serde_json::json!({ "username": "new_name", "master_password": "pass" }))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/auth/salt/old_name", base))
+    let resp = client.post(format!("{}/auth/login", base))
+        .json(&serde_json::json!({ "username": "old_name", "master_password": "pass" }))
         .send().await.unwrap();
-    assert_eq!(resp.status(), 404);
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn test_get_salt_does_not_leak_user_existence() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "real_user", "master_password": "pass" }))
+        .send().await.unwrap();
+
+    // Usuario existente y usuario inexistente responden igual: 200 + 32 hex.
+    for username in ["real_user", "ghost_user"] {
+        let resp = client.get(format!("{}/auth/salt/{}", base, username))
+            .send().await.unwrap();
+        assert_eq!(resp.status(), 200, "salt de {username}");
+        let body: Value = resp.json().await.unwrap();
+        let salt = body["salt"].as_str().unwrap();
+        assert_eq!(salt.len(), 32, "salt de {username}");
+    }
+}
+
+#[tokio::test]
+async fn test_sync_run_requires_sync_key() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "sync_key_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    client.post(format!("{}/sync/config", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({
+            "host": "db.example.com",
+            "user": "admin",
+            "password": "prueba",
+            "db_name": "pact_db"
+        }))
+        .send().await.unwrap();
+
+    // Sin la cabecera X-Pact-Sync-Key no se puede descifrar la config remota.
+    let resp = client.post(format!("{}/sync/run", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 400);
 }
 
 #[tokio::test]
@@ -940,6 +991,48 @@ async fn test_totp_seed_is_stored_opaque() {
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
     assert_eq!(body["seed"], opaque_seed);
+}
+
+#[tokio::test]
+async fn test_update_and_remove_totp() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "totp_edit", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p" }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    // Añadir TOTP a una cuenta existente.
+    let resp = client.put(format!("{}/vault/accounts/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p", "totp_seed": "opaque-blob" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["seed"], "opaque-blob");
+
+    // Quitar TOTP con cadena vacía.
+    let resp = client.put(format!("{}/vault/accounts/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p", "totp_seed": "" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 404);
 }
 
 #[tokio::test]

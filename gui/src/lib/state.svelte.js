@@ -39,6 +39,10 @@ export const globalState = $state({
   selectedUser: null,
   /** @type {CryptoKey|null} */
   masterKey: null, // Llave E2E (Solo en RAM)
+  /** @type {CryptoKey|null} */
+  syncKey: null, // Subclave para envolver la config remota (Solo en RAM)
+  /** @type {string|null} */
+  syncKeyHex: null, // Misma subclave en hex, para enviarla al servidor en sync
   /** @type {string|null} */
   authToken: null, // Token de sesión Bearer
 
@@ -267,6 +271,8 @@ export const globalState = $state({
     this.hasConflicts = false;
     this.selectedUser = null;
     this.masterKey = null;
+    this.syncKey = null;
+    this.syncKeyHex = null;
     this.authToken = null;
     this.stopAutoSync();
     this.stopInactivityWatch();
@@ -281,32 +287,15 @@ export const globalState = $state({
     const { api } = await import('./api.js');
 
     try {
-      // 1. Machine ID
-      const midData = await api.get('/system/machine-id', { silent: true });
-      this.machineId = midData.machine_id;
-
-      // 2. Solo intentamos cargar/enviar config de sync si tenemos token
+      // Machine-id y config de sync requieren sesión; en el arranque no hay
+      // token, así que se cargan tras autenticar (refreshSyncConfig).
       if (this.authToken) {
-        const { decryptWithHardware } = await import('./crypto_utils.js');
-        const encryptedConfig = safeStorage.getItem('pact_remote_v1');
-        const savedConfig = await decryptWithHardware(encryptedConfig);
+        const midData = await api.get('/system/machine-id', { silent: true });
+        this.machineId = midData.machine_id;
 
-        if (savedConfig?.host) {
-          this.dbMode = savedConfig.preferred_mode || 'remote';
-          await api.post('/sync/config', {
-            preferred_mode: savedConfig.preferred_mode || 'remote',
-            host: savedConfig.host,
-            user: savedConfig.user,
-            password: savedConfig.password,
-            db_name: savedConfig.db_name || 'pact_db'
-          });
-        }
-
-        // 3. Sync Config
         const data = await api.get('/sync/config', { silent: true });
         if (data.preferred_mode) this.dbMode = data.preferred_mode;
       }
-
     } catch (e) {
       if (e.message !== "Unauthorized") {
         console.error("Error inicializando estado global:", e);

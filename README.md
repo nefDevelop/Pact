@@ -43,6 +43,7 @@ observa metadatos y parte de la configuración. Estos son los límites conocidos
 | `folders.name` | Cifrado E2E |
 | `accounts.icon_data` | Cifrado E2E |
 | `totp_settings.encrypted_seed` | Cifrado E2E; el código TOTP se genera en el cliente |
+| `sync_configs.remote_pass` | Cifrado con una subclave derivada de la `MasterKey`; el servidor la descifra solo en tránsito durante el sync |
 | `users.master_hash` | Verificador Argon2id de la `AuthKey` (no reversible a la `MasterKey`) |
 
 ### Datos que el servidor SÍ observa (pendiente)
@@ -52,8 +53,8 @@ observa metadatos y parte de la configuración. Estos son los límites conocidos
 | **Metadatos estructurales** (`folder_id`, `is_favorite`, `deleted_at`, `version`, `created_at`/`updated_at`, `has_totp`) | Nº de cuentas, favoritos, papelera, horarios y qué cuentas tienen 2FA | Ocultar/agrupar metadatos |
 | **`sync_configs.remote_host` / `remote_user` / `remote_name`** | Infraestructura y usuario de la BD remota | Hacer la sincronización en cliente o documentarlo como decisión |
 | **`users.username` / `color` / `created_at`** | Identidad y número de usuarios | Cifrar el alias de presentación |
-| **`/auth/users` y `/auth/salt/:username` (pre-login)** | Enumeración de usuarios y ataques offline al `master_hash` | Limitar el listado o exigir un secreto local |
-| **`sync_configs.remote_pass` y `totp` antiguos cifrados con clave derivada de `/etc/machine-id`** | La clave vive en la misma máquina, así que es recuperable con acceso local | Derivar de la `MasterKey` lo que el servidor no necesite descifrar |
+| **`/auth/users` (pre-login)** | Listado de nombres de usuario | Limitar el listado o exigir un secreto local |
+| **`/auth/salt/:username`** | ~~Enumeración~~ mitigado | Devuelve un salt determinista falso para usuarios inexistentes + rate limit por IP |
 
 ### Modelo de amenaza
 - **Servidor/BD comprometidos**: no pueden descifrar secretos, nombres de carpeta,
