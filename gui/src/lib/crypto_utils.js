@@ -29,14 +29,55 @@ export const safeStorage = {
   }
 };
 
+const isTauri = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+
 /**
- * Derivación de llaves E2E usando Argon2id (vía Rust/Tauri).
- * Genera dos llaves:
- * 1. masterKey: Para cifrar los datos localmente (Nunca sale del cliente).
- * 2. authKey: Para autenticarse con el servidor (Hash derivado).
+ * Módulo WASM de `pact-core`, cargado solo cuando hace falta (navegador).
+ *
+ * En Tauri la derivación va por el comando nativo `derive_keys`, así que el
+ * WASM no se descarga nunca en la app de escritorio.
+ */
+let wasmModulePromise = null;
+function loadWasm() {
+  if (!wasmModulePromise) {
+    // El import dinámico mantiene el WASM fuera del chunk inicial: en Tauri
+    // jamás se ejecuta y el navegador lo carga al desbloquear la bóveda.
+    wasmModulePromise = import('../wasm/pact_core.js');
+  }
+  return wasmModulePromise;
+}
+
+/**
+ * Derivación de llaves E2E con Argon2id.
+ *
+ * Produce tres llaves a partir de la contraseña maestra y el salt:
+ * 1. `masterKey`: cifra los secretos E2E. Nunca sale del cliente.
+ * 2. `authKey`: autentica contra el servidor (dominio separado por sal).
+ * 3. `syncKey`: subclave que envuelve la contraseña de la BD remota.
+ *
+ * Ambas rutas (Tauri y navegador) ejecutan el **mismo** código Rust: el
+ * escritorio vía comando nativo y el navegador vía el WASM de `pact-core`.
+ * Devolviendo exactamente el mismo contrato, una bóveda creada en un cliente se
+ * abre en el otro.
  */
 export async function deriveKeys(password, saltHex) {
-  const keys = await invoke('derive_keys', { password, saltHex });
+  let keys;
+  if (isTauri) {
+    keys = await invoke('derive_keys', { password, saltHex });
+  } else {
+    const wasm = await loadWasm();
+    const salt = new Uint8Array(
+      saltHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
+    );
+    const derived = wasm.wasm_derivar_claves_dual(password, salt);
+    // `free()` libera el bloque de memoria que reservó la llamada en el WASM.
+    keys = {
+      master_key: derived.master_key,
+      auth_key: derived.auth_key,
+      sync_key: derived.sync_key
+    };
+    derived.free();
+  }
 
   const authKey = keys.auth_key;
   const syncKeyHex = keys.sync_key;

@@ -29,6 +29,9 @@ Thumbs.db
 # --- TAURI SIDECAR ---
 crates/pact-desktop/binaries/
 
+# --- WASM (generado por `make build-wasm`) ---
+gui/src/wasm/
+
 # --- PACT SPECIFIC ---
 *.db
 *.db-journal

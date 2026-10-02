@@ -20,7 +20,7 @@ SIDECAR_DIR = crates/pact-desktop/binaries
 SIDECAR = $(SIDECAR_DIR)/pact-server-$(TARGET_TRIPLE)$(EXEEXT)
 
 .PHONY: help install install-gui deps test test-rs test-gui test-unit test-integration coverage mutants lint format run-server dev clean dev-tauri \
-	build build-gui build-server build-desktop build-tauri prepare-sidecar check check-rs check-gui audit test-mysql
+	build build-gui build-server build-desktop build-tauri build-wasm prepare-sidecar check check-rs check-gui audit test-mysql test-wasm
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -51,6 +51,11 @@ test-unit: ## Ejecuta unitarias Rust (session, ratelimit, crypto, db)
 test-integration: ## Ejecuta tests de integración (API, sync, use_cases, storage, security)
 	$(CARGO) test -p pact-server --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests --test mysql_tests
 
+test-wasm: ## Tests de paridad WASM vs nativo (requiere wasm-pack)
+	@command -v wasm-pack >/dev/null 2>&1 || \
+		(echo "Falta wasm-pack. Instálalo con: cargo install wasm-pack"; exit 1)
+	wasm-pack test --node crates/pact-core
+
 test-mysql: ## Tests de MySQL/MariaDB (requiere PACT_TEST_MYSQL_URL)
 	@test -n "$$PACT_TEST_MYSQL_URL" || (echo "Define PACT_TEST_MYSQL_URL (p. ej. mysql://user:pass@127.0.0.1:3306/pact_test)"; exit 1)
 	$(CARGO) test -p pact-server --test mysql_tests -- --nocapture
@@ -79,7 +84,15 @@ dev-tauri: deps prepare-sidecar ## Lanza Pact en modo Escritorio Nativo (Tauri +
 
 build: build-server build-desktop ## Genera todas las versiones de producción (Servidor y Desktop)
 
-build-gui: deps ## Compila la interfaz para producción
+build-wasm: ## Compila pact-core a WASM para el KDF del navegador (requiere wasm-pack)
+	@command -v wasm-pack >/dev/null 2>&1 || \
+		(echo "Falta wasm-pack. Instálalo con: cargo install wasm-pack"; exit 1)
+	@echo "Compilando pact-core a WASM..."
+	wasm-pack build crates/pact-core --target bundler --release \
+		--out-dir ../../gui/src/wasm --out-name pact_core --no-typescript
+	@echo "✓ WASM generado en gui/src/wasm"
+
+build-gui: deps build-wasm ## Compila la interfaz para producción
 	@echo "Construyendo GUI..."
 	cd $(GUI_DIR) && $(NPM) run build
 
