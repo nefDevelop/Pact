@@ -72,7 +72,7 @@ impl StorageManager {
     pub fn save_db(&self, username: &str, db_path: &Path) -> io::Result<()> {
         let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
 
@@ -104,9 +104,74 @@ impl StorageManager {
         }
 
         // Reemplazar el original con el temporal
-        temp_pcty.persist(pcty_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
         
         tracing::debug!("save_db (Zip I/O) completado en {:?}", t_total.elapsed());
+        Ok(())
+    }
+
+    /// Elimina la base de datos de un usuario del contenedor .pcty.
+    pub fn delete_user_db(&self, username: &str) -> io::Result<()> {
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
+        let pcty_path = path_lock.as_ref()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+
+        let db_name = format!("{}.db", username).to_lowercase();
+        let parent_dir = pcty_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        let temp_pcty = NamedTempFile::new_in(parent_dir)?;
+
+        {
+            let mut zin = ZipArchive::new(File::open(pcty_path)?)?;
+            let mut zout = ZipWriter::new(&temp_pcty);
+            for i in 0..zin.len() {
+                let file = zin.by_index(i)?;
+                if file.name().to_lowercase() == db_name {
+                    continue; // Omitimos la DB del usuario eliminado
+                }
+                zout.raw_copy_file(file)?;
+            }
+        }
+
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Renombra la base de datos de un usuario dentro del contenedor .pcty.
+    pub fn rename_user_db(&self, old_username: &str, new_username: &str) -> io::Result<()> {
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
+        let pcty_path = path_lock.as_ref()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+
+        let old_name = format!("{}.db", old_username).to_lowercase();
+        let new_entry = format!("{}.db", new_username);
+        let new_name_lc = new_entry.to_lowercase();
+        let parent_dir = pcty_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        let temp_pcty = NamedTempFile::new_in(parent_dir)?;
+
+        {
+            let mut zin = ZipArchive::new(File::open(pcty_path)?)?;
+            let mut zout = ZipWriter::new(&temp_pcty);
+            let options = FileOptions::<()>::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            for i in 0..zin.len() {
+                let mut file = zin.by_index(i)?;
+                let name_lc = file.name().to_lowercase();
+
+                if name_lc == old_name {
+                    zout.start_file(new_entry.as_str(), options)?;
+                    io::copy(&mut file, &mut zout)?;
+                } else if name_lc == new_name_lc {
+                    continue; // Se reescribe con el contenido del usuario renombrado
+                } else {
+                    zout.raw_copy_file(file)?;
+                }
+            }
+        }
+
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
         Ok(())
     }
 
@@ -157,7 +222,7 @@ impl StorageManager {
     pub fn extract_db(&self, username: &str, dest_path: &Path) -> io::Result<bool> {
         let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
 
@@ -191,7 +256,7 @@ impl StorageManager {
     pub fn list_users(&self) -> io::Result<Vec<String>> {
         let pcty_path = {
             let path_lock = self.pcty_path.lock()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+                .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
             path_lock.clone()
         };
 

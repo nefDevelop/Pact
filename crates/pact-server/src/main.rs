@@ -210,7 +210,9 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    if let Err(e) = axum::serve(listener, app).await {
+    // `into_make_service_with_connect_info` habilita ConnectInfo<SocketAddr>
+    // para el rate limiting por IP en los endpoints de autenticación.
+    if let Err(e) = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await {
         tracing::error!("Error del servidor: {}", e);
         std::process::exit(1);
     }

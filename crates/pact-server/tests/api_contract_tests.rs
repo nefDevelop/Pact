@@ -6,7 +6,7 @@ use pact_server::{
     AppState, crypto::SyncCrypto,
     auth::ratelimit::auth_rate_limiter,
 };
-use pact_server::models::{CreateUser, CreateFolder, CreateAccount};
+use pact_server::models::CreateUser;
 use uuid::Uuid;
 use serde_json::Value;
 
@@ -312,15 +312,12 @@ async fn test_delete_user_cascades() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "delete_me", "pass").await;
     let client = reqwest::Client::new();
-    client.post(format!("{}/auth/register", base))
-        .json(&serde_json::json!({
-            "username": "delete_me",
-            "master_password": "pass"
-        }))
-        .send().await.unwrap();
 
+    // Borrar exige sesión autenticada y la contraseña maestra.
     let resp = client.delete(format!("{}/auth/delete_me", base))
+        .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "master_password": "pass" }))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -352,7 +349,7 @@ async fn test_get_users_returns_list() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
-    assert!(body["users"].as_array().unwrap().len() > 0);
+    assert!(!body["users"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -773,10 +770,12 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("POST", format!("{}/vault/accounts/1/restore", base)),
         ("DELETE", format!("{}/vault/accounts/trash/empty", base)),
         ("GET", format!("{}/vault/pending-entries", base)),
+        ("POST", format!("{}/auth/update", base)),
+        ("GET", format!("{}/vault/proxy-icon", base)),
     ];
 
     for (method, url) in endpoints {
-        let resp = match method.as_ref() {
+        let resp = match method {
             "GET" => client.get(&url).send().await.unwrap(),
             "POST" => client.post(&url).json(&serde_json::json!({})).send().await.unwrap(),
             "DELETE" => client.delete(&url).send().await.unwrap(),
@@ -811,7 +810,7 @@ async fn test_export_vault_with_correct_password() {
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
     assert_eq!(body["username"], "export_ok");
-    assert!(body["folders"].as_array().unwrap().len() > 0);
+    assert!(!body["folders"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -820,16 +819,12 @@ async fn test_update_user() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "old_name", "pass").await;
     let client = reqwest::Client::new();
-    client.post(format!("{}/auth/register", base))
-        .json(&serde_json::json!({
-            "username": "old_name",
-            "master_password": "pass",
-            "color": "#ff0000"
-        }))
-        .send().await.unwrap();
 
+    // Renombrar exige sesión autenticada.
     let resp = client.post(format!("{}/auth/update", base))
+        .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({
             "old_name": "old_name",
             "new_name": "new_name",

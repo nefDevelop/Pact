@@ -5,12 +5,40 @@ use axum::{
 };
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use crate::db::Database;
+use crate::crypto::SyncCrypto;
 use crate::storage::StorageManager;
 use crate::schemas::{FolderCreate, AccountCreate, AccountQuery, PendingAccount, VaultPath};
 use crate::models::{CreateFolder, CreateAccount};
 use crate::auth::middleware::AuthenticatedUser;
 use crate::error::{AppError, Result};
+
+const MAX_TITLE_LEN: usize = 200;
+const MAX_NAME_LEN: usize = 100;
+const MAX_ICON_BYTES: usize = 1024 * 1024; // 1 MB
+
+/// Comprueba si una IP resuelta apunta a un rango privado, loopback o de
+/// enlace local. Se usa para mitigar SSRF en el proxy de iconos.
+fn is_forbidden_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || (octets[0] == 100 && (64..128).contains(&octets[1])) // CGNAT 100.64.0.0/10
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_unique_local()
+                || v6.is_unicast_link_local()
+        }
+    }
+}
 
 pub async fn get_vault_path(
     State(storage): State<Arc<StorageManager>>,
@@ -30,10 +58,26 @@ pub async fn set_vault_path(
     let path = payload.path.map(std::path::PathBuf::from);
     let force_init = payload.force_init.unwrap_or(false);
     tracing::info!("[VAULT] Petición de cambio de bóveda: {:?} (force_init: {})", path, force_init);
-    
+
+    // El primer arranque (sin bóveda vinculada) se permite sin sesión para poder
+    // crear/abrir la bóveda inicial. Cambiar de bóveda cuando ya hay usuarios
+    // (lo que resetea la DB local) exige estar autenticado.
+    if storage.get_path().is_some() {
+        let has_users = !db.get_all_users().await.map_err(|e| AppError::Internal(e.into()))?.is_empty();
+        if has_users && user_opt.is_none() {
+            return Err(AppError::Unauthorized);
+        }
+    }
+
     let mut is_new = false;
 
     if let Some(p) = &path {
+        // Solo aceptamos archivos .pcty para evitar apuntar a rutas arbitrarias.
+        match p.extension().and_then(|e| e.to_str()) {
+            Some(ext) if ext.eq_ignore_ascii_case("pcty") => {}
+            _ => return Err(AppError::BadRequest("La bóveda debe tener extensión .pcty".to_string())),
+        }
+
         if !p.exists() || force_init {
             tracing::info!("[VAULT] Creando nueva bóveda en: {:?}", p);
             storage.init_vault(p).map_err(|e| AppError::BadRequest(format!("No se pudo inicializar la bóveda: {}", e)))?;
@@ -50,7 +94,7 @@ pub async fn set_vault_path(
     
     storage.set_path(path.clone());
 
-    if let Some(p) = path {
+    if path.is_some() {
         tracing::info!("[VAULT] Paso 1: Ruta fijada, reseteando DB local");
         db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
 
@@ -116,11 +160,16 @@ pub async fn create_folder(
     let user = db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    tracing::debug!("Creando carpeta '{}' para usuario {}", payload.name, session.username);
+    let name = payload.name.trim();
+    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
+        return Err(AppError::BadRequest(format!("El nombre de la carpeta debe tener entre 1 y {} caracteres", MAX_NAME_LEN)));
+    }
+
+    tracing::debug!("Creando carpeta '{}' para usuario {}", name, session.username);
 
     let new_folder = CreateFolder {
         user_id: user.id,
-        name: payload.name.clone(),
+        name: name.to_string(),
         color: payload.color.clone(),
         icon: payload.icon.clone(),
         uid: None,
@@ -139,13 +188,18 @@ pub async fn update_folder(
     let user = db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
 
-    // Verificar propiedad (opcional pero recomendado)
+    // Verificar propiedad
     let folders = db.get_folders_by_user(user.id).await?;
     let folder = folders.into_iter().find(|f| f.id == id).ok_or(AppError::NotFound)?;
 
+    let name = payload.name.trim();
+    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
+        return Err(AppError::BadRequest(format!("El nombre de la carpeta debe tener entre 1 y {} caracteres", MAX_NAME_LEN)));
+    }
+
     let updated = CreateFolder {
         user_id: user.id,
-        name: payload.name,
+        name: name.to_string(),
         color: payload.color,
         icon: payload.icon,
         uid: Some(folder.uid),
@@ -161,6 +215,14 @@ pub async fn delete_folder(
     Path(id): Path<i32>,
     AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
+    let user = db.get_user_by_username(&session.username).await?
+        .ok_or(AppError::NotFound)?;
+
+    // Verificar propiedad: la carpeta debe pertenecer al usuario autenticado.
+    if !db.get_folders_by_user(user.id).await?.iter().any(|f| f.id == id) {
+        return Err(AppError::NotFound);
+    }
+
     db.delete_folder(id).await?;
     storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
@@ -196,11 +258,19 @@ pub async fn get_accounts(
 pub async fn create_account(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
+    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
     Json(payload): Json<AccountCreate>,
 ) -> Result<impl IntoResponse> {
     let user = db.get_user_by_username(&session.username).await?
         .ok_or(AppError::NotFound)?;
+
+    if payload.title.trim().is_empty() || payload.title.chars().count() > MAX_TITLE_LEN {
+        return Err(AppError::BadRequest(format!("El título debe tener entre 1 y {} caracteres", MAX_TITLE_LEN)));
+    }
+    if payload.encrypted_pass.is_empty() {
+        return Err(AppError::BadRequest("La contraseña cifrada es obligatoria".to_string()));
+    }
 
     tracing::debug!("Creando cuenta '{}' en carpeta ID {:?}", payload.title, payload.folder_id);
 
@@ -220,8 +290,11 @@ pub async fn create_account(
     storage.mark_dirty(&session.username);
 
     // Solo persistimos un ajuste TOTP si el usuario aportó una semilla real.
+    // El seed se cifra en reposo con la clave del servidor (necesaria para
+    // generar los códigos TOTP).
     if let Some(seed) = payload.totp_seed.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        if let Err(e) = db.create_totp_setting(id, seed, None).await {
+        let encrypted_seed = sync_crypto.encrypt(seed);
+        if let Err(e) = db.create_totp_setting(id, &encrypted_seed, None).await {
             tracing::warn!("[VAULT] No se pudo guardar el seed TOTP de la cuenta {}: {}", id, e);
         }
     }
@@ -241,6 +314,13 @@ pub async fn update_account(
 
     let accounts = db.get_accounts_by_user(user.id).await?;
     let account = accounts.into_iter().find(|a| a.id == id).ok_or(AppError::NotFound)?;
+
+    if payload.title.trim().is_empty() || payload.title.chars().count() > MAX_TITLE_LEN {
+        return Err(AppError::BadRequest(format!("El título debe tener entre 1 y {} caracteres", MAX_TITLE_LEN)));
+    }
+    if payload.encrypted_pass.is_empty() {
+        return Err(AppError::BadRequest("La contraseña cifrada es obligatoria".to_string()));
+    }
 
     let updated = CreateAccount {
         user_id: user.id,
@@ -286,6 +366,14 @@ pub async fn delete_account(
     Path(id): Path<i32>,
     AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
+    let user = db.get_user_by_username(&session.username).await?
+        .ok_or(AppError::NotFound)?;
+
+    // Verificar propiedad: la cuenta debe pertenecer al usuario autenticado.
+    if !db.get_accounts_by_user(user.id).await?.iter().any(|a| a.id == id) {
+        return Err(AppError::NotFound);
+    }
+
     db.delete_account(id).await?;
     storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
@@ -297,6 +385,13 @@ pub async fn restore_account(
     Path(id): Path<i32>,
     AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
+    let user = db.get_user_by_username(&session.username).await?
+        .ok_or(AppError::NotFound)?;
+
+    if !db.get_accounts_by_user(user.id).await?.iter().any(|a| a.id == id) {
+        return Err(AppError::NotFound);
+    }
+
     db.restore_account(id).await?;
     storage.mark_dirty(&session.username);
     Ok(StatusCode::OK)
@@ -364,8 +459,15 @@ pub async fn get_pending_entries(
 pub async fn delete_pending_entry(
     State(db): State<Arc<dyn Database>>,
     Path(id): Path<i32>,
-    _user: AuthenticatedUser, 
+    AuthenticatedUser(session): AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
+    // Verificar que la entrada pendiente pertenece al usuario autenticado.
+    let owns_entry = db.get_pending_accounts(&session.username).await?
+        .iter().any(|p| p.id == id);
+    if !owns_entry {
+        return Err(AppError::NotFound);
+    }
+
     db.delete_pending_account(id).await?;
     Ok(StatusCode::OK)
 }
@@ -385,10 +487,28 @@ pub async fn upload_vault(
 ) -> Result<impl IntoResponse> {
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(e.to_string()))? {
         if field.name() == Some("file") {
-            let file_name = field.file_name().unwrap_or("uploaded.pcty").to_string();
+            let raw_name = field.file_name().unwrap_or("uploaded.pcty");
+            // Nos quedamos solo con el nombre base para evitar path traversal.
+            let file_name = std::path::Path::new(raw_name)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("uploaded.pcty")
+                .to_string();
+
+            if !file_name.to_ascii_lowercase().ends_with(".pcty") {
+                return Err(AppError::BadRequest("El archivo debe ser una bóveda .pcty".to_string()));
+            }
+
             let data = field.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
             let path = std::path::PathBuf::from(&file_name);
             std::fs::write(&path, &data).map_err(|e| AppError::Internal(e.into()))?;
+
+            // Validar la firma antes de vincular la bóveda.
+            if !storage.validate_vault(&path).map_err(|e| AppError::Internal(e.into()))? {
+                let _ = std::fs::remove_file(&path);
+                return Err(AppError::BadRequest("El archivo no es una bóveda de Pact válida".to_string()));
+            }
+
             storage.set_path(Some(path));
             return Ok(StatusCode::OK);
         }
@@ -401,7 +521,14 @@ pub async fn initialize_vault(
     AuthenticatedUser(_session): AuthenticatedUser,
     Json(payload): Json<HashMap<String, String>>,
 ) -> Result<impl IntoResponse> {
-    let name = payload.get("name").map(|s| s.as_str()).unwrap_or("vault");
+    let raw_name = payload.get("name").map(|s| s.as_str()).unwrap_or("vault");
+    // Sanear el nombre: solo alfanuméricos, espacios, guiones y guiones bajos.
+    let cleaned: String = raw_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_'))
+        .collect();
+    let name = cleaned.trim();
+    let name = if name.is_empty() { "vault" } else { name };
     let file_name = format!("{}.pcty", name);
     let path = std::path::PathBuf::from(&file_name);
     storage.init_vault(&path).map_err(|e| AppError::BadRequest(e.to_string()))?;
@@ -411,6 +538,7 @@ pub async fn initialize_vault(
 
 pub async fn get_totp_code(
     State(db): State<Arc<dyn Database>>,
+    State(sync_crypto): State<Arc<SyncCrypto>>,
     AuthenticatedUser(session): AuthenticatedUser,
     Path(id): Path<i32>,
 ) -> Result<impl IntoResponse> {
@@ -425,7 +553,10 @@ pub async fn get_totp_code(
     let setting = db.get_totp_setting_by_account(id).await?
         .ok_or(AppError::NotFound)?;
 
-    let code = crate::vault::totp::get_totp_code(&setting.encrypted_seed);
+    // El seed se guarda cifrado. Fallback a texto plano para datos antiguos.
+    let decrypted = sync_crypto.decrypt(&setting.encrypted_seed);
+    let seed = if decrypted.is_empty() { setting.encrypted_seed.clone() } else { decrypted };
+    let code = crate::vault::totp::get_totp_code(&seed);
     Ok(Json(serde_json::json!({ "code": code })))
 }
 
@@ -452,6 +583,7 @@ pub async fn update_account_icon(
 
 pub async fn proxy_icon(
     Query(params): Query<HashMap<String, String>>,
+    _user: AuthenticatedUser,
 ) -> Result<impl IntoResponse> {
     let url = params.get("url").ok_or(AppError::BadRequest("Falta parámetro url".to_string()))?;
 
@@ -460,13 +592,28 @@ pub async fn proxy_icon(
     if scheme != "http" && scheme != "https" {
         return Err(AppError::BadRequest("Solo se permiten URLs HTTP/HTTPS".to_string()));
     }
-    let host = parsed.host_str().unwrap_or("");
-    if host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" || host.starts_with("10.") || host.starts_with("192.168.") || host.starts_with("172.") {
-        return Err(AppError::BadRequest("URL no permitida".to_string()));
+
+    let host = parsed.host_str().ok_or(AppError::BadRequest("URL sin host".to_string()))?;
+    let port = parsed.port_or_known_default().unwrap_or(443);
+
+    // Resolvemos el DNS y rechazamos cualquier IP en rangos privados/loopback
+    // para mitigar SSRF (incluye metadata cloud 169.254.169.254, etc.).
+    let addrs = tokio::net::lookup_host((host, port)).await
+        .map_err(|_| AppError::BadRequest("No se pudo resolver el host".to_string()))?;
+    let mut any = false;
+    for addr in addrs {
+        any = true;
+        if is_forbidden_ip(addr.ip()) {
+            return Err(AppError::BadRequest("URL no permitida".to_string()));
+        }
+    }
+    if !any {
+        return Err(AppError::BadRequest("No se pudo resolver el host".to_string()));
     }
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|e| AppError::Internal(e.into()))?;
 
@@ -475,9 +622,18 @@ pub async fn proxy_icon(
         .await
         .map_err(|e| AppError::BadRequest(format!("Error al descargar: {}", e)))?;
 
+    if let Some(len) = response.content_length() {
+        if len as usize > MAX_ICON_BYTES {
+            return Err(AppError::BadRequest("Imagen demasiado grande".to_string()));
+        }
+    }
+
     let bytes = response.bytes().await.map_err(|e| AppError::BadRequest(format!("Error al leer: {}", e)))?;
+    if bytes.len() > MAX_ICON_BYTES {
+        return Err(AppError::BadRequest("Imagen demasiado grande".to_string()));
+    }
+
     use base64::Engine;
     let base64_str = base64::engine::general_purpose::STANDARD.encode(&bytes);
-
     Ok(Json(serde_json::json!({ "base64": base64_str })))
 }

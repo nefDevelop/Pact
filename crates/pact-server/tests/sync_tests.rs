@@ -51,7 +51,7 @@ async fn test_sync_folder_creation_local_to_remote() {
     let remote_folders = remote_db.get_folders_by_user(user_id).await.unwrap();
     assert_eq!(remote_folders.len(), 1);
     assert_eq!(remote_folders[0].name, folder_name);
-    assert!(remote_folders[0].uid.len() > 0);
+    assert!(!remote_folders[0].uid.is_empty());
 }
 
 #[tokio::test]

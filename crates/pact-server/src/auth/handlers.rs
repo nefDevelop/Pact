@@ -1,18 +1,47 @@
 use axum::{
-    extract::{State, Json, Path},
+    extract::{State, Json, Path, ConnectInfo},
     http::{StatusCode, HeaderMap},
     response::IntoResponse,
 };
 use std::sync::Arc;
+use std::net::SocketAddr;
 use rand::{RngCore, rngs::OsRng};
 
 use crate::db::Database;
 use crate::auth::ratelimit::SharedRateLimiter;
 use crate::auth::session::SharedSessionManager;
+use crate::auth::middleware::AuthenticatedUser;
 use crate::storage::StorageManager;
 use crate::schemas::{UserRegister, UserLogin, AuthResponse, UsersResponse, UserListItem};
 use crate::models::CreateUser;
 use crate::error::{AppError, Result};
+
+/// Valida el nombre de usuario. Se usa como clave en la DB y como nombre de
+/// archivo dentro de la bóveda, por lo que no puede contener separadores de
+/// ruta ni caracteres de control.
+fn validate_username(username: &str) -> Result<()> {
+    let len = username.chars().count();
+    if len == 0 || len > 64 {
+        return Err(AppError::BadRequest("El usuario debe tener entre 1 y 64 caracteres".to_string()));
+    }
+    if username.contains('/') || username.contains('\\') || username.contains("..") {
+        return Err(AppError::BadRequest("El usuario contiene caracteres no permitidos".to_string()));
+    }
+    if username.chars().any(|c| c.is_control()) {
+        return Err(AppError::BadRequest("El usuario contiene caracteres no permitidos".to_string()));
+    }
+    Ok(())
+}
+
+/// Construye la clave del rate limiter combinando IP y usuario cuando la IP
+/// está disponible. Esto evita que un atacante bloquee a una víctima agotando
+/// sus intentos desde otra máquina.
+fn rate_key(prefix: &str, username: &str, connect_info: &Option<ConnectInfo<SocketAddr>>) -> String {
+    match connect_info {
+        Some(ConnectInfo(addr)) => format!("{}:{}:{}", prefix, addr.ip(), username),
+        None => format!("{}:{}", prefix, username),
+    }
+}
 
 pub async fn get_users(
     State(db): State<Arc<dyn Database>>,
@@ -63,10 +92,13 @@ pub async fn register(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
     State(limiter): State<SharedRateLimiter>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Json(payload): Json<UserRegister>,
 ) -> Result<impl IntoResponse> {
-    let rate_key = format!("register:{}", payload.username);
-    if !limiter.check(&rate_key) {
+    validate_username(&payload.username)?;
+
+    let key = rate_key("register", &payload.username, &connect_info);
+    if !limiter.check(&key) {
         return Err(AppError::BadRequest("Demasiados intentos. Espera un minuto.".to_string()));
     }
     let t_total = std::time::Instant::now();
@@ -124,10 +156,11 @@ pub async fn login(
     State(db): State<Arc<dyn Database>>,
     State(session_mgr): State<SharedSessionManager>,
     State(limiter): State<SharedRateLimiter>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Json(payload): Json<UserLogin>,
 ) -> Result<impl IntoResponse> {
-    let rate_key = format!("login:{}", payload.username);
-    if !limiter.check(&rate_key) {
+    let key = rate_key("login", &payload.username, &connect_info);
+    if !limiter.check(&key) {
         return Err(AppError::BadRequest("Demasiados intentos. Espera un minuto.".to_string()));
     }
     let t_total = std::time::Instant::now();
@@ -179,9 +212,10 @@ pub async fn unlock(
     state_db: State<Arc<dyn Database>>,
     state_session_mgr: State<SharedSessionManager>,
     state_limiter: State<SharedRateLimiter>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     json_payload: Json<UserLogin>,
 ) -> Result<impl IntoResponse> {
-    login(state_db, state_session_mgr, state_limiter, json_payload).await
+    login(state_db, state_session_mgr, state_limiter, connect_info, json_payload).await
 }
 
 pub async fn lock(
@@ -200,15 +234,29 @@ pub async fn lock(
 
 pub async fn update_user(
     State(db): State<Arc<dyn Database>>,
+    State(storage): State<Arc<StorageManager>>,
+    AuthenticatedUser(_session): AuthenticatedUser,
     Json(payload): Json<crate::schemas::UserUpdate>,
 ) -> Result<impl IntoResponse> {
+    validate_username(&payload.new_name)?;
     db.update_user(&payload.old_name, &payload.new_name, &payload.new_color).await?;
+
+    // La bóveda guarda un `<usuario>.db` por cuenta: hay que renombrarlo para
+    // que el usuario siga siendo localizable tras el cambio de nombre.
+    if payload.old_name != payload.new_name {
+        if let Err(e) = storage.rename_user_db(&payload.old_name, &payload.new_name) {
+            tracing::warn!("[AUTH] No se pudo renombrar la DB en la bóveda: {}", e);
+        }
+    }
+    storage.mark_dirty(&payload.new_name);
     Ok(StatusCode::OK)
 }
 
 pub async fn delete_user(
     State(db): State<Arc<dyn Database>>,
+    State(storage): State<Arc<StorageManager>>,
     State(session_mgr): State<SharedSessionManager>,
+    AuthenticatedUser(_session): AuthenticatedUser,
     Path(username): Path<String>,
     Json(payload): Json<crate::schemas::MasterPasswordOnly>,
 ) -> Result<impl IntoResponse> {
@@ -235,6 +283,11 @@ pub async fn delete_user(
 
     // 4. Borrar de la base de datos
     db.delete_user(&username).await?;
+
+    // 5. Eliminar también su DB del contenedor .pcty para no dejarla huérfana.
+    if let Err(e) = storage.delete_user_db(&username) {
+        tracing::warn!("[AUTH] No se pudo eliminar la DB de '{}' de la bóveda: {}", username, e);
+    }
 
     Ok(StatusCode::OK)
 }

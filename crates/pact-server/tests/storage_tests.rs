@@ -1,9 +1,8 @@
 use std::fs::File;
 use std::io::{Write, Read};
-use std::path::PathBuf;
 use tempfile::tempdir;
 use pact_server::storage::StorageManager;
-use zip::{ZipArchive, ZipWriter, write::FileOptions};
+use zip::{ZipWriter, write::FileOptions};
 
 #[test]
 fn test_vault_initialization_and_validation() {

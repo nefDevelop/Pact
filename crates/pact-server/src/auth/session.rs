@@ -18,6 +18,12 @@ pub struct SessionManager {
     session_timeout: Duration,
 }
 
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionManager {
     pub fn new() -> Self {
         Self::new_with_timeout(Duration::hours(1))
