@@ -49,6 +49,11 @@ make dev
 - **Frontend:** [http://localhost:8088](http://localhost:8088)
 - **Backend API:** [http://localhost:8002](http://localhost:8002)
 
+> [!NOTE]
+> La derivación de claves (Argon2id) se ejecuta vía Tauri, por lo que el registro
+> y el desbloqueo solo funcionan en el shell nativo (`make dev-tauri`). El modo
+> navegador sirve para trabajar en la interfaz.
+
 ### B. Modo Desktop Nativo (Tauri)
 Lanza la aplicación con su ventana nativa y backend integrado:
 ```bash
@@ -78,8 +83,13 @@ make test-gui         # Tests del frontend (Vitest)
 
 ### Análisis de Código (Linting)
 ```bash
-make lint         # Verifica estándares de código con Clippy y ESLint
+make lint         # Verifica estándares de código con Clippy, ESLint y svelte-check
+make check        # Comprueba compilación de Rust y tipos de la GUI
 ```
+
+### Integración Continua
+El workflow de GitHub Actions (`.github/workflows/ci.yml`) ejecuta `make lint`,
+`make test-unit`, `make test-integration` y `make test-gui` en cada push/PR.
 
 ## Estructura del Proyecto
 

@@ -33,7 +33,7 @@ Get the current state of the server, including version and active sessions.
 ```json
 {
   "status": "Running",
-  "version": "0.1.0-alpha",
+  "version": "0.1.0",
   "engine": "Rust/Axum",
   "database": "SQLite (Connected)",
   "active_sessions": 5
@@ -69,7 +69,8 @@ Register a new user in the system.
   "color": "#ff0000"
 }
 ```
-- **Response**: `200 OK` with `AuthResponse` or `400 Bad Request` with `ErrorResponse`.
+- **Response**: `201 Created` with `AuthResponse` or `400 Bad Request` with `ErrorResponse`.
+- **Note**: `username` must be 1–64 chars and cannot contain `/`, `\` or `..`.
 
 ### Login
 `POST /auth/login`
@@ -98,7 +99,10 @@ Authenticate a user and create a session.
 
 Retrieve the salt for a specific user to perform hashing on the client.
 - **Response**: `200 OK`
-- **Body**: `String` (text/plain)
+- **Body**: JSON
+```json
+{ "salt": "a1b2c3d4..." }
+```
 
 ### Unlock Session
 `POST /auth/unlock`
@@ -122,7 +126,9 @@ List all users registered in the local instance.
 ### Update User
 `POST /auth/update`
 
-Update current user's profile (username and color).
+Update a user's profile (username and color). Requires an authenticated session
+(`Authorization: Bearer <token>`). Renaming a user also renames its `<user>.db`
+inside the `.pcty` vault.
 - **Request Body**: `UserUpdate` (JSON)
 ```json
 {
@@ -131,20 +137,20 @@ Update current user's profile (username and color).
   "new_color": "#00ff00"
 }
 ```
-- **Response**: `200 OK`.
+- **Response**: `200 OK`, `401 Unauthorized` without session.
 
 ### Delete User
 `DELETE /auth/:username`
 
-Permanently delete a user account and its data. Requires master password verification.
-- **Request Body**: `UserDelete` (JSON)
+Permanently delete a user account and its data. Requires an authenticated session
+and master password verification. Removes the user's `<user>.db` from the vault.
+- **Request Body**: `MasterPasswordOnly` (JSON)
 ```json
 {
-  "username": "alice",
   "master_password": "hashed_password"
 }
 ```
-- **Response**: `200 OK` or `401 Unauthorized`.
+- **Response**: `200 OK`, `401 Unauthorized` or `404 Not Found`.
 
 ---
 
@@ -190,7 +196,10 @@ Delete a folder. Note: Accounts in this folder will have their `folder_id` set t
 ### Get Accounts
 `GET /vault/accounts`
 
-Retrieve all accounts (credentials) for the authenticated user.
+Retrieve accounts for the authenticated user. Trashed accounts are hidden by
+default.
+- **Query params** (all optional): `include_deleted=true` (include trash),
+  `is_favorite=true`, `folder_id=<id>`.
 - **Response**: `200 OK`
 - **Body**: `Array<Account>`
 
@@ -265,11 +274,14 @@ Get the path to the current vault file (e.g., `pact.pcty`).
 ### Set Vault Path
 `POST /vault/config/path`
 
-Change or initialize the vault file path.
+Change or initialize the vault file path. The path must end in `.pcty`.
+On first run (no users yet) it can be called without a session; once users
+exist it requires authentication because it resets the local database.
 - **Request Body**: `VaultPath` (JSON)
 ```json
 {
-  "path": "/new/path/to/vault.pcty"
+  "path": "/new/path/to/vault.pcty",
+  "force_init": false
 }
 ```
 
@@ -279,6 +291,54 @@ Change or initialize the vault file path.
 Retrieve accounts shared with the user that are waiting to be accepted.
 - **Response**: `200 OK`
 - **Body**: `Array<PendingAccount>`
+
+### Delete Pending Entry
+`DELETE /vault/pending-entries/:id`
+
+Discard a pending entry. Only the owner can delete it (`404` otherwise).
+- **Response**: `200 OK`.
+
+### Get Pending Count
+`GET /vault/pending-count/:username`
+
+Get the number of pending entries for a user. Available before login so the lock
+screen can show the badge.
+- **Response**: `200 OK` with `{ "count": number }`.
+
+### Upload Vault
+`POST /vault/upload` *(multipart/form-data, authenticated)*
+
+Upload a `.pcty` vault file. The server keeps only the base filename, rejects
+non-`.pcty` files and validates the vault signature before linking it.
+- **Response**: `200 OK`, `400 Bad Request`.
+
+### Initialize Vault
+`POST /vault/initialize` *(authenticated)*
+
+Create a new empty vault. The provided `name` is sanitized (alphanumerics,
+spaces, `-`, `_`).
+- **Request Body**: `{ "name": "my_vault" }`
+- **Response**: `200 OK` with `{ "path": "..." }`.
+
+### Get TOTP Code
+`GET /vault/totp/:id` *(authenticated)*
+
+Generate the current 6-digit TOTP code for an account. The stored seed is
+encrypted at rest; returns `------` if it cannot be processed.
+- **Response**: `200 OK` with `{ "code": "123456" }`.
+
+### Update Account Icon
+`PATCH /vault/accounts/:id/icon` *(authenticated)*
+- **Request Body**: `{ "icon_data": "data:image/png;base64,..." }`
+- **Response**: `200 OK`.
+
+### Proxy Icon
+`GET /vault/proxy-icon?url=<https_url>` *(authenticated)*
+
+Download a remote icon server-side. Resolves DNS and blocks private/loopback/
+link-local/CGNAT addresses (SSRF protection), does not follow redirects and caps
+the response at 1 MB.
+- **Response**: `200 OK` with `{ "base64": "..." }`, `400 Bad Request`.
 
 ---
 
@@ -299,14 +359,21 @@ Execute the synchronization plan (push/pull changes).
 ### Check Sync Status
 `GET /sync/check`
 
-Verify the connection with the remote synchronization server.
-- **Response**: `200 OK`
+Check whether there are remote changes to pull.
+- **Response**: `200 OK` with `{ "has_changes": boolean }`.
+
+### Test Sync Connection
+`POST /sync/test`
+
+Test connectivity with a remote database without persisting the configuration.
+- **Request Body**: `SyncConfig` (JSON)
+- **Response**: `200 OK` or `400 Bad Request` (the MySQL URL is never echoed).
 
 ### Get Sync Configuration
 `GET /sync/config`
 
-Retrieve the current synchronization settings (host, user, etc.).
-- **Response**: `200 OK` with `SyncConfig`.
+Retrieve the current synchronization settings (the password is never returned).
+- **Response**: `200 OK` with `SyncConfig` or `404 Not Found` if not configured.
 
 ### Set Sync Configuration
 `POST /sync/config`

@@ -35,3 +35,19 @@
 - [x] Auditoría de seguridad del cifrado E2E ✅
 - [x] Eliminar dependencias de Python del entorno de usuario final ✅
 
+### Fase 7: Cierre y Pulido ✅
+- [x] CRUD de cuentas E2E en la GUI (crear/editar/eliminar) y copia al portapapeles
+- [x] TOTP funcional (Base32 + URIs otpauth + cifrado en reposo)
+- [x] Contrato de sincronización alineado (`/sync/run` calcula, `/sync/apply` aplica) y propagación de borrados
+- [x] Auto-bloqueo por inactividad y auto-sync según modo local/remoto/híbrido
+- [x] Endurecimiento de seguridad (auth/IDOR, path traversal, SSRF, cifrado TOTP, rate limit por IP)
+- [x] Pestaña de Categorías, bandeja de pendientes, tema persistente, CSP y accesibilidad
+- [x] CI (lint + tests) y tests de componentes Svelte
+
+### Próximos pasos
+- [ ] Cobertura de código (`cargo tarpaulin`) y testing de mutación (`cargo mutants`) en CI
+- [ ] Migraciones y cobertura de tests para MariaDB/MySQL remoto
+- [ ] Empaquetar `pact-server` como sidecar de Tauri (`externalBin`) para la app instalada
+- [ ] Fallback WebCrypto/WASM para el modo navegador
+- [ ] i18n (es/en) y tests E2E de UI
+

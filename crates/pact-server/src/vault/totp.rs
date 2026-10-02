@@ -35,7 +35,10 @@ fn generate_totp_code(seed: &str) -> Result<String, String> {
         .to_bytes()
         .map_err(|e| format!("Secret error: {e:?}"))?;
 
-    let totp = TOTP::new(
+    // `new_unchecked` evita la validación de tamaño mínimo (128 bits) de
+    // `TOTP::new`. Los seeds de 80 bits (16 caracteres Base32) son el estándar
+    // de facto de la mayoría de autenticadores y su HMAC es válido.
+    let totp = TOTP::new_unchecked(
         Algorithm::SHA1,
         6,
         1,
@@ -43,7 +46,7 @@ fn generate_totp_code(seed: &str) -> Result<String, String> {
         secret,
         None,
         String::new(),
-    ).map_err(|e| format!("TOTP init error: {e:?}"))?;
+    );
 
     totp.generate_current()
         .map_err(|e| format!("TOTP generate error: {e:?}"))
@@ -63,6 +66,15 @@ mod tests {
         let code = get_totp_code("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
         assert_ne!(code, "------");
         assert_eq!(code.len(), 6);
+    }
+
+    #[test]
+    fn generates_code_from_short_80_bit_seed() {
+        // Seed típico de 10 bytes (16 caracteres Base32) usado por la mayoría
+        // de autenticadores; `TOTP::new` lo rechazaría por tamaño.
+        let code = get_totp_code("JBSWY3DPEHPK3PXP");
+        assert_eq!(code.len(), 6);
+        assert!(code.chars().all(|c| c.is_ascii_digit()), "código inesperado: {code:?}");
     }
 
     #[test]

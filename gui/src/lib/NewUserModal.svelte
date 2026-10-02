@@ -133,8 +133,7 @@
 
   let passwordStrength = $derived.by(() => {
     if (isCriticallyWeak || password.length === 0) return 0;
-    let metCount = requirements.filter(r => r.met).length;
-    console.log('[DEBUG] password:', password, 'length:', password.length, 'metCount:', metCount, 'reqs:', requirements.map(r => r.met), 'isCriticallyWeak:', isCriticallyWeak);
+    const metCount = requirements.filter(r => r.met).length;
     if (password.length < 12) return Math.min(metCount, 3);
     if (metCount === 4) return 4;
     return Math.min(metCount, 3);

@@ -96,7 +96,7 @@
         }
       }
     } catch (e) { 
-        if (e.message !== "Unauthorized") console.error("[DEBUG] Error en loadUsers:", e); 
+        if (e.message !== "Unauthorized") console.error("[AUTH] Error en loadUsers:", e); 
     } finally {
       isLoading = false;
       globalState.isSyncing = false;

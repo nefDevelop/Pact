@@ -64,3 +64,16 @@ impl SyncCrypto {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sync_crypto_roundtrip() {
+        let c = SyncCrypto::new("test-machine-id");
+        let enc = c.encrypt("JBSWY3DPEHPK3PXP");
+        assert!(!enc.is_empty(), "encrypt produjo vacío");
+        assert_eq!(c.decrypt(&enc), "JBSWY3DPEHPK3PXP");
+    }
+}

@@ -219,7 +219,9 @@ macro_rules! impl_database {
             }
 
             async fn delete_account(&self, id: i32) -> Result<(), Error> {
-                let sql = format!("UPDATE accounts SET deleted_at = {} WHERE id = ?", $timestamp);
+                // Se incrementa la versión para que el borrado (tombstone) gane
+                // en la reconciliación Last-Write-Wins del motor de sync.
+                let sql = format!("UPDATE accounts SET deleted_at = {}, version = version + 1, updated_at = {} WHERE id = ?", $timestamp, $timestamp);
                 sqlx::query(&sql)
                     .bind(id)
                     .execute(&self.pool)
@@ -228,7 +230,8 @@ macro_rules! impl_database {
             }
 
             async fn restore_account(&self, id: i32) -> Result<(), Error> {
-                sqlx::query("UPDATE accounts SET deleted_at = NULL WHERE id = ?")
+                let sql = format!("UPDATE accounts SET deleted_at = NULL, version = version + 1, updated_at = {} WHERE id = ?", $timestamp);
+                sqlx::query(&sql)
                     .bind(id)
                     .execute(&self.pool)
                     .await?;

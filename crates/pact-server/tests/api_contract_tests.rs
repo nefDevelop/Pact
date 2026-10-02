@@ -335,6 +335,8 @@ async fn test_delete_user_cascades() {
 async fn test_get_users_returns_list() {
     let db = setup_test_db().await;
     let state = build_app_state(db);
+    // `get_users` solo lista usuarios cuando hay una bóveda vinculada.
+    state.storage.set_path(Some(std::path::PathBuf::from("/tmp/pact_test.pcty")));
     let base = start_test_server(state).await;
 
     let client = reqwest::Client::new();
@@ -772,6 +774,8 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("GET", format!("{}/vault/pending-entries", base)),
         ("POST", format!("{}/auth/update", base)),
         ("GET", format!("{}/vault/proxy-icon", base)),
+        ("POST", format!("{}/vault/initialize", base)),
+        ("POST", format!("{}/vault/upload", base)),
     ];
 
     for (method, url) in endpoints {
@@ -868,4 +872,108 @@ async fn test_set_sync_config_password_cleared_on_get() {
     let body: Value = resp.json().await.unwrap();
     assert_eq!(body["password"], "");
     assert_eq!(body["host"], "db.example.com");
+}
+
+#[tokio::test]
+async fn test_unlock_returns_token() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "unlock_user", "master_password": "pass" }))
+        .send().await.unwrap();
+
+    let resp = client.post(format!("{}/auth/unlock", base))
+        .json(&serde_json::json!({ "username": "unlock_user", "master_password": "pass" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert!(!body["token"].as_str().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_register_rejects_unsafe_username() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    let resp = client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "../evil", "master_password": "pass" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_totp_code_generation() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "totp_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({
+            "title": "2FA",
+            "encrypted_pass": "p",
+            "totp_seed": "JBSWY3DPEHPK3PXP"
+        }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    let code = body["code"].as_str().unwrap();
+    assert_eq!(code.len(), 6);
+    assert!(code.chars().all(|c| c.is_ascii_digit()), "código TOTP inesperado: {code:?}");
+}
+
+#[tokio::test]
+async fn test_update_account_icon() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "icon_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "Icon", "encrypted_pass": "p" }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    let resp = client.patch(format!("{}/vault/accounts/{}/icon", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "icon_data": "data:image/png;base64,AAAA" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body[0]["icon_data"], "data:image/png;base64,AAAA");
+}
+
+#[tokio::test]
+async fn test_proxy_icon_blocks_private_addresses() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "proxy_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.get(format!("{}/vault/proxy-icon?url=http://127.0.0.1/favicon.ico", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 400);
 }
