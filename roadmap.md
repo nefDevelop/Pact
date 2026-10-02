@@ -64,6 +64,11 @@
 - [x] `remote_pass` cifrada con una subclave derivada de la `MasterKey` (elimina el uso de `machine-id`); se descifra solo en tránsito con `X-Pact-Sync-Key`
 - [x] Editar/borrar TOTP (residual de Fase 1)
 
+### Fase 11: Completar UX (Fase 3) ✅
+- [x] i18n propio (es/en) sin dependencias, con conmutador en Ajustes
+- [x] Iconos de marca servidos por el backend (allowlist; el webview no contacta con terceros)
+- [x] Accesibilidad: focus-trap en modales y `aria-label` en botones de solo icono
+
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
 - [ ] Ocultar metadatos estructurales (nº de cuentas, favoritos, timestamps)
