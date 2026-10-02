@@ -111,9 +111,9 @@ servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 - [x] README: el modo navegador deja de estar limitado a interfaz
 
 **Release**
-- [ ] Empaquetado Linux (AppImage) y Windows (NSIS/MSI)
+- [x] Empaquetado Linux (AppImage) y Windows (NSIS/MSI) — targets `build-appimage` y `build-windows`
 - [x] Documentación de producción (instalación, datos, permisos, backup, servicio)
-- [ ] Bump a 0.3.0 y tag
+- [x] Bump a 0.3.0 y tag
 
 ### Próximos pasos
 - [ ] Cifrado a nivel de archivo del contenedor `.pcty` (SQLCipher o similar)
