@@ -4,6 +4,56 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-10-03
+
+Arranque en frío de la app: elegir bóveda, recordarla entre sesiones y volver a
+pedir el primer usuario. Sin cambios en el formato del contenedor ni en el modelo
+Zero-Knowledge.
+
+### Fixed
+- **La bóveda elegida se perdía al reiniciar.** `set_vault_path` solo la mantenía
+  en memoria y `storage` se construye en cada arranque desde `PACT_VAULT_PATH`,
+  que el AppImage no define. Al reabrir, el servidor trataba cada sesión como la
+  primera vez y volvía a pedir elegir bóveda, aunque la anterior siguiera en
+  disco. Ahora la elección se guarda en `<data_dir>/vault_path` (0600) y el
+  arranque la resuelve con precedencia `PACT_VAULT_PATH` > ruta recordada > ruta
+  por defecto.
+- **Una bóveda recordada que ya no existe no se distinguía de una instalación
+  nueva.** `/auth/users` solo miraba la ruta en memoria, así que respondía
+  `empty` y el usuario no sabía qué había pasado. Ahora responde `configured`
+  con el nombre del archivo, y la interfaz avisa de cuál falta y ofrece crear o
+  abrir otra.
+- **`vault_status` mentía.** Se fijaba a `ready` con solo que `get_path()`
+  devolviera algo, y con una ruta por defecto siempre devolvía, así que `empty`
+  era inalcanzable y nunca se ofrecía crear o abrir. `ready` ahora exige que el
+  archivo esté en disco y sea una bóveda válida.
+- **Los avatares no cargaban en ninguna build de Tauri.** `ced322b` restringió
+  `img-src` al backend local, pero los avatares nunca se migraron y seguían con
+  `api.dicebear.com` hardcodeado; en dev y en producción la CSP los bloqueaba y
+  caían siempre al fallback de iniciales. Solo se veían en el navegador, donde
+  Vite no manda cabeceras CSP.
+
+### Security
+- **La bóveda se creaba legible para todo el sistema.** `init_vault` usa
+  `File::create`, que respeta el umask, y dejaba el `.pcty` en 644. Ahora se
+  restringe a 600, como ya documentaba el README.
+
+### Changed
+- El primer arranque vuelve a ofrecer crear o abrir bóveda en lugar de crear
+  una en silencio: el usuario decide dónde vive su bóveda.
+- La pantalla sin bóveda dice "Crea tu primer vault" en lugar de "Crea tu primer
+  usuario", que era prematuro cuando todavía no existe ninguna.
+- Con la bóveda lista y sin usuarios, hay un botón para crear el primer usuario:
+  antes, cerrar el modal dejaba la pantalla sin ninguna salida.
+
+### Known issues
+- Si la app se cierra con `SIGTERM`, el `pact-server` queda huérfano ocupando el
+  8002. Con la reutilización de `0.3.1` es inofensivo, pero el proceso no termina.
+- `svelte-check` no detecta referencias a identificadores inexistentes en los
+  templates, porque el type-checking de los ficheros `.js` está desactivado.
+- `POST /vault/config/path` resetea la BD local cada vez que se fija una ruta,
+  incluso cuando ya hay usuarios.
+
 ## [0.3.1] - 2026-10-03
 
 Correcciones de la ventana en blanco al abrir el AppImage, y del arranque cuando
@@ -111,6 +161,7 @@ el modelo Zero-Knowledge.
 - `@tailwindcss/vite` pasa a `devDependencies`; `dependencies` queda solo con lo
   que se usa en runtime.
 
+[0.3.2]: https://example.com/pact/releases/tag/v0.3.2
 [0.3.1]: https://example.com/pact/releases/tag/v0.3.1
 [0.3.0]: https://example.com/pact/releases/tag/v0.3.0
 

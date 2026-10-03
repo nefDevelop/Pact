@@ -245,4 +245,4 @@ El workflow de GitHub Actions (`.github/workflows/ci.yml`) ejecuta en cada push/
 - `/migrations`: Esquemas de base de datos SQL.
 
 ---
-**Pact v0.3.1 | 2026**
+**Pact v0.3.2 | 2026**
