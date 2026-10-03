@@ -149,3 +149,19 @@ fn test_storage_concurrency_stress() {
     let final_users = storage.list_users().unwrap();
     assert_eq!(final_users.len(), 10);
 }
+
+/// La bóveda guarda las credenciales: no puede quedar legible por cualquiera.
+/// `File::create` respeta el umask y la dejaba en 644.
+#[cfg(unix)]
+#[test]
+fn test_init_vault_deja_permisos_600() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempdir().unwrap();
+    let vault_path = dir.path().join("permisos.pcty");
+    let storage = StorageManager::new(None);
+    storage.init_vault(&vault_path).unwrap();
+
+    let mode = std::fs::metadata(&vault_path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600, "la bóveda debe ser 600, no {:o}", mode & 0o777);
+}

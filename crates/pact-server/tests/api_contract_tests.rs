@@ -354,6 +354,69 @@ async fn test_get_users_returns_list() {
     assert!(!body["users"].as_array().unwrap().is_empty());
 }
 
+/// Primer arranque: sin bóveda vinculada hay que poder ofrecer crear/abrir, así
+/// que el estado debe ser `empty` y no una ruta configurada inexistente.
+#[tokio::test]
+async fn test_get_users_sin_boveda_reporta_empty() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    // Sin `set_path`: es lo que ocurre cuando la bóveda por defecto no existe.
+    let base = start_test_server(state).await;
+
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "empty");
+    assert_eq!(body["vault_path"], "");
+}
+
+/// Bóveda configurada pero con el archivo ausente: no es una bóveda abierta, y
+/// el frontend no debe pedir un usuario contra ella.
+#[tokio::test]
+async fn test_get_users_con_ruta_sin_archivo_no_reporta_ready() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    state.storage.set_path(Some(std::path::PathBuf::from(
+        "/tmp/pact_ruta_que_no_existe_12345.pcty",
+    )));
+    let base = start_test_server(state).await;
+
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "configured");
+}
+
+/// Bóveda válida en disco: `ready`, que es lo que hace saltar el modal de
+/// primer usuario sin pasar por la pantalla de crear/abrir.
+#[tokio::test]
+async fn test_get_users_con_boveda_valida_reporta_ready() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+
+    let dir = std::env::temp_dir().join(format!("pact_ready_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("valida.pcty");
+    state.storage.init_vault(&path).unwrap();
+    // `build_app_state` parte de `None`; abrir la bóveda es lo que fija la ruta.
+    state.storage.set_path(Some(path.clone()));
+
+    let base = start_test_server(state).await;
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "ready");
+    assert_eq!(body["vault_path"], "valida.pcty");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[tokio::test]
 async fn test_vault_endpoints_return_401_without_token() {
     let db = setup_test_db().await;

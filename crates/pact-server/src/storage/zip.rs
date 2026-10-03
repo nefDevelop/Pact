@@ -33,14 +33,23 @@ impl StorageManager {
         tracing::info!("Inicializando nueva bóveda en {:?}", path);
         let file = File::create(path)?;
         let mut zip = ZipWriter::new(file);
-        
+
         let options = FileOptions::<()>::default()
             .compression_method(zip::CompressionMethod::Stored);
-        
+
         zip.start_file("pact.sig", options)?;
         zip.write_all(b"Pact Vault v1.0")?;
         zip.finish()?;
-        
+
+        // `File::create` respeta el umask (normalmente 022), así que la bóveda
+        // quedaba en 644 y era legible por cualquier usuario del sistema. La
+        // bóveda guarda las credenciales, así que se restringe a 600.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+
         Ok(())
     }
 

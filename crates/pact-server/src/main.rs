@@ -229,9 +229,13 @@ async fn main() {
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         format!("sqlite:{}", default_dir.join("pact.db").to_string_lossy())
     });
-    let vault_path = std::env::var("PACT_VAULT_PATH").unwrap_or_else(|_| {
-        default_dir.join("pact.pcty").to_string_lossy().to_string()
-    });
+    // Una variable presente pero vacía equivale a no definirla: si no, una ruta
+    // vacía se colaba como bóveda "configurada" y el frontend no podía ofrecer
+    // la pantalla de abrir/crear.
+    let vault_path = std::env::var("PACT_VAULT_PATH")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .unwrap_or_else(|| default_dir.join("pact.pcty").to_string_lossy().to_string());
     let listen_addr = std::env::var("PACT_LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8002".to_string());
     let limiter_cleanup_secs: u64 = std::env::var("PACT_LIMITER_CLEANUP_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
     let flush_interval_secs: u64 = std::env::var("PACT_FLUSH_INTERVAL_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
@@ -288,33 +292,25 @@ async fn main() {
     
     let db: Arc<dyn Database> = Arc::new(sqlite_db);
     let session_mgr = Arc::new(SessionManager::new());
-    let storage = Arc::new(StorageManager::new(Some(std::path::PathBuf::from(&vault_path))));
-
-    // Bóveda por defecto en el primer arranque. `init_vault` solo se llamaba
-    // desde `POST /vault/config/path`, que usa el flujo de Ajustes, así que tras
-    // crear el primer usuario la app se quedaba con una bóveda "ready" que en
-    // disco no existía: `get_path()` devuelve la ruta configurada sin comprobar
-    // el archivo. Solo se autocrea la ruta por defecto; si `PACT_VAULT_PATH` la
-    // eligió el usuario, no se toca (así una bóveda borrada a mano no reaparece
-    // vacía sin avisar).
-    let uses_default_vault = std::env::var("PACT_VAULT_PATH").is_err();
-    if uses_default_vault && !std::path::Path::new(&vault_path).exists() {
-        match storage.init_vault(std::path::Path::new(&vault_path)) {
-            Ok(()) => {
-                // `File::create` respeta el umask y deja la bóveda en 644,
-                // legible por cualquier usuario del sistema.
-                #[cfg(unix)]
-                if let Err(e) = std::fs::set_permissions(
-                    &vault_path,
-                    <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o600),
-                ) {
-                    tracing::warn!("No se pudo ajustar el permiso de {}: {}", vault_path, e);
-                }
-                tracing::info!("Bóveda creada en {}", vault_path)
-            }
-            Err(e) => tracing::warn!("No se pudo crear la bóveda en {}: {}", vault_path, e),
-        }
-    }
+    // Solo vinculamos la bóveda si el archivo existe: una ruta por defecto que
+    // aún no se ha creado no es una bóveda abierta. Así el primer arranque deja
+    // `get_path() == None`, el frontend recibe `vault_status: "empty"` y muestra
+    // la pantalla de crear/abrir en lugar de pedir un usuario de la nada. La
+    // ruta elegida por el usuario sí se pasa siempre (exista o haya que crearla).
+    let vault_explicit = std::env::var("PACT_VAULT_PATH")
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false);
+    let vault_exists = std::path::Path::new(&vault_path).exists();
+    let initial_vault = if vault_explicit || vault_exists {
+        Some(std::path::PathBuf::from(&vault_path))
+    } else {
+        tracing::info!(
+            "Sin bóveda vinculada en {}; se mostrará la pantalla de crear/abrir.",
+            vault_path
+        );
+        None
+    };
+    let storage = Arc::new(StorageManager::new(initial_vault));
 
     let auth_limiter = pact_server::auth::ratelimit::auth_rate_limiter();
     let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();

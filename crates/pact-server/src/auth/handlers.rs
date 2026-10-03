@@ -93,6 +93,17 @@ pub async fn get_users(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
+    // `get_path()` devuelve la ruta configurada aunque el archivo no exista, así
+    // que sin mirar el disco se informaba de una bóveda "ready" inexistente.
+    // Ahora "ready" exige que el archivo esté en disco y sea una bóveda válida;
+    // una ruta configurada sin archivo se reporta como "configured", para que el
+    // frontend pueda pedir al usuario que la abra o la cree.
+    let vault_status = match path.as_ref() {
+        Some(p) if p.exists() && storage.validate_vault(p).unwrap_or(false) => "ready",
+        Some(_) => "configured",
+        None => "empty",
+    };
+
     let users = db.get_all_users().await?;
     tracing::debug!("[AUTH] get_users: {} usuarios encontrados en DB local.", users.len());
 
@@ -107,7 +118,7 @@ pub async fn get_users(
         users: users_list,
         source: "local".to_string(),
         vault_path: vault_name,
-        vault_status: "ready".to_string(),
+        vault_status: vault_status.to_string(),
     }))
 }
 

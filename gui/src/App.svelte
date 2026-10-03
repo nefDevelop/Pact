@@ -31,6 +31,9 @@
   let isMobile = $state(false);
   let isDropdownOpen = $state(false);
   let isModalOpen = $state(false);
+  // Estado de la bóveda según el servidor: 'empty' (sin ruta), 'configured'
+  // (ruta puesta pero sin archivo) o 'ready' (archivo válido en disco).
+  let vaultStatus = $state('empty');
   let isSettingsOpen = $state(false);
   let isEntryModalOpen = $state(false);
   let entryModalMode = $state('normal');
@@ -72,6 +75,10 @@
       const userList = data.users || [];
       // El modo de BD se determina tras autenticar (refreshSyncConfig), no aquí.
       globalState.vaultPath = data.vault_path || '';
+      // `ready` = hay archivo de bóveda en disco; `configured` = hay ruta puesta
+      // pero el archivo no existe (bóveda borrada o aún no creada). Distinguirlo
+      // es lo que evita pedir un usuario contra una bóveda que no está.
+      vaultStatus = data.vault_status || 'empty';
 
       users = userList.map(u => ({
         id: u.id,
@@ -95,10 +102,10 @@
       } else {
         selectedUser = null;
         globalState.selectedUser = null;
-        // Si hay boveda vinculada pero 0 usuarios, lanzamos el modal
-        if (globalState.vaultPath) {
-          isModalOpen = true;
-        }
+        // Solo pedimos el primer usuario si la bóveda existe de verdad. Si solo
+        // hay una ruta configurada sin archivo, mandamos a la pantalla de
+        // crear/abrir, que es la que resuelve ese estado.
+        isModalOpen = vaultStatus === 'ready';
       }
     } catch (e) { 
         if (e.message !== "Unauthorized") console.error("[AUTH] Error en loadUsers:", e); 
@@ -412,15 +419,29 @@
           <!-- PANTALLA DE INICIO SUBTIL -->
           <div class="flex flex-col items-center text-center opacity-50 gap-8 animate-in fade-in zoom-in duration-700">
             <div class="flex flex-col gap-2">
-              {#if globalState.vaultPath}
+              {#if vaultStatus === 'ready'}
+                <!-- Bóveda válida pero sin ningún usuario: el primer usuario es
+                     la acción principal. Sin esto, cerrar el modal dejaba la
+                     pantalla sin ninguna forma de volver a crearlo. -->
                 <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.emptyVaultTitle', { name: globalState.vaultPath.split('/').pop() })}</p>
                 <p class="text-sm opacity-60">{i18n.t('app.emptyVaultHint')}</p>
+              {:else if vaultStatus === 'configured'}
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.noUsersTitle')}</p>
               {:else}
                 <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.noUsersTitle')}</p>
               {/if}
             </div>
             
             <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-border rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
+              {#if vaultStatus === 'ready'}
+                <!-- Bóveda cargada y sin usuarios: crear el primer usuario. -->
+                <button onclick={handleNewUserClick} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                  <div class="w-12 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+                  <div class="flex flex-col text-left">
+                    <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.newUser')}</span>
+                  </div>
+                </button>
+              {:else}
               <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
                 <div class="w-12 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><File size={24} /></div>
                 <div class="flex flex-col text-left">
@@ -438,6 +459,7 @@
                   <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
                 </div>
               </button>
+              {/if}
             </div>
           </div>
         {/if}
