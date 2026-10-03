@@ -32,6 +32,7 @@ fn build_app_state(db: Arc<dyn Database>) -> AppState {
         auth_limiter,
         public_limiter,
         db_type: "SQLite".to_string(),
+        data_dir: std::env::temp_dir(),
     }
 }
 
@@ -415,6 +416,31 @@ async fn test_get_users_con_boveda_valida_reporta_ready() {
     assert_eq!(body["vault_path"], "valida.pcty");
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Bóveda recordada de una sesión anterior pero ya ausente del disco: hay que
+/// avisar (con el nombre) y ofrecer crear/abrir, no pedir un usuario.
+#[tokio::test]
+async fn test_get_users_con_boveda_recordada_ausente_reporta_configured() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+
+    let data_dir = std::env::temp_dir().join(format!("pact_rec_{}", std::process::id()));
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let mut state = state;
+    state.data_dir = data_dir.clone();
+    pact_server::storage::remember_vault_path(&data_dir, Some(std::path::Path::new("/tmp/ausente.pcty"))).unwrap();
+
+    let base = start_test_server(state).await;
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "configured");
+    assert_eq!(body["vault_path"], "ausente.pcty");
+
+    let _ = std::fs::remove_dir_all(&data_dir);
 }
 
 #[tokio::test]

@@ -77,7 +77,16 @@ pub async fn get_users(
 
     let path = storage.get_path();
 
-    if path.is_none() {
+    // Si no hay bóveda vinculada, miramos si había una recordada de la sesión
+    // anterior. Distinguir "recordada pero ya no está" de "nunca hubo" permite
+    // avisar al usuario en vez de tratar el arranque como la primera vez.
+    let remembered = if path.is_none() {
+        crate::storage::read_remembered_vault_path(&app.data_dir)
+    } else {
+        None
+    };
+
+    if path.is_none() && remembered.is_none() {
         tracing::debug!("[AUTH] get_users: No hay bóveda vinculada.");
         return Ok(Json(UsersResponse {
             users: vec![],
@@ -90,6 +99,11 @@ pub async fn get_users(
     // Solo exponemos el nombre del archivo, no la ruta completa del sistema.
     let vault_name = path.as_ref()
         .and_then(|p| p.file_name())
+        .or_else(|| {
+            remembered
+                .as_deref()
+                .and_then(|r| std::path::Path::new(r).file_name())
+        })
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
@@ -97,11 +111,12 @@ pub async fn get_users(
     // que sin mirar el disco se informaba de una bóveda "ready" inexistente.
     // Ahora "ready" exige que el archivo esté en disco y sea una bóveda válida;
     // una ruta configurada sin archivo se reporta como "configured", para que el
-    // frontend pueda pedir al usuario que la abra o la cree.
+    // frontend pueda avisar y ofrecer crear o abrir otra.
     let vault_status = match path.as_ref() {
         Some(p) if p.exists() && storage.validate_vault(p).unwrap_or(false) => "ready",
         Some(_) => "configured",
-        None => "empty",
+        // Ruta recordada que ya no está en disco.
+        None => "configured",
     };
 
     let users = db.get_all_users().await?;

@@ -27,6 +27,7 @@ fn build_app_state(db: Arc<dyn Database>) -> AppState {
         auth_limiter: auth_rate_limiter(),
         public_limiter: public_rate_limiter(),
         db_type: "SQLite".to_string(),
+        data_dir: std::env::temp_dir(),
     }
 }
 

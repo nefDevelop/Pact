@@ -232,9 +232,15 @@ async fn main() {
     // Una variable presente pero vacía equivale a no definirla: si no, una ruta
     // vacía se colaba como bóveda "configurada" y el frontend no podía ofrecer
     // la pantalla de abrir/crear.
+    //
+    // Orden de precedencia: `PACT_VAULT_PATH` (explícita) > ruta recordada de la
+    // última vez que el usuario eligió una > ruta por defecto. La recordada es lo
+    // que hace que al reabrir la app se vuelva a cargar la bóveda de siempre en
+    // lugar de tratar cada arranque como el primero.
     let vault_path = std::env::var("PACT_VAULT_PATH")
         .ok()
         .filter(|v| !v.trim().is_empty())
+        .or_else(|| pact_server::storage::read_remembered_vault_path(&default_dir))
         .unwrap_or_else(|| default_dir.join("pact.pcty").to_string_lossy().to_string());
     let listen_addr = std::env::var("PACT_LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8002".to_string());
     let limiter_cleanup_secs: u64 = std::env::var("PACT_LIMITER_CLEANUP_SECS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
@@ -346,6 +352,7 @@ async fn main() {
         auth_limiter,
         public_limiter,
         db_type: "SQLite".to_string(),
+        data_dir: default_dir.clone(),
     };
 
     let app = Router::new()

@@ -80,6 +80,17 @@
       // es lo que evita pedir un usuario contra una bóveda que no está.
       vaultStatus = data.vault_status || 'empty';
 
+      // Ruta recordada cuya bóveda ya no está en disco: avisamos con el nombre y
+      // dejamos la pantalla de crear/abrir, sin vincular una bóveda inexistente.
+      if (vaultStatus === 'configured' && globalState.vaultPath) {
+        globalState.notify(
+          'No se encontró la bóveda',
+          `El archivo "${globalState.vaultPath}" no está. Crea una nueva bóveda o abre otra.`,
+          'warning',
+          8000
+        );
+      }
+
       users = userList.map(u => ({
         id: u.id,
         name: u.username, // El alias elegido por el usuario

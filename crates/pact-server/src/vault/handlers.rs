@@ -12,6 +12,7 @@ use crate::schemas::{FolderCreate, AccountCreate, AccountQuery, PendingAccount, 
 use crate::models::{CreateFolder, CreateAccount};
 use crate::auth::middleware::AuthenticatedUser;
 use crate::error::{AppError, Result};
+use crate::AppState;
 
 const MAX_TITLE_LEN: usize = 200;
 // Los nombres de carpeta llegan cifrados E2E, por lo que el límite es holgado
@@ -46,6 +47,7 @@ pub async fn get_vault_path(
 pub async fn set_vault_path(
     State(db): State<Arc<dyn Database>>,
     State(storage): State<Arc<StorageManager>>,
+    State(app): State<AppState>,
     user_opt: Option<AuthenticatedUser>,
     Json(payload): Json<VaultPath>,
 ) -> Result<StatusCode> {
@@ -97,6 +99,13 @@ pub async fn set_vault_path(
     }
     
     storage.set_path(path.clone());
+
+    // Recordar la elección entre reinicios: sin esto, al reabrir la app el
+    // servidor volvía a arrancar sin bóveda y trataba cada sesión como la
+    // primera, perdiendo la que el usuario ya había elegido.
+    if let Err(e) = crate::storage::remember_vault_path(&app.data_dir, path.as_deref()) {
+        tracing::warn!("No se pudo recordar la bóveda elegida: {}", e);
+    }
 
     if path.is_some() {
         tracing::info!("[VAULT] Paso 1: Ruta fijada, reseteando DB local");

@@ -24,6 +24,8 @@ pub struct AppState {
     pub auth_limiter: crate::auth::ratelimit::SharedRateLimiter,
     pub public_limiter: crate::auth::ratelimit::SharedRateLimiter,
     pub db_type: String,
+    /// Directorio de datos, para recordar la bóveda elegida entre reinicios.
+    pub data_dir: std::path::PathBuf,
 }
 
 // Implementación de FromRef para permitir extraer partes del estado individualmente en los handlers

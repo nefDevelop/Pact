@@ -28,7 +28,7 @@ const messages = {
     app: {
       settings: 'Configuración',
       users: 'Usuarios',
-      noUsersTitle: 'Crea tu primer usuario para empezar.',
+      noUsersTitle: 'Crea tu primer vault para empezar.',
       emptyVaultTitle: 'Bóveda vacía: {name}',
       emptyVaultHint: 'Crea tu primer usuario en esta bóveda para continuar.',
       newUser: 'Crear Usuario',
@@ -181,7 +181,7 @@ const messages = {
     app: {
       settings: 'Settings',
       users: 'Users',
-      noUsersTitle: 'Create your first user to get started.',
+      noUsersTitle: 'Create your first vault to get started.',
       emptyVaultTitle: 'Empty vault: {name}',
       emptyVaultHint: 'Create your first user in this vault to continue.',
       newUser: 'Create User',
