@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Modo demo para capturas de pantalla** (`make screens`, `make demo`,
+  `make seed-demo`): genera una bóveda de ejemplo en `data/demo/` con 5 carpetas,
+  18 entradas, 3 en la papelera, 6 favoritas y 3 con TOTP, todo cifrado con la
+  clave de la demo (`demo` / `DemoPass123!`). Aísla `DATABASE_URL`,
+  `PACT_VAULT_PATH` y el puerto para no tocar la bóveda real.
+
+### Fixed
+- **El guardado de la base dentro de la bóveda usaba `pact.db` del directorio de
+  trabajo.** Con un `DATABASE_URL` distinto del de por defecto, el flush diferido
+  fallaba en el log y el `pact.db` del directorio de trabajo podía acabar dentro
+  del `.pcty` en vez de la base real del usuario. `StorageManager` ahora conoce la
+  ruta que resuelve el arranque, y esa resolución de rutas se comparte desde el
+  nuevo módulo `paths`.
+- **`make dev` y `make run-server` fallaban al no poder elegir binario.** Al
+  añadirse el binario `seed_demo`, `cargo run -p pact-server` se volvía ambiguo;
+  resuelto con `default-run = "pact-server"` en el manifiesto del crate.
+
 ## [0.3.2] - 2026-10-03
 
 Arranque en frío de la app: elegir bóveda, recordarla entre sesiones y volver a

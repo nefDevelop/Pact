@@ -23,7 +23,8 @@ SIDECAR_DIR = crates/pact-desktop/binaries
 SIDECAR = $(SIDECAR_DIR)/pact-server-$(TARGET_TRIPLE)$(EXEEXT)
 
 .PHONY: help install install-gui deps test test-rs test-gui test-unit test-integration coverage mutants lint format run-server dev clean dev-tauri \
-	build build-gui build-server build-desktop build-appimage build-windows build-tauri build-wasm prepare-sidecar check check-rs check-gui audit test-mysql test-wasm
+	build build-gui build-server build-desktop build-appimage build-windows build-tauri build-wasm prepare-sidecar check check-rs check-gui audit test-mysql test-wasm \
+	seed-demo demo screens
 
 help: ## Muestra este mensaje de ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -51,8 +52,8 @@ test-unit: ## Ejecuta unitarias Rust (session, ratelimit, crypto, db)
 	$(CARGO) test -p pact-server --test session_tests --test ratelimit_tests --test db_crud_tests
 	$(CARGO) test -p pact-core
 
-test-integration: ## Ejecuta tests de integración (API, sync, use_cases, storage, security)
-	$(CARGO) test -p pact-server --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests --test coverage_gap_tests --test mysql_tests
+test-integration: ## Ejecuta tests de integración (API, sync, use_cases, storage, security, seed)
+	$(CARGO) test -p pact-server --test api_contract_tests --test sync_tests --test use_case_tests --test storage_tests --test security_tests --test coverage_gap_tests --test seed_demo_tests --test mysql_tests
 
 test-wasm: ## Tests de paridad WASM vs nativo (requiere wasm-pack)
 	@command -v wasm-pack >/dev/null 2>&1 || \
@@ -79,9 +80,66 @@ dev: deps ## Lanza Pact en modo Desarrollo (Rust API + Vite en navegador)
 
 dev-tauri: deps prepare-sidecar ## Lanza Pact en modo Escritorio Nativo (Tauri + Svelte)
 	@echo "Lanzando Pact en TAURI DEV MODE..."
-	-pkill -9 -f "pact-server" 2>/dev/null; sleep 1
+	# El corchete en `[p]act-server` es necesario: sin él, el `pkill -f` también
+	# casa con el propio shell de la receta y make se mata a sí mismo
+	# ("Terminado (killed) (no tiene efecto)"). La caché de Vite se borra porque
+	# si quedó desfasada tras editar un .svelte, vite-plugin-svelte no resuelve el
+	# módulo virtual de estilos y @tailwindcss/vite acaba leyendo el fuente del
+	# componente; el síntoma es ventana en blanco solo en dev.
+	-pkill -9 -f "[p]act-server" 2>/dev/null; sleep 1
+	@rm -rf $(GUI_DIR)/node_modules/.vite
 	# Tauri empaqueta/arranca pact-server (sidecar) como hijo de la ventana.
 	(trap 'kill 0' SIGINT; cd $(GUI_DIR) && $(NPM) run dev -- --port $(GUI_PORT) < /dev/null & cd crates/pact-desktop && npx --package @tauri-apps/cli tauri dev < /dev/null)
+
+# --- MODO DEMO (capturas de pantalla) ---
+# Aísla BD y bóveda en $(DEMO_DIR) para no tocar la del usuario. El servidor
+# sirve la GUI desde `gui/dist`, relativo al directorio de trabajo, así que el
+# objetivo se ejecuta desde la raíz del repo con la GUI ya compilada.
+
+DEMO_DIR ?= data/demo
+DEMO_PORT ?= 8092
+DEMO_USER ?= demo
+DEMO_PASS ?= DemoPass123!
+
+seed-demo: ## Dataset cifrado de demo en $(DEMO_DIR) (5 carpetas, 21 cuentas)
+	@mkdir -p $(DEMO_DIR)
+	$(CARGO) run -q -p pact-server --bin seed_demo -- --data-dir $(DEMO_DIR) --username $(DEMO_USER) --password $(DEMO_PASS) --force
+
+demo: build-gui seed-demo ## Levanta el servidor de demo con la bóveda de ejemplo
+	@echo ""
+	@echo "  Pact demo en http://localhost:$(DEMO_PORT)"
+	@echo "  Usuario: $(DEMO_USER) / $(DEMO_PASS)"
+	@echo ""
+	DATABASE_URL="sqlite:$(DEMO_DIR)/pact.db" \
+	PACT_VAULT_PATH="$(DEMO_DIR)/pact.pcty" \
+	PACT_LISTEN_ADDR="127.0.0.1:$(DEMO_PORT)" \
+	$(CARGO) run -q -p pact-server --bin pact-server
+
+screens: build-gui seed-demo ## Igual que demo, reinicia el puerto y lista las pantallas
+	-pkill -9 -f "[p]act-server" 2>/dev/null; sleep 1
+	@echo ""
+	@echo "  📸 Checklist de capturas (http://localhost:$(DEMO_PORT))"
+	@echo ""
+	@echo "    Selectores de usuario ......  abrir / y elegir 'demo'"
+	@echo "    Desbloqueo .................  contraseña $(DEMO_PASS)"
+	@echo "    Vista rápida ...............  vista de búsqueda + favoritos"
+	@echo "    Gestor completo ...........  botón de abrir el gestor (icono de panel)"
+	@echo "    Carpeta concreta ..........  sidebar: Personal / Trabajo / Finanzas / Desarrollo"
+	@echo "    Favoritos .................  sidebar: Favoritos"
+	@echo "    Papelera .................  sidebar: Papelera (3 entradas borradas)"
+	@echo "    Alta de entrada ...........  botón + (o Ctrl+N)"
+	@echo "    Alta de carpeta ...........  botón de carpeta en la sidebar"
+	@echo "    Ajustes ...................  engranaje: Usuarios / Categorías / Sistema / Bóveda"
+	@echo "    Bloqueo ...................  Ctrl+L"
+	@echo "    Tema claro/oscuro .........  pie de página"
+	@echo ""
+	@echo "  El contenido está cifrado con la clave de la demo, así que la lista"
+	@echo "  de entradas se ve sin descifrar nada a mano."
+	@echo ""
+	DATABASE_URL="sqlite:$(DEMO_DIR)/pact.db" \
+	PACT_VAULT_PATH="$(DEMO_DIR)/pact.pcty" \
+	PACT_LISTEN_ADDR="127.0.0.1:$(DEMO_PORT)" \
+	$(CARGO) run -q -p pact-server --bin pact-server
 
 # --- MODOS DE PRODUCCIÓN / BUILD ---
 

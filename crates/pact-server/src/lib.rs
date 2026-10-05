@@ -4,6 +4,7 @@ pub mod error;
 pub mod models;
 pub mod auth;
 pub mod vault;
+pub mod paths;
 pub mod storage;
 pub mod schemas;
 pub mod sync;

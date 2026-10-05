@@ -98,66 +98,6 @@ fn cors_layer() -> CorsLayer {
         .allow_headers([axum::http::header::AUTHORIZATION, axum::http::header::CONTENT_TYPE])
 }
 
-/// Directorio de datos persistente de Pact.
-///
-/// Antes el `machine-id` de reserva se escribía como `pact.machine` en el
-/// directorio de trabajo, que cambia según desde dónde se lance el servidor y
-/// no es escribible en un sistema de ficheros de solo lectura. Ahora se resuelve
-/// por `PACT_DATA_DIR` y, si no, por el directorio de datos del usuario (XDG en
-/// Linux, `%APPDATA%` en Windows, `~/Library/Application Support` en macOS).
-fn data_dir() -> Option<std::path::PathBuf> {
-    if let Ok(dir) = std::env::var("PACT_DATA_DIR") {
-        if !dir.trim().is_empty() {
-            return Some(std::path::PathBuf::from(dir));
-        }
-    }
-
-    let base: std::path::PathBuf = if cfg!(target_os = "windows") {
-        match std::env::var("APPDATA") {
-            Ok(a) => std::path::PathBuf::from(a),
-            Err(_) => return None,
-        }
-    } else if cfg!(target_os = "macos") {
-        match std::env::var("HOME") {
-            Ok(h) => std::path::PathBuf::from(h).join("Library/Application Support"),
-            Err(_) => return None,
-        }
-    } else {
-        match std::env::var("XDG_DATA_HOME") {
-            Ok(x) => std::path::PathBuf::from(x),
-            Err(_) => match std::env::var("HOME") {
-                Ok(h) => std::path::PathBuf::from(h).join(".local/share"),
-                Err(_) => return None,
-            },
-        }
-    };
-
-    let dir = base.join("pact");
-    match std::fs::create_dir_all(&dir) {
-        Ok(()) => Some(dir),
-        Err(e) => {
-            tracing::warn!("No se pudo crear el directorio de datos ({}): {}", dir.display(), e);
-            None
-        }
-    }
-}
-
-/// Directorio de datos con reserva: si no se puede determinar (ni por variable
-/// ni por el directorio del usuario), cae al actual en vez de fallar.
-///
-/// El directorio de trabajo solo sirve si es escribible: en el AppImage es el
-/// montaje squashfs de solo lectura.
-fn data_dir_or_cwd() -> std::path::PathBuf {
-    if let Some(dir) = data_dir() {
-        return dir;
-    }
-    tracing::warn!(
-        "No se pudo determinar el directorio de datos; se usa el actual. \
-         Define PACT_DATA_DIR si el proceso no puede escribir en él."
-    );
-    std::path::PathBuf::from(".")
-}
-
 fn read_machine_id() -> String {
     let paths = ["/etc/machine-id", "/var/lib/dbus/machine-id"];
     for path in &paths {
@@ -173,7 +113,7 @@ fn read_machine_id() -> String {
     // fingerprint por hardware siga siendo estable entre reinicios.
     tracing::warn!("No se pudo leer machine-id del sistema, generando uno persistente");
 
-    let Some(dir) = data_dir() else {
+    let Some(dir) = pact_server::paths::data_dir() else {
         tracing::error!(
             "Sin directorio de datos disponible: se generará un machine-id efímero. \
              Define PACT_DATA_DIR para que sea estable entre reinicios."
@@ -225,10 +165,7 @@ async fn main() {
     // directorio de trabajo. En el AppImage el CWD es el punto de montaje
     // squashfs de solo lectura, así que `sqlite:pact.db` relativo fallaba con
     // "Read-only file system" y el servidor salía con código 1.
-    let default_dir = data_dir_or_cwd();
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        format!("sqlite:{}", default_dir.join("pact.db").to_string_lossy())
-    });
+    let default_dir = pact_server::paths::data_dir_or_cwd();
     // Una variable presente pero vacía equivale a no definirla: si no, una ruta
     // vacía se colaba como bóveda "configurada" y el frontend no podía ofrecer
     // la pantalla de abrir/crear.
@@ -248,17 +185,23 @@ async fn main() {
     
     // Esta versión solo soporta SQLite como base local. MySQL/MariaDB se usa
     // únicamente como destino de la sincronización remota.
-    if !db_url.starts_with("sqlite:") {
-        tracing::error!(
-            "DATABASE_URL solo admite SQLite (p. ej. 'sqlite:pact.db'); recibido '{}'. \
-             MySQL/MariaDB se configura como destino de sincronización, no como DB local.",
-            db_url
-        );
-        std::process::exit(1);
+    //
+    // Se valida el valor crudo de la variable (y no la ruta ya resuelta) para
+    // que `DATABASE_URL=""` siga siendo un error de configuración y no se
+    // convierta en silencio en la ruta por defecto.
+    if let Ok(raw) = std::env::var("DATABASE_URL") {
+        if !raw.starts_with("sqlite:") {
+            tracing::error!(
+                "DATABASE_URL solo admite SQLite (p. ej. 'sqlite:pact.db'); recibido '{}'. \
+                 MySQL/MariaDB se configura como destino de sincronización, no como DB local.",
+                raw
+            );
+            std::process::exit(1);
+        }
     }
 
-    let path = db_url.trim_start_matches("sqlite:");
-    let db_path = std::path::Path::new(path);
+    let db_path = pact_server::paths::resolve_db_path(&default_dir);
+    let db_url = format!("sqlite:{}", db_path.to_string_lossy());
     if let Some(parent) = db_path.parent() {
         if !parent.as_os_str().is_empty() && !parent.exists() {
             if let Err(e) = std::fs::create_dir_all(parent) {
@@ -269,7 +212,7 @@ async fn main() {
     }
     if !db_path.exists() {
         tracing::info!("Base de datos no encontrada, creando: {}", db_path.display());
-        if let Err(e) = std::fs::File::create(db_path) {
+        if let Err(e) = std::fs::File::create(&db_path) {
             tracing::error!("No se pudo crear el archivo de DB: {}", e);
             std::process::exit(1);
         }
@@ -277,7 +220,7 @@ async fn main() {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if let Err(e) = std::fs::set_permissions(db_path, std::fs::Permissions::from_mode(0o600)) {
+            if let Err(e) = std::fs::set_permissions(&db_path, std::fs::Permissions::from_mode(0o600)) {
                 tracing::warn!("No se pudieron restringir los permisos de {}: {}", db_path.display(), e);
             }
         }
@@ -317,6 +260,9 @@ async fn main() {
         None
     };
     let storage = Arc::new(StorageManager::new(initial_vault));
+    // El bóveda guarda este SQLite: si no se le dice cuál, usa `pact.db` en el
+    // directorio de trabajo en vez de la ruta de `DATABASE_URL`.
+    storage.set_db_path(db_path.clone());
 
     let auth_limiter = pact_server::auth::ratelimit::auth_rate_limiter();
     let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();

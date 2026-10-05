@@ -47,3 +47,8 @@ build/
 .tmp/
 __pycache__/
 *.pyc
+
+# --- MODO DEMO (make seed-demo) ---
+# Bóveda y base de datos de ejemplo con credenciales conocidas. Se regeneran en
+# un segundo; nunca deben acabar en un commit.
+data/

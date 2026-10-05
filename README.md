@@ -113,7 +113,26 @@ Lanza la aplicación con su ventana nativa y backend integrado:
 make dev-tauri
 ```
 
-### C. Compilación para Producción
+### C. Modo Demo (capturas de pantalla)
+Bóveda de ejemplo con credenciales ficticias, para ver la interfaz poblada sin
+teclear nada:
+```bash
+make screens    # bóveda + GUI compilada + servidor en el puerto 8092 y checklist
+make demo       # igual, pero sin reiniciar el puerto ni listar las pantallas
+make seed-demo  # solo regenera la bóveda
+```
+- **Credenciales:** `demo` / `DemoPass123!`
+- **URL:** [http://localhost:8092](http://localhost:8092) (cambiable con `make demo DEMO_PORT=9092`)
+
+Trae 5 carpetas, 18 entradas, 3 en la papelera, 6 favoritas y 3 con TOTP, con
+fechas repartidas hacia atrás. Todo va cifrado con la clave de la demo, igual
+que en producción: la lista se descifra en el navegador, no hay atajos en la base.
+
+> Todo queda en `data/demo/` (ignorado por git): la base, la bóveda `.pcty` y el
+> `vault_path` recordado. Ni la bóveda real ni la base de `~/.local/share/pact`
+> se tocan.
+
+### D. Compilación para Producción
 Genera el binario del servidor y el paquete de escritorio:
 ```bash
 make build          # Servidor + escritorio (rpm por defecto)

@@ -5,16 +5,40 @@ use std::path::{Path, PathBuf};
 use zip::{ZipArchive, ZipWriter, write::FileOptions};
 use tempfile::NamedTempFile;
 
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 pub struct StorageManager {
     pcty_path: Mutex<Option<PathBuf>>,
     pending_saves: Mutex<HashSet<String>>,
+    /// Ruta real del SQLite local. Antes el guardado diferido usaba
+    /// `Path::new("pact.db")`, o sea el directorio de trabajo: con un
+    /// `DATABASE_URL` de otra ruta fallaba el flush y se podía colar en el
+    /// `.pcty` una base que no era la del usuario.
+    ///
+    /// Se resuelve de forma diferida para no obligar a todos los constructores
+    /// a conocerla; `main` la fija con `set_db_path` al arrancar.
+    db_path: OnceLock<PathBuf>,
 }
 
 impl StorageManager {
     pub fn new(path: Option<PathBuf>) -> Self {
-        Self { pcty_path: Mutex::new(path), pending_saves: Mutex::new(HashSet::new()) }
+        Self {
+            pcty_path: Mutex::new(path),
+            pending_saves: Mutex::new(HashSet::new()),
+            db_path: OnceLock::new(),
+        }
+    }
+
+    /// Fija la ruta del SQLite local (la que usa el servidor). Si ya estaba
+    /// resuelta, no hace nada: quien llama es el arranque, que siempre va antes
+    /// que cualquier flush.
+    pub fn set_db_path(&self, path: PathBuf) {
+        let _ = self.db_path.set(path);
+    }
+
+    /// Ruta del SQLite local que se guarda dentro del `.pcty`.
+    pub fn db_path(&self) -> &Path {
+        self.db_path.get_or_init(|| crate::paths::resolve_db_path(&crate::paths::data_dir_or_cwd()))
     }
 
     pub fn set_path(&self, path: Option<PathBuf>) {
@@ -209,7 +233,7 @@ impl StorageManager {
 
         let mut saved = 0;
         for username in &dirty_users {
-            match self.save_db(username, std::path::Path::new("pact.db")) {
+            match self.save_db(username, self.db_path()) {
                 Ok(_) => {
                     tracing::debug!("Guardado diferido completado para {}", username);
                     saved += 1;

@@ -125,3 +125,65 @@ servidor web, local o remoto, sin perder el modelo Zero-Knowledge.
 - [ ] Tests E2E de UI
 - [ ] Runner Windows para construir y verificar los instaladores NSIS/MSI
 
+
+---
+
+## Modo Demo (bóveda de ejemplo para capturas)
+
+- [x] **Seed cifrado en `crates/pact-server/src/bin/seed_demo.rs`**:
+  - 5 carpetas, 18 entradas, 3 en la papelera, 6 favoritas y 3 con TOTP, con
+    `created_at` repartido hacia atrás.
+  - **Todo el contenido va cifrado con `pact-core`**: cada campo se sella con
+    `sellar_dato_json` y la master key derivada de la contraseña de la demo, que
+    es lo que espera el navegador. Sembrar en claro habría dejado la demo con la
+    lista ilegible.
+  - El `master_hash` se deriva como hace el servidor: Argon2id sobre el **hex de
+    la authKey** con los bytes ASCII de la sal (`auth/handlers.rs`). El cliente
+    nunca envía la contraseña, así que sin replicar esto el usuario `demo` no
+    podría desbloquear la bóveda.
+  - La contraseña `DemoPass123!` cumple el filtro del cliente (12 caracteres,
+    mayúscula, número y símbolo, `NewUserModal.svelte`), que el backend no
+    comprueba pero la GUI sí.
+  - Base y bóveda quedan en modo 600, como hace el servidor.
+- [x] **La `.pcty` se genera con la base del usuario dentro**:
+  - No es cosmético: al abrir una bóveda, `POST /vault/config/path` ejecuta
+    `db.reset()` y extrae el primer `<usuario>.db` que encuentre. Con una
+    bóveda que solo tuviera la firma, la demo se quedaba vacía justo al abrirla,
+    que es el gesto inicial de cualquier captura.
+  - Se reutiliza `StorageManager::save_db`, el mismo camino que usa la app.
+- [x] **Objetivos `seed-demo`, `demo` y `screens`**:
+  - Aíslan `DATABASE_URL`, `PACT_VAULT_PATH` y `PACT_LISTEN_ADDR` en `data/demo/`
+    para no tocar la bóveda real. `data/` añadido a `.gitignore`.
+  - El checklist de `screens` es de estados y atajos, no de URLs: la SPA no
+    enruta, todo ocurre en `/`.
+  - Requiere `make build-gui` porque el servidor sirve la GUI desde `gui/dist`
+    relativo al directorio de trabajo.
+- [x] **Tests en `crates/pact-server/tests/seed_demo_tests.rs`** (incluidos en
+  `make test-integration`): recuentos, papelera, favoritos, que todo está
+  cifrado **y se descifra** con la contraseña documentada, que el `master_hash`
+  coincide con el que calcula el servidor y que la bóveda contiene
+  `pact.sig` + `demo.db`.
+
+### Corregido de paso (lo bloqueaba para la demo)
+
+- [x] **El guardado de la base dentro de la bóveda usaba `pact.db` del directorio
+  de trabajo** (`storage/zip.rs`, `vault/handlers.rs`):
+  - Con un `DATABASE_URL` distinto del de por defecto, el flush diferido fallaba
+    (solo en el log) y el `pact.db` del directorio de trabajo podía acabar
+    dentro del `.pcty` en lugar de la base real del usuario.
+  - Ahora `StorageManager` conoce la ruta real de la base: `main` se la pasa con
+    `set_db_path` y, si nadie lo hizo, se resuelve una sola vez desde
+    `DATABASE_URL`.
+  - La resolución de rutas (`data_dir`, `data_dir_or_cwd`, `resolve_db_path`) se
+    movió a `paths.rs`, porque hasta ahora vivía en `main.rs` y el `StorageManager`
+    no podía usarla.
+- [x] **`cargo run -p pact-server` dejaba de funcionar al añadir el binario del
+  seed**: con dos binarios en el crate, cargo no sabe cuál arrancar y fallaban
+  `make dev` y `make run-server`. Resuelto con `default-run = "pact-server"`.
+
+### Pendiente
+
+- [ ] **Los avatares y los iconos de marca dependen de red externa**
+  (`api.dicebear.com` y el proxy `/vault/icon?domain=`). Sin red salen los
+  fallbacks de iniciales, así que las capturas sin conexión pierden esos
+  detalles.

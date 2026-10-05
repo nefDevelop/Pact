@@ -117,9 +117,9 @@ pub async fn set_vault_path(
                 Ok(users) => {
                     tracing::info!("[VAULT] Usuarios encontrados en bóveda: {:?} (total: {})", users, users.len());
                     if let Some(first_user) = users.first() {
-                        tracing::info!("[VAULT] Paso 3: Extrayendo DB del usuario '{}' a pact.db", first_user);
-                        match storage.extract_db(first_user, std::path::Path::new("pact.db")) {
-                            Ok(true) => tracing::info!("[VAULT] DB de '{}' extraída correctamente a pact.db", first_user),
+                        tracing::info!("[VAULT] Paso 3: Extrayendo DB del usuario '{}' a {}", first_user, storage.db_path().display());
+                        match storage.extract_db(first_user, storage.db_path()) {
+                            Ok(true) => tracing::info!("[VAULT] DB de '{}' extraída correctamente a {}", first_user, storage.db_path().display()),
                             Ok(false) => tracing::warn!("[VAULT] No se encontró archivo {}.db dentro de la bóveda", first_user),
                             Err(e) => tracing::error!("[VAULT] Error extrayendo DB de '{}': {:?}", first_user, e),
                         }
@@ -142,10 +142,10 @@ pub async fn set_vault_path(
         tracing::info!("[VAULT] Usuario autenticado '{}' detectado durante el cambio.", session.username);
         if is_new {
             tracing::info!("[VAULT] Persistiendo DB actual de '{}' en la nueva bóveda.", session.username);
-            let _ = storage.save_db(&session.username, std::path::Path::new("pact.db"));
+            let _ = storage.save_db(&session.username, storage.db_path());
         } else {
             tracing::info!("[VAULT] Intentando recuperar DB de '{}' de la bóveda cargada.", session.username);
-            let _ = storage.extract_db(&session.username, std::path::Path::new("pact.db"));
+            let _ = storage.extract_db(&session.username, storage.db_path());
         }
     }
 
