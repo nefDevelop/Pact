@@ -95,9 +95,16 @@ async fn run() -> Result<(), String> {
     let pool = open_with_migrations(&db_path).await?;
 
     // La sal la elige el cliente en `NewUserModal`; aquí es fija para que la
-    // demo sea reproducible y se pueda documentar.
+    // demo sea reproducible y se pueda documentar. Se decodifica el hex a los
+    // 16 bytes crudos porque los clientes (navegador vía WASM en
+    // `crypto_utils.js`, escritorio vía comando Tauri `derive_keys`) derivan
+    // sobre los bytes crudos, no sobre el ASCII del hex. Si el seed derivara
+    // sobre el ASCII, el usuario de la demo nunca desbloquearía en la UI y el
+    // contenido sería indescifrable (ver test
+    // `seed_demo_desbloquea_como_el_navegador`).
     let salt = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
-    let (master_key, auth_key) = derivar_claves_dual(&args.password, &salt.as_bytes())
+    let salt_raw = hex::decode(salt).map_err(|e| format!("sal de la demo inválida: {}", e))?;
+    let (master_key, auth_key) = derivar_claves_dual(&args.password, &salt_raw)
         .map_err(|e| format!("derivando las claves: {:?}", e))?;
 
     // El servidor vuelve a derivar sobre el string hex de la authKey y los bytes

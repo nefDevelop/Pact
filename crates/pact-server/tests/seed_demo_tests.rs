@@ -18,6 +18,12 @@ use tempfile::tempdir;
 const DEMO_PASSWORD: &str = "DemoPass123!";
 const DEMO_SALT: &str = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
+/// La sal como la usan los clientes (navegador vía WASM y escritorio vía
+/// comando Tauri): 16 bytes crudos decodificados del hex, no el ASCII.
+fn salt_cruda() -> Vec<u8> {
+    hex::decode(DEMO_SALT).expect("la sal de la demo debe ser hex válido")
+}
+
 /// Ejecuta el binario del seed contra un directorio temporal.
 fn seed(data_dir: &PathBuf) {
     let salida = Command::new(env!("CARGO_BIN_EXE_seed_demo"))
@@ -93,7 +99,7 @@ async fn seed_demo_cifra_todo_el_contenido() {
     seed(&data_dir);
 
     let db = pool(&data_dir).await;
-    let (master_key, _) = derivar_claves_dual(DEMO_PASSWORD, DEMO_SALT.as_bytes()).unwrap();
+    let (master_key, _) = derivar_claves_dual(DEMO_PASSWORD, &salt_cruda()).unwrap();
 
     // Si el seed guardara algo en claro, la UI lo mostraría sin descifrar.
     let filas: Vec<(String, String, String, String)> = sqlx::query_as(
@@ -155,16 +161,61 @@ async fn seed_demo_la_contrasena_documentada_sirve() {
     assert_eq!(salt, DEMO_SALT);
 
     // Esto es exactamente lo que hace el servidor al autenticar: el cliente
-    // manda el hex de la authKey y el servidor deriva sobre ese string con los
-    // bytes ASCII de la sal. Si el seed derivara sobre otra cosa, el usuario
-    // de la demo no podría desbloquear la bóveda.
-    let (_, auth_key) = derivar_claves_dual(DEMO_PASSWORD, salt.as_bytes()).unwrap();
+    // (navegador o escritorio) deriva la authKey sobre los 16 bytes crudos de
+    // la sal y manda su hex; el servidor deriva sobre ese string con los bytes
+    // ASCII de la sal. Si el seed derivara sobre otra cosa, el usuario de la
+    // demo no podría desbloquear la bóveda.
+    let (_, auth_key) = derivar_claves_dual(DEMO_PASSWORD, &salt_cruda()).unwrap();
     let esperado = derivar_masterkey(&hex::encode(&auth_key), salt.as_bytes()).unwrap();
     assert_eq!(
         master_hash,
         hex::encode(esperado),
         "el master_hash sembrado no es el que calcula el servidor"
     );
+}
+
+/// El navegador (WASM, `gui/src/lib/crypto_utils.js`) y el escritorio
+/// (comando Tauri `derive_keys`) decodifican el hex de la sal a los 16 bytes
+/// crudos antes de derivar. Este test replica exactamente ese cálculo: si el
+/// seed derivara sobre los bytes ASCII del hex, el `master_hash` no
+/// coincidiría y `demo / DemoPass123!` daría 401 en la UI (además del
+/// contenido indescifrable).
+#[tokio::test]
+async fn seed_demo_desbloquea_como_el_navegador() {
+    let dir = tempdir().unwrap();
+    let data_dir = dir.path().join("demo");
+    seed(&data_dir);
+
+    let db = pool(&data_dir).await;
+    let (master_hash, salt): (String, String) =
+        sqlx::query_as("SELECT master_hash, salt FROM users WHERE username = 'demo'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+
+    // Como el navegador: hex -> 16 bytes crudos.
+    let salt_raw = salt_cruda();
+    assert_eq!(salt_raw.len(), 16);
+    let (master_key, auth_key) = derivar_claves_dual(DEMO_PASSWORD, &salt_raw).unwrap();
+
+    // Como el servidor al autenticar: deriva sobre el hex de la authKey con
+    // los bytes ASCII de la sal.
+    let esperado = derivar_masterkey(&hex::encode(&auth_key), salt.as_bytes()).unwrap();
+    assert_eq!(
+        master_hash,
+        hex::encode(esperado),
+        "el navegador no podría desbloquear la demo: el seed deriva sobre otra sal"
+    );
+
+    // Y con esa misma master_key se descifra el contenido sembrado.
+    let titulo: String = sqlx::query_scalar("SELECT title FROM accounts LIMIT 1")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    let claro = abrir_dato_json(&titulo, &master_key)
+        .expect("el navegador no podría descifrar las cuentas de la demo");
+    let valor: String = serde_json::from_slice(&claro).unwrap();
+    assert!(!valor.is_empty());
 }
 
 #[tokio::test]
