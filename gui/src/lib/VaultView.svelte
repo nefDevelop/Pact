@@ -292,11 +292,11 @@
   });
 </script>
 
-<div class="w-full max-w-7xl mx-auto h-[85vh] transition-all duration-500 ease-in-out relative group/vault">
+<div class="w-full max-w-7xl mx-auto flex-1 min-h-0 flex flex-col lg:h-[85vh] transition-all duration-500 ease-in-out relative group/vault">
   
   {#if !showManager}
     <!-- VISTA 1: ACCESO RÁPIDO -->
-    <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
+    <div class="w-full flex-1 min-h-0 flex flex-col items-center justify-start pt-12 px-6">
       <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border shadow-elev-1 mb-8 w-full max-w-2xl">
         <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
           <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-[var(--md-surface-variant)]" />
@@ -383,8 +383,8 @@
     <!-- Envoltorio con aire vertical: sin él el panel redondeado se pegaba al
          borde superior. El problema es de alto disponible, no de ancho, así que
          el padding se aplica a todos los tamaños (antes se anulaba en `md`). -->
-    <div class="w-full h-full py-4">
-      <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
+    <div class="w-full flex-1 min-h-0 py-4 flex flex-col">
+      <div class="w-full flex-1 min-h-0 bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
       
       <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-border flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">

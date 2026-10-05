@@ -376,14 +376,14 @@
     </div>
   {/if}
 
-  <div class="flex-1 w-full {isUnlocked ? 'max-w-none' : 'max-w-7xl'} mx-auto relative lg:overflow-hidden transition-all duration-700 ease-in-out">
-    <div class="grid {isUnlocked || users.length === 0 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[1fr_400px_1fr]'} w-full h-full gap-12 px-4 lg:p-8 transition-all duration-700 ease-in-out">
+  <div class="flex-1 min-h-0 w-full {isUnlocked ? 'max-w-none' : 'max-w-7xl'} mx-auto relative overflow-hidden flex flex-col transition-all duration-700 ease-in-out">
+    <div class="grid {isUnlocked || users.length === 0 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-[1fr_400px_1fr]'} w-full flex-1 min-h-0 gap-12 px-4 lg:p-8 transition-all duration-700 ease-in-out">
 
       {#if !isUnlocked && users.length > 0}
         <div class="hidden lg:block h-full"></div>
       {/if}
 
-      <div class="flex flex-col items-center justify-center h-full w-full z-10 transition-all duration-700 ease-in-out">
+      <div class="flex flex-col items-center justify-center h-full min-h-0 w-full z-10 transition-all duration-700 ease-in-out">
         {#if selectedUser && !isUnlocked}
           
           <!-- Mobile User Profile Pill -->
@@ -412,7 +412,7 @@
             <LoginBox user={selectedUser} onUnlock={() => { isUnlocked = true; loadFolders(); }} />
           </div>
         {:else if isUnlocked}
-          <div class="w-full h-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div class="w-full flex-1 min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
             <VaultView 
               bind:this={vaultRef}
               user={selectedUser} 
