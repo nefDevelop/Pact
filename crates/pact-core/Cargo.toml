@@ -8,6 +8,12 @@ license.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[package.metadata.wasm-pack.profile.release]
+# El wasm-opt que trae wasm-pack no reconoce las operaciones `bulk memory` que
+# emite el std de Rust actual. El propio LLVM ya optimiza la salida, así que
+# desactivamos el post-proceso de binaryen en vez de fijar una versión antigua.
+wasm-opt = false
+
 [dependencies]
 argon2 = { workspace = true }
 aes-gcm = { workspace = true }

@@ -1,0 +1,248 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    name: Lint & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Install GUI dependencies
+        run: make install-gui
+
+      - name: Lint (ESLint, svelte-check, Clippy)
+        run: make lint
+
+      - name: Rust unit tests
+        run: make test-unit
+
+      - name: Rust integration tests
+        run: make test-integration
+
+      - name: Frontend tests
+        run: make test-gui
+
+  desktop:
+    name: Desktop sidecar build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-desktop-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-desktop-
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Install GUI dependencies
+        run: make install-gui
+
+      - name: Prepare pact-server sidecar
+        run: make prepare-sidecar
+
+      - name: Check desktop crate (validates externalBin)
+        run: cargo check -p pact-desktop
+
+  mysql:
+    name: MariaDB tests
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: pact_test
+          MARIADB_USER: pact
+          MARIADB_PASSWORD: pact
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-mysql-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-mysql-
+
+      - name: Run MySQL tests
+        env:
+          PACT_TEST_MYSQL_URL: mysql://pact:pact@127.0.0.1:3306/pact_test
+        run: make test-mysql
+
+  coverage:
+    name: Coverage (tarpaulin)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-cov-
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Generate coverage
+        run: cargo tarpaulin -p pact-core -p pact-server --out Xml --output-dir coverage --fail-under 80
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+
+  wasm:
+    name: WASM build & parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-wasm-
+
+      - name: Install cargo-wasm-pack
+        run: cargo install wasm-pack --locked
+
+      # El cliente web depende de este módulo: si falla el build, el navegador
+      # no puede derivar las claves y el registro/desbloqueo quedan rotos.
+      - name: Build WASM
+        run: make build-wasm
+
+      # Comprueba que el WASM y el código nativo derivan las mismas claves.
+      - name: WASM parity tests
+        run: make test-wasm
+
+  mutants:
+    name: Mutation testing (cargo-mutants)
+    runs-on: ubuntu-latest
+    # No bloquea el pipeline inicialmente: solo publica el reporte de mutantes.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-mutants-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-mutants-
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --locked
+
+      - name: Run mutation testing on pact-core
+        run: cargo mutants -p pact-core --out mutants.out
+
+      - name: Upload mutants report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutants
+          path: mutants.out/

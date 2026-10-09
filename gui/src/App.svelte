@@ -9,17 +9,21 @@
   import FolderModal from './lib/FolderModal.svelte';
   import VaultModal from './lib/VaultModal.svelte';
   import NotificationProvider from './lib/NotificationProvider.svelte';
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { globalState } from './lib/state.svelte.js';
   import { api } from './lib/api.js';
+  import { decryptE2E } from './lib/crypto_utils.js';
+  import { i18n } from './lib/i18n.svelte.js';
+  import { applyTheme } from './lib/themeMode.js';
+  import { invoke as tauriInvoke } from '@tauri-apps/api/core';
   import { Settings, ChevronDown, Plus, File, Sun, Moon } from 'lucide-svelte';
   
   // Soporte para Tauri v2
   const isTauri = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__);
-  const invoke = isTauri
-    ? (async () => (await import('@tauri-apps/api/core')).invoke) 
-    : null;
+  // Import estático: `@tauri-apps/api/core` ya está en el bundle (lo usa
+  // crypto_utils.js), así que el import dinámico solo impedía separar el chunk.
+  const invoke = isTauri ? tauriInvoke : null;
 
   let users = $state([]);
   let isLoading = $state(true);
@@ -27,9 +31,13 @@
   let isMobile = $state(false);
   let isDropdownOpen = $state(false);
   let isModalOpen = $state(false);
+  // Estado de la bóveda según el servidor: 'empty' (sin ruta), 'configured'
+  // (ruta puesta pero sin archivo) o 'ready' (archivo válido en disco).
+  let vaultStatus = $state('empty');
   let isSettingsOpen = $state(false);
   let isEntryModalOpen = $state(false);
   let entryModalMode = $state('normal');
+  let entryToEdit = $state(null);
   let folders = $state([]);
   let vaultRef = $state();
   let isUnlocked = $state(false);
@@ -46,26 +54,42 @@
 
   async function loadFolders() {
     try {
-      folders = await api.get('/vault/folders');
+      const raw = await api.get('/vault/folders');
+      // Los nombres de carpeta se cifran E2E; se descifran al cargarlos.
+      folders = await Promise.all((raw || []).map(async (f) => {
+        let name = f.name;
+        if (globalState.masterKey && f.name) {
+          const decrypted = await decryptE2E(f.name, globalState.masterKey);
+          if (typeof decrypted === 'string' && decrypted) name = decrypted;
+        }
+        return { ...f, name };
+      }));
     } catch (e) { /* Error manejado por api.js */ }
-  }
-
-  async function loadVaultPath() {
-    try {
-      const data = await api.get('/vault/config/path', { silent: true });
-      globalState.vaultPath = data.path || '';
-    } catch (e) { console.error(e); }
   }
 
   async function loadUsers(showToast = false) {
     globalState.isSyncing = true;
     users = [];
-    await loadVaultPath();
     try {
       const data = await api.get('/auth/users');
       const userList = data.users || [];
-      if (data.source) globalState.dbMode = data.source;
+      // El modo de BD se determina tras autenticar (refreshSyncConfig), no aquí.
       globalState.vaultPath = data.vault_path || '';
+      // `ready` = hay archivo de bóveda en disco; `configured` = hay ruta puesta
+      // pero el archivo no existe (bóveda borrada o aún no creada). Distinguirlo
+      // es lo que evita pedir un usuario contra una bóveda que no está.
+      vaultStatus = data.vault_status || 'empty';
+
+      // Ruta recordada cuya bóveda ya no está en disco: avisamos con el nombre y
+      // dejamos la pantalla de crear/abrir, sin vincular una bóveda inexistente.
+      if (vaultStatus === 'configured' && globalState.vaultPath) {
+        globalState.notify(
+          'No se encontró la bóveda',
+          `El archivo "${globalState.vaultPath}" no está. Crea una nueva bóveda o abre otra.`,
+          'warning',
+          8000
+        );
+      }
 
       users = userList.map(u => ({
         id: u.id,
@@ -89,13 +113,13 @@
       } else {
         selectedUser = null;
         globalState.selectedUser = null;
-        // Si hay boveda vinculada pero 0 usuarios, lanzamos el modal
-        if (globalState.vaultPath) {
-          isModalOpen = true;
-        }
+        // Solo pedimos el primer usuario si la bóveda existe de verdad. Si solo
+        // hay una ruta configurada sin archivo, mandamos a la pantalla de
+        // crear/abrir, que es la que resuelve ese estado.
+        isModalOpen = vaultStatus === 'ready';
       }
     } catch (e) { 
-        if (e.message !== "Unauthorized") console.error("[DEBUG] Error en loadUsers:", e); 
+        if (e.message !== "Unauthorized") console.error("[AUTH] Error en loadUsers:", e); 
     } finally {
       isLoading = false;
       globalState.isSyncing = false;
@@ -105,8 +129,7 @@
   async function promptForVaultPath(mode = 'open') {
     if (invoke) {
       try {
-        const invoker = await invoke();
-        const path = await invoker('browse_file', { mode });
+        const path = await invoke('browse_file', { mode });
         if (path) {
           await api.post('/vault/config/path', { path, force_init: mode === 'save' });
           globalState.vaultPath = path;
@@ -180,9 +203,41 @@
 
   function handleAddUser() { loadUsers(); }
 
-  function openEntryModal(mode) {
+  function openEntryModal(mode = 'normal') {
+    entryToEdit = null;
     entryModalMode = mode;
     isEntryModalOpen = true;
+  }
+
+  function handleEditEntry(entry) {
+    entryToEdit = entry;
+    entryModalMode = 'normal';
+    isEntryModalOpen = true;
+  }
+
+  // Cifra/descifra ya se resuelve en el modal; aquí persistimos en el backend.
+  async function handleSaveEntry(payload) {
+    const { id, ...body } = payload;
+    try {
+      if (id) {
+        await api.put(`/vault/accounts/${id}`, body);
+        globalState.notify('Bóveda', 'Entrada actualizada', 'success');
+      } else {
+        await api.post('/vault/accounts', body);
+        globalState.notify('Bóveda', 'Entrada guardada', 'success');
+      }
+      if (vaultRef) await vaultRef.loadAccounts();
+      globalState.refreshTrashCount();
+      return true;
+    } catch (e) {
+      // api.js ya notifica el error; mantenemos el modal abierto.
+      return false;
+    }
+  }
+
+  function handleDatabaseChange() {
+    loadFolders();
+    globalState.refreshTrashCount();
   }
 
   // Drag & Drop
@@ -200,19 +255,46 @@
     }
   }
 
+  // La paleta tonal se deriva del color del usuario. Cuando se selecciona o
+  // cambia un usuario (LoginBox, Ajustes) hay que re-aplicarla: antes solo se
+  // re-aplicaba al cambiar el tema, así que el color real del usuario no se
+  // aplicaba hasta que el usuario alternaba claro/oscuro.
+  $effect(() => {
+    applyTheme(globalState.userColor);
+  });
+
   onMount(() => {
     globalState.initialize().then(() => loadUsers());
-    const interval = setInterval(() => { if (isUnlocked) globalState.refreshPendingCount(); }, 30000);
-    
+
     const onRefresh = () => loadUsers();
     window.addEventListener('pact:refresh-users', onRefresh);
     window.addEventListener('pact:force-lock', handleLock);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('pact:refresh-users', onRefresh);
       window.removeEventListener('pact:force-lock', handleLock);
     };
+  });
+
+  // Auto-bloqueo por inactividad y auto-sync mientras la bóveda está abierta.
+  // `untrack` evita que los cambios de estado internos (isSyncing, timers...)
+  // vuelvan a disparar este efecto en bucle.
+  $effect(() => {
+    const unlocked = isUnlocked;
+    const mode = globalState.dbMode;
+    untrack(() => {
+      if (unlocked) {
+        globalState.startInactivityWatch();
+        if (mode === 'remote' || mode === 'hybrid') {
+          globalState.startAutoSync();
+        } else {
+          globalState.stopAutoSync();
+        }
+      } else {
+        globalState.stopInactivityWatch();
+        globalState.stopAutoSync();
+      }
+    });
   });
 
   function handleKeydown(e) {
@@ -232,7 +314,7 @@
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
       e.preventDefault();
-      if (isUnlocked) isEntryModalOpen = true;
+      if (isUnlocked) openEntryModal('normal');
     }
   }
 </script>
@@ -243,17 +325,17 @@
   ondragover={handleDragOver}
   ondragleave={handleDragLeave}
   ondrop={handleDrop}
-  class="h-screen bg-[#f6f8fb] dark:bg-[#0b0a0d] text-[#1c1b1f] dark:text-[#e6e1e5] font-sans flex flex-col relative transition-colors duration-700 overflow-hidden { !isUnlocked ? 'items-center justify-center' : '' }">
+  class="h-screen bg-[var(--md-background)] text-[var(--md-on-background)] font-sans flex flex-col relative transition-colors duration-700 overflow-hidden { !isUnlocked ? 'items-center justify-center' : '' }">
   
   {#if isDragging}
-    <div class="fixed inset-0 z-[100] bg-[#6750A4]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[#6750A4]/40 m-8 rounded-[64px]">
+    <div class="fixed inset-0 z-[100] bg-[var(--md-primary)]/20 backdrop-blur-xl flex items-center justify-center animate-in fade-in duration-300 pointer-events-none border-[6px] border-dashed border-[var(--md-primary)]/40 m-8 rounded-[64px]">
       <div class="flex flex-col items-center gap-6 scale-110">
-        <div class="w-32 h-32 rounded-[48px] bg-[#6750A4] text-white flex items-center justify-center shadow-2xl shadow-[#6750A4]/40 animate-bounce">
+        <div class="w-32 h-32 rounded-[48px] bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shadow-elev-2  animate-bounce">
           <File size={64} strokeWidth={2.5} />
         </div>
         <div class="text-center">
-          <h2 class="text-4xl font-black tracking-tight text-[#6750A4]">Suelta tu Bóveda</h2>
-          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[#6750A4]">Solo archivos .pcty</p>
+          <h2 class="text-4xl font-black tracking-tight text-[var(--md-primary)]">{i18n.t('app.dropVault')}</h2>
+          <p class="text-[12px] font-black uppercase tracking-[0.3em] opacity-60 mt-2 text-[var(--md-primary)]">{i18n.t('app.dropVaultHint')}</p>
         </div>
       </div>
     </div>
@@ -274,7 +356,7 @@
     <!-- Mobile Dropdown (positioned fixed para estar sobre el backdrop) -->
     {#if pillRect}
       <div in:fly={{ y: -10, duration: 300 }} out:fade={{ duration: 200 }}
-           class="fixed z-[61] p-4 bg-white dark:bg-[#16151a] rounded-[32px] border border-black/[0.08] dark:border-white/[0.08] shadow-2xl max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
+           class="fixed z-[61] p-4 bg-[var(--md-surface-2)] rounded-[32px] ring-window shadow-elev-3 max-h-[300px] overflow-y-auto custom-scrollbar lg:hidden"
            style="top: {pillRect.top}px; left: {pillRect.left}px; width: {pillRect.width}px">
         <UserList onSelect={(u) => { handleUserSelect(u); }} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
       </div>
@@ -285,8 +367,9 @@
     <div class="fixed top-8 right-8 flex gap-3 z-50">
       <button 
         onclick={() => isSettingsOpen = true}
-        class="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-black/[0.08] dark:border-white/[0.08] opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
-        title="Configuración"
+        class="p-3 rounded-2xl bg-[var(--md-surface)]/60 backdrop-blur-md border border-border opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all"
+        title={i18n.t('app.settings')}
+        aria-label={i18n.t('app.settings')}
       >
         <Settings size={20} strokeWidth={2.5} />
       </button>
@@ -305,22 +388,22 @@
           
           <!-- Mobile User Profile Pill -->
           <div class="w-full max-w-[400px] mb-6 flex lg:hidden flex-col gap-2">
-            <div class="w-full flex items-center bg-white dark:bg-[#16151a] h-20 rounded-full border border-black/[0.08] dark:border-white/[0.08] group/pill">
+            <div class="w-full flex items-center bg-[var(--md-surface-2)] h-20 rounded-full border border-border group/pill">
               <button 
                 bind:this={pillRef}
                 onclick={toggleDropdown}
                 class="flex-1 h-full px-3 flex items-center rounded-l-full active:scale-[0.98] transition-all min-w-0 cursor-pointer"
               >
-                <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-black/5 p-0.5 border-2 ml-1" style="border-color: {selectedUser.color}66">
-                  <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full" />
+                <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 bg-[var(--md-primary-container)] p-1 border-2 ml-1" style="border-color: {selectedUser.color}66">
+                  <img src={selectedUser.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-[var(--md-primary-container)]" />
                 </div>
                 <div class="flex flex-col text-left flex-grow ml-4 pr-4 min-w-0">
-                  <span class="text-sm font-bold truncate">{selectedUser.name}</span>
-                  <span class="text-[10px] font-black uppercase tracking-widest opacity-30">
-                    {isDropdownOpen ? 'Cerrar' : 'Cambiar'}
+                  <span class="text-sm font-bold truncate text-[var(--md-on-surface)]">{selectedUser.name}</span>
+                  <span class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
+                    {isDropdownOpen ? i18n.t('common.close') : i18n.t('app.change')}
                   </span>
                 </div>
-                <ChevronDown size={20} class="opacity-30 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
+                <ChevronDown size={20} class="opacity-50 transition-transform duration-300 mr-2 {isDropdownOpen ? 'rotate-180' : ''}" />
               </button>
             </div>
           </div>
@@ -336,8 +419,10 @@
               {folders}
               onLock={handleLock} 
               onOpenSettings={() => isSettingsOpen = true}
-              onOpenNewEntry={(m) => openEntryModal(m || 'normal')}
+              onOpenNewEntry={() => openEntryModal('normal')}
               onOpenNewFolder={() => isNamingFolder = true}
+              onEditEntry={handleEditEntry}
+              onDatabaseChange={handleDatabaseChange}
               bind:showManager
             />
           </div>
@@ -345,32 +430,47 @@
           <!-- PANTALLA DE INICIO SUBTIL -->
           <div class="flex flex-col items-center text-center opacity-50 gap-8 animate-in fade-in zoom-in duration-700">
             <div class="flex flex-col gap-2">
-              {#if globalState.vaultPath}
-                <p class="text-xl lg:text-2xl font-bold tracking-tight">Bóveda vacía: {globalState.vaultPath.split('/').pop()}</p>
-                <p class="text-sm opacity-60">Crea tu primer usuario en esta bóveda para continuar.</p>
+              {#if vaultStatus === 'ready'}
+                <!-- Bóveda válida pero sin ningún usuario: el primer usuario es
+                     la acción principal. Sin esto, cerrar el modal dejaba la
+                     pantalla sin ninguna forma de volver a crearlo. -->
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.emptyVaultTitle', { name: globalState.vaultPath.split('/').pop() })}</p>
+                <p class="text-sm opacity-60">{i18n.t('app.emptyVaultHint')}</p>
+              {:else if vaultStatus === 'configured'}
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.noUsersTitle')}</p>
               {:else}
-                <p class="text-xl lg:text-2xl font-bold tracking-tight">Crea tu primer usuario para empezar.</p>
+                <p class="text-xl lg:text-2xl font-bold tracking-tight">{i18n.t('app.noUsersTitle')}</p>
               {/if}
             </div>
             
-            <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-black/20 dark:border-white/20 rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
-              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4] text-white flex items-center justify-center shrink-0 shadow-sm group-hover:scale-110 transition-transform"><File size={24} /></div>
+            <div class="flex flex-col gap-4 p-6 border-2 border-dashed border-border rounded-[48px] bg-black/[0.02] dark:bg-white/[0.01]">
+              {#if vaultStatus === 'ready'}
+                <!-- Bóveda cargada y sin usuarios: crear el primer usuario. -->
+                <button onclick={handleNewUserClick} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                  <div class="w-12 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+                  <div class="flex flex-col text-left">
+                    <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.newUser')}</span>
+                  </div>
+                </button>
+              {:else}
+              <button onclick={() => promptForVaultPath('open')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[var(--md-primary)] text-[var(--md-on-primary)] flex items-center justify-center shrink-0 shadow-elev-1 group-hover:scale-110 transition-transform"><File size={24} /></div>
                 <div class="flex flex-col text-left">
-                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Abrir Bóveda</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Seleccionar archivo .pcty</span>
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.openVault')}</span>
+                  <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase tracking-widest">{i18n.t('app.openVaultHint')}</span>
                 </div>
               </button>
 
               <div class="h-px w-12 bg-black/10 dark:bg-white/10 mx-auto"></div>
 
-              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-full hover:opacity-100 hover:border-[#6750A4]/50 hover:bg-[#6750A4]/5 active:scale-95 group w-full">
-                <div class="w-12 h-12 rounded-full bg-[#6750A4]/10 text-[#6750A4] flex items-center justify-center shrink-0 border border-[#6750A4]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
+              <button onclick={() => promptForVaultPath('save')} class="flex items-center gap-4 p-4 pr-12 transition-all duration-300 bg-[var(--md-surface)] border border-border rounded-full hover:opacity-100 hover:border-[var(--md-primary)]/40 hover:bg-[var(--md-primary)]/5 active:scale-95 group w-full">
+                <div class="w-12 h-12 rounded-full bg-[var(--md-primary)]/10 text-[var(--md-primary)] flex items-center justify-center shrink-0 border border-[var(--md-primary)]/20 group-hover:scale-110 transition-transform"><Plus size={24} /></div>
                 <div class="flex flex-col text-left">
-                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">Crear Nueva</span>
-                  <span class="text-[9px] opacity-40 font-bold uppercase tracking-widest">Empezar desde cero</span>
+                  <span class="text-[10px] font-black uppercase tracking-[0.2em]">{i18n.t('app.createVault')}</span>
+                  <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase tracking-widest">{i18n.t('app.createVaultHint')}</span>
                 </div>
               </button>
+              {/if}
             </div>
           </div>
         {/if}
@@ -379,7 +479,7 @@
       {#if !isUnlocked && users.length > 0}
         <div class="hidden lg:flex flex-col justify-center h-full animate-in fade-in slide-in-from-right duration-1000">
           <div class="p-2">
-            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] opacity-30 mb-6 ml-4">Usuarios</h2>
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)] mb-6 ml-4">{i18n.t('app.users')}</h2>
             <UserList onSelect={handleUserSelect} selectedId={selectedUser?.id} {isMobile} bind:users={users} onAddClick={handleNewUserClick} />
           </div>
         </div>
@@ -398,10 +498,12 @@
   <NewEntryModal 
     isOpen={isEntryModalOpen} 
     mode={entryModalMode} 
+    entry={entryToEdit}
     {folders} 
     user={selectedUser}
+    onSave={handleSaveEntry}
     onOpenNewFolder={() => isNamingFolder = true}
-    onClose={() => isEntryModalOpen = false} 
+    onClose={() => { isEntryModalOpen = false; entryToEdit = null; }} 
   />
 
   <FolderModal 
@@ -418,8 +520,7 @@
 </main>
 
 <style>
-  :global(body) { margin: 0; padding: 0; background-color: #f6f8fb; overflow: hidden; }
-  :global(.dark body) { background-color: #0b0a0d; }
+  :global(body) { margin: 0; padding: 0; overflow: hidden; }
   @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes zoom-in { from { transform: scale(0.95); } to { transform: scale(1); } }
   @keyframes slide-in-from-right { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

@@ -41,7 +41,7 @@ async fn test_login_user_enumeration_prevention() {
     });
     let limiter = auth_rate_limiter();
     
-    let res = login(State(db.clone()), State(session_mgr.clone()), State(limiter), payload).await;
+    let res = login(State(db.clone()), State(session_mgr.clone()), State(limiter), None, payload).await;
     assert!(res.is_err());
     // El error debería ser Unauthorized, no NotFound
     // Nota: Dependiendo de cómo esté implementado AppError, esto puede variar

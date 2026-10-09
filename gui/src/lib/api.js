@@ -1,4 +1,5 @@
 import { globalState } from './state.svelte.js';
+import { devLog, devDebug, devError } from './logger.js';
 
 const isTauri = typeof window !== 'undefined' && (!!window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.protocol === 'file:');
 const API_BASE = isTauri ? 'http://127.0.0.1:8002' : '';
@@ -11,6 +12,12 @@ class ApiClient {
         if (globalState.authToken) {
             headers.set('Authorization', `Bearer ${globalState.authToken}`);
         }
+
+        // La clave de sync viaja solo en las llamadas de sincronización para que
+        // el servidor descifre la config remota en tránsito.
+        if (globalState.syncKeyHex && endpoint.startsWith('/sync/')) {
+            headers.set('X-Pact-Sync-Key', globalState.syncKeyHex);
+        }
         
         if (options.body && !(options.body instanceof FormData)) {
             headers.set('Content-Type', 'application/json');
@@ -22,9 +29,9 @@ class ApiClient {
         };
 
         try {
-            console.log(`[API] ${options.method || 'GET'} ${url}`, options.body || '');
+            devLog(`[API] ${options.method || 'GET'} ${url}`, options.body || '');
             const response = await fetch(url, config);
-            console.log(`[API] Response ${url}: ${response.status}`, response.statusText);
+            devDebug(`[API] Response ${url}: ${response.status}`, response.statusText);
             
             if (response.status === 401) {
                 if (globalState.authToken) {
@@ -58,7 +65,7 @@ class ApiClient {
             }
         } catch (error) {
             if (error.message !== "Unauthorized") {
-                console.error(`[API] Error in ${url}:`, error);
+                devError(`[API] Error in ${url}:`, error);
             }
             throw error;
         }
@@ -84,6 +91,14 @@ class ApiClient {
         });
     }
 
+    patch(endpoint, body, options = {}) {
+        return this.request(endpoint, {
+            ...options,
+            method: 'PATCH',
+            body: body instanceof FormData ? body : JSON.stringify(body)
+        });
+    }
+
     delete(endpoint, body, options = {}) {
         return this.request(endpoint, { 
             ...options, 
@@ -94,3 +109,9 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+
+// URL absoluta para recursos servidos por el backend (p. ej. iconos en <img>,
+// donde no se pueden enviar cabeceras de autenticación).
+export function apiAssetUrl(path) {
+    return API_BASE + path;
+}

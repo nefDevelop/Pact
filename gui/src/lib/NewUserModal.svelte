@@ -4,6 +4,8 @@
   import { globalState } from './state.svelte.js';
   import { api } from './api.js';
   import { deriveKeys } from './crypto_utils.js';
+  import { focusTrap } from './focusTrap.js';
+  import { i18n } from './i18n.svelte.js';
   
   let { isOpen, onSave, onClose, users = [] } = $props();
   
@@ -133,8 +135,7 @@
 
   let passwordStrength = $derived.by(() => {
     if (isCriticallyWeak || password.length === 0) return 0;
-    let metCount = requirements.filter(r => r.met).length;
-    console.log('[DEBUG] password:', password, 'length:', password.length, 'metCount:', metCount, 'reqs:', requirements.map(r => r.met), 'isCriticallyWeak:', isCriticallyWeak);
+    const metCount = requirements.filter(r => r.met).length;
     if (password.length < 12) return Math.min(metCount, 3);
     if (metCount === 4) return 4;
     return Math.min(metCount, 3);
@@ -210,12 +211,12 @@
     role="presentation"
   ></div>
 
-  <div class="w-full max-w-[500px] bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.1] relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-2xl">
+  <div use:focusTrap role="dialog" aria-modal="true" aria-label="Nuevo usuario" class="w-full max-w-[500px] bg-[var(--md-surface-2)] rounded-[40px] ring-window relative z-10 overflow-hidden transition-colors duration-500 ease-in-out shadow-elev-3">
     
     <div class="px-8 pt-8 pb-4 flex justify-between items-center transition-colors duration-500 ease-in-out">
       <div class="flex flex-col">
-        <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">Nuevo Usuario</h3>
-        <p class="text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">Configurar identidad personal</p>
+        <h3 class="text-2xl font-bold tracking-tight text-[var(--md-on-background)]">{i18n.t('userModal.title')}</h3>
+        <p class="text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{i18n.t('userModal.subtitle')}</p>
       </div>
       <button 
         onclick={onClose}
@@ -234,7 +235,7 @@
             <img 
               src={`https://api.dicebear.com/9.x/notionists/svg?seed=${seed}`} 
               alt="Avatar preview" 
-              class="w-full h-full rounded-full object-cover bg-black/5"
+              class="w-full h-full rounded-full object-cover bg-[var(--md-surface-variant)]"
               onerror={handleAvatarError}
             />
             <div 
@@ -246,20 +247,20 @@
           </div>
           <button 
             onclick={generateNewAvatar}
-            class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white dark:bg-[#2b2930] border border-black/10 dark:border-white/10 flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-sm"
+            class="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[var(--md-surface-3)] border border-border flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-elev-1"
             aria-label="Generar nuevo avatar"
           >
             <Dice5 size={14} />
           </button>
         </div>
         <div class="flex-1 flex flex-col gap-2">
-          <label for="identity-alias" class="text-[10px] font-black uppercase tracking-widest opacity-30 px-2 text-[var(--md-on-background)]">Alias de Usuario</label>
+          <label for="identity-alias" class="text-[10px] font-black uppercase tracking-widest opacity-30 px-2 text-[var(--md-on-background)]">{i18n.t('userModal.alias')}</label>
           <input 
             id="identity-alias"
             type="text" 
             bind:value={name}
             placeholder="Ej. Neftali"
-            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[#6750A4]/10 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
+            class="w-full h-12 bg-[var(--md-surface-variant)] rounded-2xl px-5 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm font-bold text-[var(--md-on-background)] transition-all duration-300"
           />
         </div>
       </div>
@@ -267,8 +268,8 @@
       <!-- Master Password Section -->
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
-          <label for="master-pass" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">
-            <Lock size={10} /> Contraseña Maestra
+          <label for="master-pass" class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
+            <Lock size={10} /> {i18n.t('userModal.masterPassword')}
           </label>
           {#if password}
             <span class="text-[9px] font-black uppercase tracking-tighter {isCriticallyWeak ? 'text-red-600 animate-pulse' : (passwordStrength >= 4 ? 'text-blue-500 font-black' : 'opacity-40')}">
@@ -283,19 +284,21 @@
             type={showPassword ? 'text' : 'password'}
             bind:value={password}
             placeholder="Introduce una clave fuerte..."
-            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[#6750A4]/20 border border-transparent focus:border-[#6750A4]/10 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
+            class="w-full h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-6 pr-24 focus:outline-none focus:ring-2 focus:ring-[var(--md-primary)]/20 border border-transparent focus:border-[var(--md-primary)]/30 text-sm {isCriticallyWeak ? 'ring-2 ring-red-500/20 border-red-500/50' : ''}"
           />
           <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <button 
               onclick={generatePassphrase}
-              class="p-2.5 rounded-xl hover:bg-[#6750A4]/10 text-[#6750A4] opacity-60 hover:opacity-100 transition-all"
+              class="p-2.5 rounded-xl hover:bg-[var(--md-primary)]/10 text-[var(--md-primary)] opacity-60 hover:opacity-100 transition-all"
               title="Generar frase segura"
+              aria-label="Generar frase segura"
             >
               <Dice5 size={18} />
             </button>
             <button 
               onclick={() => showPassword = !showPassword}
               class="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             >
               {#if showPassword} <EyeOff size={18} /> {:else} <Eye size={18} /> {/if}
             </button>
@@ -329,7 +332,7 @@
 
         <div class="flex gap-1 h-1 px-2">
           {#each Array(4) as _, i}
-            <div class="flex-1 rounded-full transition-all  {i < passwordStrength && password && !isCriticallyWeak ? strengthColors[passwordStrength] : (isCriticallyWeak && i === 0 ? strengthColors[0] : 'bg-black/5 dark:bg-white/5')}"></div>
+            <div class="flex-1 rounded-full transition-all  {i < passwordStrength && password && !isCriticallyWeak ? strengthColors[passwordStrength] : (isCriticallyWeak && i === 0 ? strengthColors[0] : 'bg-[var(--md-surface-variant)]')}"></div>
           {/each}
         </div>
       </div>
@@ -337,12 +340,13 @@
       <!-- Visual Customization -->
       <div class="space-y-4">
         <div class="flex justify-between items-center px-2">
-          <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest opacity-30">
-            <Palette size={10} /> Identificador Visual
+          <span class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
+            <Palette size={10} /> {i18n.t('userModal.identify')}
           </span>
           <button 
             onclick={refreshColors}
             class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 opacity-30 hover:opacity-100 transition-all group/refresh"
+            aria-label="Cambiar paleta de colores"
           >
             <RefreshCw size={12} class="group-active/refresh:rotate-180 transition-transform " />
           </button>
@@ -354,6 +358,7 @@
                 onclick={() => (color = c)}
                 class="w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center hover:scale-110 cursor-pointer {color === c ? 'scale-110' : 'border-transparent'}"
                 style="background-color: {c}; border-color: {color === c ? c : 'transparent'}; box-shadow: {color === c ? `0 0 0 4px ${c}33` : 'none'};"
+                aria-label="Elegir color {c}"
               >
                 {#if color === c}
                   <Check size={12} class="text-white" />
@@ -366,30 +371,30 @@
     </div>
 
     <!-- Actions -->
-    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-black/[0.03] dark:border-white/[0.03] flex justify-end gap-4 items-center">
+    <div class="p-8 bg-[var(--md-surface-variant)] border-t border-border flex justify-end gap-4 items-center">
       {#if isRegistering}
         <div class="flex items-center gap-4 pr-4 animate-in fade-in slide-in-from-right-4">
           <div class="flex flex-col items-end">
-            <span class="text-[10px] font-black uppercase tracking-widest text-[#6750A4]">Cifrado de Grado Militar</span>
-            <span class="text-[9px] opacity-40 font-bold uppercase">Procesando Argon2id...</span>
+            <span class="text-[10px] font-black uppercase tracking-widest text-[var(--md-primary)]">Cifrado de Grado Militar</span>
+            <span class="text-[9px] text-[var(--md-on-surface-variant)] font-bold uppercase">Procesando Argon2id...</span>
           </div>
-          <div class="w-10 h-10 rounded-full border-4 border-[#6750A4]/10 border-t-[#6750A4] animate-spin"></div>
+          <div class="w-10 h-10 rounded-full border-4 border-[var(--md-primary)] border-t-[var(--md-primary)] animate-spin"></div>
         </div>
       {:else}
         <button 
           onclick={onClose}
           class="px-6 h-12 rounded-full text-[10px] font-black uppercase tracking-widest opacity-40 hover:opacity-100 transition-all"
         >
-          Cancelar
+          {i18n.t('common.cancel')}
         </button>
         <button 
           onclick={handleSave}
           disabled={!name || passwordStrength < 4 || isCriticallyWeak}
-          class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-lg shadow-black/10"
+          class="px-10 h-14 rounded-full text-white font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3 active:scale-95 disabled:opacity-20 disabled:grayscale shadow-elev-2"
           style="background-color: {color}"
         >
           <ShieldCheck size={18} />
-          Crear Identidad
+          {i18n.t('userModal.create')}
         </button>
       {/if}
     </div>

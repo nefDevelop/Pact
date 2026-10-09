@@ -3,10 +3,10 @@ use pact_server::{
     db::{Database, SqliteDatabase},
     auth::session::SessionManager,
     storage::StorageManager,
-    AppState, crypto::SyncCrypto,
+    AppState,
     auth::ratelimit::auth_rate_limiter,
 };
-use pact_server::models::{CreateUser, CreateFolder, CreateAccount};
+use pact_server::models::CreateUser;
 use uuid::Uuid;
 use serde_json::Value;
 
@@ -21,17 +21,18 @@ async fn setup_test_db() -> Arc<dyn Database> {
 fn build_app_state(db: Arc<dyn Database>) -> AppState {
     let session_mgr = Arc::new(SessionManager::new());
     let storage = Arc::new(StorageManager::new(None));
-    let sync_crypto = Arc::new(SyncCrypto::new("test-machine-id"));
     let auth_limiter = auth_rate_limiter();
+    let public_limiter = pact_server::auth::ratelimit::public_rate_limiter();
 
     AppState {
         db,
         session_mgr,
         storage,
         machine_id: "test-machine-id".to_string(),
-        sync_crypto,
         auth_limiter,
+        public_limiter,
         db_type: "SQLite".to_string(),
+        data_dir: std::env::temp_dir(),
     }
 }
 
@@ -64,9 +65,9 @@ fn build_router(state: AppState) -> axum::Router {
         .route("/vault/pending-count/:username", get(pact_server::vault::handlers::get_pending_count))
         .route("/vault/upload", post(pact_server::vault::handlers::upload_vault))
         .route("/vault/initialize", post(pact_server::vault::handlers::initialize_vault))
-        .route("/vault/totp/:id", get(pact_server::vault::handlers::get_totp_code))
+        .route("/vault/totp/:id", get(pact_server::vault::handlers::get_totp_seed))
         .route("/vault/accounts/:id/icon", axum::routing::patch(pact_server::vault::handlers::update_account_icon))
-        .route("/vault/proxy-icon", get(pact_server::vault::handlers::proxy_icon))
+        .route("/vault/icon", get(pact_server::vault::handlers::proxy_icon_image))
         .route("/sync/run", post(pact_server::sync::handlers::run_sync))
         .route("/sync/apply", post(pact_server::sync::handlers::apply_sync))
         .route("/sync/check", get(pact_server::sync::handlers::check_sync))
@@ -312,15 +313,12 @@ async fn test_delete_user_cascades() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "delete_me", "pass").await;
     let client = reqwest::Client::new();
-    client.post(format!("{}/auth/register", base))
-        .json(&serde_json::json!({
-            "username": "delete_me",
-            "master_password": "pass"
-        }))
-        .send().await.unwrap();
 
+    // Borrar exige sesión autenticada y la contraseña maestra.
     let resp = client.delete(format!("{}/auth/delete_me", base))
+        .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({ "master_password": "pass" }))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -338,6 +336,8 @@ async fn test_delete_user_cascades() {
 async fn test_get_users_returns_list() {
     let db = setup_test_db().await;
     let state = build_app_state(db);
+    // `get_users` solo lista usuarios cuando hay una bóveda vinculada.
+    state.storage.set_path(Some(std::path::PathBuf::from("/tmp/pact_test.pcty")));
     let base = start_test_server(state).await;
 
     let client = reqwest::Client::new();
@@ -355,10 +355,95 @@ async fn test_get_users_returns_list() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
-    let users = body["users"].as_array().unwrap();
-    assert!(users.is_empty());
-    assert_eq!(body["vault_status"], "empty");
+    assert!(!body["users"].as_array().unwrap().is_empty());
 }
+
+/// Primer arranque: sin bóveda vinculada hay que poder ofrecer crear/abrir, así
+/// que el estado debe ser `empty` y no una ruta configurada inexistente.
+#[tokio::test]
+async fn test_get_users_sin_boveda_reporta_empty() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    // Sin `set_path`: es lo que ocurre cuando la bóveda por defecto no existe.
+    let base = start_test_server(state).await;
+
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "empty");
+    assert_eq!(body["vault_path"], "");
+}
+
+/// Bóveda configurada pero con el archivo ausente: no es una bóveda abierta, y
+/// el frontend no debe pedir un usuario contra ella.
+#[tokio::test]
+async fn test_get_users_con_ruta_sin_archivo_no_reporta_ready() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    state.storage.set_path(Some(std::path::PathBuf::from(
+        "/tmp/pact_ruta_que_no_existe_12345.pcty",
+    )));
+    let base = start_test_server(state).await;
+
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "configured");
+}
+
+/// Bóveda válida en disco: `ready`, que es lo que hace saltar el modal de
+/// primer usuario sin pasar por la pantalla de crear/abrir.
+#[tokio::test]
+async fn test_get_users_con_boveda_valida_reporta_ready() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+
+    let dir = std::env::temp_dir().join(format!("pact_ready_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("valida.pcty");
+    state.storage.init_vault(&path).unwrap();
+    // `build_app_state` parte de `None`; abrir la bóveda es lo que fija la ruta.
+    state.storage.set_path(Some(path.clone()));
+
+    let base = start_test_server(state).await;
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "ready");
+    assert_eq!(body["vault_path"], "valida.pcty");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Bóveda recordada de una sesión anterior pero ya ausente del disco: hay que
+/// avisar (con el nombre) y ofrecer crear/abrir, no pedir un usuario.
+#[tokio::test]
+async fn test_get_users_con_boveda_recordada_ausente_reporta_configured() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+
+    let data_dir = std::env::temp_dir().join(format!("pact_rec_{}", std::process::id()));
+    std::fs::create_dir_all(&data_dir).unwrap();
+    let mut state = state;
+    state.data_dir = data_dir.clone();
+    pact_server::storage::remember_vault_path(&data_dir, Some(std::path::Path::new("/tmp/ausente.pcty"))).unwrap();
+
+    let base = start_test_server(state).await;
+    let body: Value = reqwest::Client::new()
+        .get(format!("{}/auth/users", base))
+        .send().await.unwrap()
+        .json().await.unwrap();
+
+    assert_eq!(body["vault_status"], "configured");
+    assert_eq!(body["vault_path"], "ausente.pcty");
+
+    let _ = std::fs::remove_dir_all(&data_dir);}
 
 #[tokio::test]
 async fn test_vault_endpoints_return_401_without_token() {
@@ -556,13 +641,21 @@ async fn test_delete_account_soft() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/vault/accounts", base))
+    // Las cuentas en papelera solo se devuelven con include_deleted=true.
+    let resp = client.get(format!("{}/vault/accounts?include_deleted=true", base))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     let body: Value = resp.json().await.unwrap();
     let accounts = body.as_array().unwrap();
     assert_eq!(accounts.len(), 1);
     assert!(accounts[0]["deleted_at"].is_string());
+
+    // Por defecto, la cuenta borrada no aparece.
+    let resp = client.get(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body.as_array().unwrap().len(), 0);
 }
 
 #[tokio::test]
@@ -687,8 +780,10 @@ async fn test_vault_path_get() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "path_user", "pass").await;
     let client = reqwest::Client::new();
     let resp = client.get(format!("{}/vault/config/path", base))
+        .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 }
@@ -699,8 +794,10 @@ async fn test_pending_count() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "pending_user", "pass").await;
     let client = reqwest::Client::new();
     let resp = client.get(format!("{}/vault/pending-count/alice", base))
+        .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
@@ -719,7 +816,11 @@ async fn test_get_sync_config_empty() {
     let resp = client.get(format!("{}/sync/config", base))
         .header("Authorization", format!("Bearer {}", token))
         .send().await.unwrap();
-    assert_eq!(resp.status(), 404);
+    // Sin configuración remota es el estado inicial normal: 200 con `null`,
+    // no 404, para que el cliente no lo trate como error.
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert!(body.is_null());
 }
 
 #[tokio::test]
@@ -770,10 +871,15 @@ async fn test_vault_endpoints_without_token_return_401() {
         ("POST", format!("{}/vault/accounts/1/restore", base)),
         ("DELETE", format!("{}/vault/accounts/trash/empty", base)),
         ("GET", format!("{}/vault/pending-entries", base)),
+        ("POST", format!("{}/auth/update", base)),
+        ("POST", format!("{}/vault/initialize", base)),
+        ("POST", format!("{}/vault/upload", base)),
+        ("GET", format!("{}/vault/config/path", base)),
+        ("GET", format!("{}/vault/pending-count/alice", base)),
     ];
 
     for (method, url) in endpoints {
-        let resp = match method.as_ref() {
+        let resp = match method {
             "GET" => client.get(&url).send().await.unwrap(),
             "POST" => client.post(&url).json(&serde_json::json!({})).send().await.unwrap(),
             "DELETE" => client.delete(&url).send().await.unwrap(),
@@ -808,7 +914,7 @@ async fn test_export_vault_with_correct_password() {
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
     assert_eq!(body["username"], "export_ok");
-    assert!(body["folders"].as_array().unwrap().len() > 0);
+    assert!(!body["folders"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -817,16 +923,12 @@ async fn test_update_user() {
     let state = build_app_state(db);
     let base = start_test_server(state).await;
 
+    let token = register_and_login(&base, "old_name", "pass").await;
     let client = reqwest::Client::new();
-    client.post(format!("{}/auth/register", base))
-        .json(&serde_json::json!({
-            "username": "old_name",
-            "master_password": "pass",
-            "color": "#ff0000"
-        }))
-        .send().await.unwrap();
 
+    // Renombrar exige sesión autenticada.
     let resp = client.post(format!("{}/auth/update", base))
+        .header("Authorization", format!("Bearer {}", token))
         .json(&serde_json::json!({
             "old_name": "old_name",
             "new_name": "new_name",
@@ -835,13 +937,64 @@ async fn test_update_user() {
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/auth/salt/new_name", base))
+    // El nuevo nombre permite iniciar sesión; el antiguo ya no.
+    let resp = client.post(format!("{}/auth/login", base))
+        .json(&serde_json::json!({ "username": "new_name", "master_password": "pass" }))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
 
-    let resp = client.get(format!("{}/auth/salt/old_name", base))
+    let resp = client.post(format!("{}/auth/login", base))
+        .json(&serde_json::json!({ "username": "old_name", "master_password": "pass" }))
         .send().await.unwrap();
-    assert_eq!(resp.status(), 404);
+    assert_eq!(resp.status(), 401);
+}
+
+#[tokio::test]
+async fn test_get_salt_does_not_leak_user_existence() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "real_user", "master_password": "pass" }))
+        .send().await.unwrap();
+
+    // Usuario existente y usuario inexistente responden igual: 200 + 32 hex.
+    for username in ["real_user", "ghost_user"] {
+        let resp = client.get(format!("{}/auth/salt/{}", base, username))
+            .send().await.unwrap();
+        assert_eq!(resp.status(), 200, "salt de {username}");
+        let body: Value = resp.json().await.unwrap();
+        let salt = body["salt"].as_str().unwrap();
+        assert_eq!(salt.len(), 32, "salt de {username}");
+    }
+}
+
+#[tokio::test]
+async fn test_sync_run_requires_sync_key() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "sync_key_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    client.post(format!("{}/sync/config", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({
+            "host": "db.example.com",
+            "user": "admin",
+            "password": "prueba",
+            "db_name": "pact_db"
+        }))
+        .send().await.unwrap();
+
+    // Sin la cabecera X-Pact-Sync-Key no se puede descifrar la config remota.
+    let resp = client.post(format!("{}/sync/run", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 400);
 }
 
 #[tokio::test]
@@ -871,3 +1024,171 @@ async fn test_set_sync_config_password_cleared_on_get() {
     assert_eq!(body["password"], "");
     assert_eq!(body["host"], "db.example.com");
 }
+
+#[tokio::test]
+async fn test_unlock_returns_token() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "unlock_user", "master_password": "pass" }))
+        .send().await.unwrap();
+
+    let resp = client.post(format!("{}/auth/unlock", base))
+        .json(&serde_json::json!({ "username": "unlock_user", "master_password": "pass" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert!(!body["token"].as_str().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn test_register_rejects_unsafe_username() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    let resp = client.post(format!("{}/auth/register", base))
+        .json(&serde_json::json!({ "username": "../evil", "master_password": "pass" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn test_totp_seed_is_stored_opaque() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "totp_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    // El cliente envía el seed ya cifrado; el servidor debe devolverlo tal cual
+    // sin descifrarlo ni interpretarlo (Zero-Knowledge).
+    let opaque_seed = "{\"nonce\":\"aa\",\"ciphertext\":\"bb\",\"tag\":\"cc\"}";
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({
+            "title": "2FA",
+            "encrypted_pass": "p",
+            "totp_seed": opaque_seed
+        }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["seed"], opaque_seed);
+}
+
+#[tokio::test]
+async fn test_update_and_remove_totp() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "totp_edit", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p" }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    // Añadir TOTP a una cuenta existente.
+    let resp = client.put(format!("{}/vault/accounts/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p", "totp_seed": "opaque-blob" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["seed"], "opaque-blob");
+
+    // Quitar TOTP con cadena vacía.
+    let resp = client.put(format!("{}/vault/accounts/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "A", "encrypted_pass": "p", "totp_seed": "" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/totp/{}", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 404);
+}
+
+#[tokio::test]
+async fn test_update_account_icon() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "icon_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "title": "Icon", "encrypted_pass": "p" }))
+        .send().await.unwrap();
+    let acc_id: i32 = resp.json().await.unwrap();
+
+    let resp = client.patch(format!("{}/vault/accounts/{}/icon", base, acc_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "icon_data": "data:image/png;base64,AAAA" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.get(format!("{}/vault/accounts", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .send().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body[0]["icon_data"], "data:image/png;base64,AAAA");
+}
+
+#[tokio::test]
+async fn test_initialize_vault_creates_file() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let token = register_and_login(&base, "init_vault_user", "pass").await;
+    let client = reqwest::Client::new();
+
+    let resp = client.post(format!("{}/vault/initialize", base))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "name": "pact_ci_test" }))
+        .send().await.unwrap();
+    assert_eq!(resp.status(), 200);
+    let body: Value = resp.json().await.unwrap();
+    assert_eq!(body["path"], "pact_ci_test.pcty");
+
+    let _ = std::fs::remove_file("pact_ci_test.pcty");
+}
+
+#[tokio::test]
+async fn test_icon_endpoint_rejects_invalid_domain() {
+    let db = setup_test_db().await;
+    let state = build_app_state(db);
+    let base = start_test_server(state).await;
+
+    let client = reqwest::Client::new();
+    // IP directa y dominio vacío deben rechazarse sin salir a la red.
+    for domain in ["127.0.0.1", "169.254.169.254", "sin-punto"] {
+        let resp = client.get(format!("{}/vault/icon?domain={}", base, domain))
+            .send().await.unwrap();
+        assert_eq!(resp.status(), 400, "dominio {domain}");
+    }
+}
+

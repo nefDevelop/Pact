@@ -4,6 +4,7 @@ pub mod error;
 pub mod models;
 pub mod auth;
 pub mod vault;
+pub mod paths;
 pub mod storage;
 pub mod schemas;
 pub mod sync;
@@ -21,9 +22,11 @@ pub struct AppState {
     pub session_mgr: SharedSessionManager,
     pub storage: Arc<StorageManager>,
     pub machine_id: String,
-    pub sync_crypto: Arc<crate::crypto::SyncCrypto>,
     pub auth_limiter: crate::auth::ratelimit::SharedRateLimiter,
+    pub public_limiter: crate::auth::ratelimit::SharedRateLimiter,
     pub db_type: String,
+    /// Directorio de datos, para recordar la bóveda elegida entre reinicios.
+    pub data_dir: std::path::PathBuf,
 }
 
 // Implementación de FromRef para permitir extraer partes del estado individualmente en los handlers
@@ -42,12 +45,6 @@ impl FromRef<AppState> for SharedSessionManager {
 impl FromRef<AppState> for Arc<StorageManager> {
     fn from_ref(state: &AppState) -> Self {
         state.storage.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<crate::crypto::SyncCrypto> {
-    fn from_ref(state: &AppState) -> Self {
-        state.sync_crypto.clone()
     }
 }
 

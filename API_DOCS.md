@@ -7,6 +7,23 @@ The server runs by default on `http://127.0.0.1:8002`.
 
 ---
 
+## Zero-Knowledge model
+
+The server stores **E2E-encrypted blobs** for `title`, `url`, `username_site`,
+`encrypted_pass`, `folder.name`, `icon_data`, the TOTP seed and the remote DB
+password (`sync_configs.remote_pass`, wrapped with a subkey derived from the
+`MasterKey`). It never receives the `MasterKey` and cannot decrypt those fields
+or generate TOTP codes. The remote DB password is decrypted only in transit
+during a sync request, using the `X-Pact-Sync-Key` header.
+
+It still observes **structural metadata** (`folder_id`, `is_favorite`,
+`deleted_at`, `version`, timestamps, `has_totp`), user names/colors and the
+remote sync configuration (`host`, `user`, `db_name`). The `.pcty` container is
+not file-level encrypted yet. See the README section *Modelo de Seguridad y
+límites de Zero-Knowledge* for details and the roadmap for pending work.
+
+---
+
 ## Index
 - [System / Health](#system--health)
 - [Authentication](#authentication)
@@ -27,23 +44,26 @@ Check if the server is up and running.
 ### Get Server Status
 `GET /status`
 
-Get the current state of the server, including version and active sessions.
+Get the current state of the server, including its version.
 - **Response**: `200 OK`
 - **Body**: `StatusResponse` (JSON)
 ```json
 {
   "status": "Running",
-  "version": "0.1.0-alpha",
+  "version": "0.2.0",
   "engine": "Rust/Axum",
-  "database": "SQLite (Connected)",
-  "active_sessions": 5
+  "database": "SQLite (Connected)"
 }
 ```
 
-### Get Machine ID
-`GET /system/machine-id`
+> This endpoint is public and deliberately omits `active_sessions`: exposing it
+> would let any local page infer whether the user currently has the app open.
 
-Get the unique identifier for the current device.
+### Get Machine ID
+`GET /system/machine-id` *(authenticated)*
+
+Get the unique identifier for the current device. Requires a session so it
+cannot be used as an unauthenticated device fingerprint.
 - **Response**: `200 OK`
 - **Body**: `MachineIdResponse` (JSON)
 ```json
@@ -69,7 +89,8 @@ Register a new user in the system.
   "color": "#ff0000"
 }
 ```
-- **Response**: `200 OK` with `AuthResponse` or `400 Bad Request` with `ErrorResponse`.
+- **Response**: `201 Created` with `AuthResponse` or `400 Bad Request` with `ErrorResponse`.
+- **Note**: `username` must be 1–64 chars and cannot contain `/`, `\` or `..`.
 
 ### Login
 `POST /auth/login`
@@ -97,8 +118,13 @@ Authenticate a user and create a session.
 `GET /auth/salt/:username`
 
 Retrieve the salt for a specific user to perform hashing on the client.
+Anti-enumeration: unknown users receive a deterministic fake salt (same format)
+so existence cannot be inferred. Rate limited per IP.
 - **Response**: `200 OK`
-- **Body**: `String` (text/plain)
+- **Body**: JSON
+```json
+{ "salt": "a1b2c3d4..." }
+```
 
 ### Unlock Session
 `POST /auth/unlock`
@@ -116,14 +142,17 @@ Terminate the current session.
 ### List Users
 `GET /auth/users`
 
-List users of the linked local vault (used by the desktop vault picker).
-Without a linked vault it returns an empty list with `vault_status: "empty"`.
-- **Response**: `200 OK` with `UsersResponse` (`users`, `source`, `vault_path`, `vault_status`).
+List all users registered in the local instance. `vault_path` contains only the
+file name (not the full filesystem path). Available before login so the lock
+screen can list users. Rate limited per IP.
+- **Response**: `200 OK` with `UsersResponse`.
 
 ### Update User
 `POST /auth/update`
 
-Update current user's profile (username and color).
+Update a user's profile (username and color). Requires an authenticated session
+(`Authorization: Bearer <token>`). Renaming a user also renames its `<user>.db`
+inside the `.pcty` vault.
 - **Request Body**: `UserUpdate` (JSON)
 ```json
 {
@@ -132,20 +161,20 @@ Update current user's profile (username and color).
   "new_color": "#00ff00"
 }
 ```
-- **Response**: `200 OK`.
+- **Response**: `200 OK`, `401 Unauthorized` without session.
 
 ### Delete User
 `DELETE /auth/:username`
 
-Permanently delete a user account and its data. Requires master password verification.
-- **Request Body**: `UserDelete` (JSON)
+Permanently delete a user account and its data. Requires an authenticated session
+and master password verification. Removes the user's `<user>.db` from the vault.
+- **Request Body**: `MasterPasswordOnly` (JSON)
 ```json
 {
-  "username": "alice",
   "master_password": "hashed_password"
 }
 ```
-- **Response**: `200 OK` or `401 Unauthorized`.
+- **Response**: `200 OK`, `401 Unauthorized` or `404 Not Found`.
 
 ---
 
@@ -164,11 +193,12 @@ Retrieve all folders for the authenticated user.
 ### Create Folder
 `POST /vault/folders`
 
-Create a new folder in the vault.
+Create a new folder in the vault. `name` is an **E2E-encrypted blob** produced
+by the client with the MasterKey (the server cannot read it).
 - **Request Body**: `FolderCreate` (JSON)
 ```json
 {
-  "name": "Personal",
+  "name": "{\"nonce\":\"...\",\"ciphertext\":\"...\",\"tag\":\"...\"}",
   "color": "#3498db",
   "icon": "folder"
 }
@@ -191,25 +221,30 @@ Delete a folder. Note: Accounts in this folder will have their `folder_id` set t
 ### Get Accounts
 `GET /vault/accounts`
 
-Retrieve all accounts (credentials) for the authenticated user.
+Retrieve accounts for the authenticated user. Trashed accounts are hidden by
+default.
+- **Query params** (all optional): `include_deleted=true` (include trash),
+  `is_favorite=true`, `folder_id=<id>`.
 - **Response**: `200 OK`
 - **Body**: `Array<Account>`
 
 ### Create Account
 `POST /vault/accounts`
 
-Create a new credential entry.
+Create a new credential entry. `title`, `url`, `username_site`,
+`encrypted_pass`, `totp_seed` and `icon_data` are **E2E-encrypted blobs** built
+by the client; the server stores them opaquely.
 - **Request Body**: `AccountCreate` (JSON)
 ```json
 {
   "folder_id": 1,
-  "title": "GitHub",
-  "url": "https://github.com",
-  "username_site": "alice",
-  "encrypted_pass": "...",
-  "totp_seed": null,
+  "title": "{...encrypted...}",
+  "url": "{...encrypted...}",
+  "username_site": "{...encrypted...}",
+  "encrypted_pass": "{...encrypted...}",
+  "totp_seed": "{...encrypted...}",
   "is_favorite": true,
-  "icon_data": "..."
+  "icon_data": "{...encrypted...}"
 }
 ```
 - **Response**: `201 Created` with the new account `ID`.
@@ -253,9 +288,9 @@ Export all user data (folders and accounts) in JSON format. Requires master pass
 - **Response**: `200 OK` with `VaultExport` (JSON).
 
 ### Get Vault Path
-`GET /vault/config/path`
+`GET /vault/config/path` *(authenticated)*
 
-Get the path to the current vault file (e.g., `pact.pcty`).
+Get the full path to the current vault file (e.g., `pact.pcty`).
 - **Response**: `200 OK`
 ```json
 {
@@ -266,24 +301,85 @@ Get the path to the current vault file (e.g., `pact.pcty`).
 ### Set Vault Path
 `POST /vault/config/path`
 
-Change or initialize the vault file path.
+Change or initialize the vault file path. The path must end in `.pcty`.
+On first run (no users yet) it can be called without a session; once users
+exist it requires authentication because it resets the local database.
 - **Request Body**: `VaultPath` (JSON)
 ```json
 {
-  "path": "/new/path/to/vault.pcty"
+  "path": "/new/path/to/vault.pcty",
+  "force_init": false
 }
 ```
 
 ### Get Pending Entries (Inbox)
 `GET /vault/pending-entries`
 
-Retrieve accounts shared with the user that are waiting to be accepted.
+> Reserved for a future sharing flow: nothing populates `pending_accounts` yet,
+> so this always returns an empty array. The GUI no longer shows an inbox.
+
 - **Response**: `200 OK`
 - **Body**: `Array<PendingAccount>`
+
+### Delete Pending Entry
+`DELETE /vault/pending-entries/:id` *(authenticated)*
+
+Discard a pending entry. Only the owner can delete it (`404` otherwise).
+- **Response**: `200 OK`.
+
+### Get Pending Count
+`GET /vault/pending-count/:username` *(authenticated)*
+
+Get the number of pending entries for a user.
+- **Response**: `200 OK` with `{ "count": number }`.
+
+### Upload Vault
+`POST /vault/upload` *(multipart/form-data, authenticated)*
+
+Upload a `.pcty` vault file. The server keeps only the base filename, rejects
+non-`.pcty` files and validates the vault signature before linking it.
+- **Response**: `200 OK`, `400 Bad Request`.
+
+### Initialize Vault
+`POST /vault/initialize` *(authenticated)*
+
+Create a new empty vault. The provided `name` is sanitized (alphanumerics,
+spaces, `-`, `_`).
+- **Request Body**: `{ "name": "my_vault" }`
+- **Response**: `200 OK` with `{ "path": "..." }`.
+
+### Get TOTP Seed
+`GET /vault/totp/:id` *(authenticated)*
+
+Return the **E2E-encrypted** TOTP seed of an account. The client decrypts it
+with the MasterKey and generates the code locally; the server never sees the
+plaintext seed and cannot generate codes.
+- **Response**: `200 OK` with `{ "seed": "{...encrypted...}" }`.
+
+### Update Account Icon
+`PATCH /vault/accounts/:id/icon` *(authenticated)*
+- **Request Body**: `{ "icon_data": "data:image/png;base64,..." }`
+- **Response**: `200 OK`.
+
+### Get Icon
+`GET /vault/icon?domain=<domain>` *(no auth; se usa en `<img>`)*
+
+Devuelve el icono de marca de un dominio a través de una **allowlist** de
+proveedores (unavatar, Google favicons, Hunter). El servidor valida el dominio
+(rechaza IPs y caracteres peligrosos) y solo contacta con proveedores fijos, de
+forma que el webview nunca habla directamente con terceros.
+- **Response**: `200 OK` con los bytes de la imagen (y `Cache-Control`),
+  `400 Bad Request` si el dominio es inválido, `404 Not Found` si no se
+  encuentra ninguna imagen.
 
 ---
 
 ## Sync Management
+
+> Sync endpoints that read the stored configuration (`/sync/run` without a body,
+> `/sync/apply`, `/sync/check`) require the header `X-Pact-Sync-Key: <hex32>`.
+> It is a subkey derived from the `MasterKey` that lets the server decrypt the
+> remote DB password **in transit only**; without it they return `400`.
 
 ### Run Sync
 `POST /sync/run`
@@ -300,14 +396,21 @@ Execute the synchronization plan (push/pull changes).
 ### Check Sync Status
 `GET /sync/check`
 
-Verify the connection with the remote synchronization server.
-- **Response**: `200 OK`
+Check whether there are remote changes to pull.
+- **Response**: `200 OK` with `{ "has_changes": boolean }`.
+
+### Test Sync Connection
+`POST /sync/test`
+
+Test connectivity with a remote database without persisting the configuration.
+- **Request Body**: `SyncConfig` (JSON)
+- **Response**: `200 OK` or `400 Bad Request` (the MySQL URL is never echoed).
 
 ### Get Sync Configuration
 `GET /sync/config`
 
-Retrieve the current synchronization settings (host, user, etc.).
-- **Response**: `200 OK` with `SyncConfig`.
+Retrieve the current synchronization settings (the password is never returned).
+- **Response**: `200 OK` with `SyncConfig`, or `200 OK` with a `null` body if no remote configuration has been saved yet (the initial state, not an error).
 
 ### Set Sync Configuration
 `POST /sync/config`

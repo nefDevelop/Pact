@@ -60,11 +60,11 @@ impl<'a> SyncEngine<'a> {
             }
         }
 
-        // Reconcile accounts (exclude soft-deleted)
+        // Reconcile accounts. Se incluyen las cuentas en papelera (tombstones)
+        // para poder propagar borrados; un borrado incrementa la versión y por
+        // tanto gana en la reconciliación Last-Write-Wins.
         let local_accounts = self.local_db.get_accounts_by_user(self.user_id).await?;
-        let local_accounts: Vec<_> = local_accounts.into_iter().filter(|a| a.deleted_at.is_none()).collect();
         let remote_accounts = self.remote_db.get_accounts_by_user(self.user_id).await?;
-        let remote_accounts: Vec<_> = remote_accounts.into_iter().filter(|a| a.deleted_at.is_none()).collect();
 
         let mut local_acc_map = HashMap::new();
         for a in &local_accounts {
@@ -105,9 +105,7 @@ impl<'a> SyncEngine<'a> {
         let local_folders = self.local_db.get_folders_by_user(self.user_id).await?;
         let remote_folders = self.remote_db.get_folders_by_user(self.user_id).await?;
         let local_accounts = self.local_db.get_accounts_by_user(self.user_id).await?;
-        let local_accounts: Vec<_> = local_accounts.into_iter().filter(|a| a.deleted_at.is_none()).collect();
         let remote_accounts = self.remote_db.get_accounts_by_user(self.user_id).await?;
-        let remote_accounts: Vec<_> = remote_accounts.into_iter().filter(|a| a.deleted_at.is_none()).collect();
 
         let local_folders_by_uid: HashMap<String, _> = local_folders.iter().map(|f| (f.uid.clone(), f)).collect();
         let remote_folders_by_uid: HashMap<String, _> = remote_folders.iter().map(|f| (f.uid.clone(), f)).collect();
@@ -143,6 +141,16 @@ impl<'a> SyncEngine<'a> {
         // 3. Pull accounts (Remote -> Local)
         for uid in &plan.to_pull_accounts {
             if let Some(remote_a) = remote_accounts_by_uid.get(uid) {
+                // El origen es un tombstone: propagamos el borrado.
+                if remote_a.deleted_at.is_some() {
+                    if let Some(local_a) = local_accounts_by_uid.get(uid) {
+                        if local_a.deleted_at.is_none() {
+                            self.local_db.delete_account(local_a.id).await?;
+                        }
+                    }
+                    continue;
+                }
+
                 let mut create_a: crate::models::CreateAccount = (*remote_a).clone().into();
 
                 // Re-map folder_id to local context if it exists
@@ -157,6 +165,11 @@ impl<'a> SyncEngine<'a> {
                 }
 
                 if let Some(local_a) = local_accounts_by_uid.get(uid) {
+                    // Si estaba en papelera localmente, la restauramos al recibir
+                    // una versión activa más reciente del remoto.
+                    if local_a.deleted_at.is_some() {
+                        self.local_db.restore_account(local_a.id).await?;
+                    }
                     self.local_db.update_account(local_a.id, &create_a, remote_a.version).await?;
                 } else {
                     self.local_db.create_account(&create_a).await?;
@@ -167,6 +180,16 @@ impl<'a> SyncEngine<'a> {
         // 4. Push accounts (Local -> Remote)
         for uid in &plan.to_push_accounts {
             if let Some(local_a) = local_accounts_by_uid.get(uid) {
+                // El origen es un tombstone: propagamos el borrado.
+                if local_a.deleted_at.is_some() {
+                    if let Some(remote_a) = remote_accounts_by_uid.get(uid) {
+                        if remote_a.deleted_at.is_none() {
+                            self.remote_db.delete_account(remote_a.id).await?;
+                        }
+                    }
+                    continue;
+                }
+
                 let mut create_a: crate::models::CreateAccount = (*local_a).clone().into();
 
                 // Re-map folder_id to remote context if it exists
@@ -181,6 +204,9 @@ impl<'a> SyncEngine<'a> {
                 }
 
                 if let Some(remote_a) = remote_accounts_by_uid.get(uid) {
+                    if remote_a.deleted_at.is_some() {
+                        self.remote_db.restore_account(remote_a.id).await?;
+                    }
                     self.remote_db.update_account(remote_a.id, &create_a, local_a.version).await?;
                 } else {
                     self.remote_db.create_account(&create_a).await?;

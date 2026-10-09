@@ -1,66 +1,53 @@
-use blake2::{Blake2b512, Digest};
-use zeroize::Zeroizing;
+//! Utilidades de cifrado simétrico con una clave aportada por el cliente.
+//!
+//! La contraseña de la base de datos remota se almacena cifrada E2E con una
+//! subclave derivada de la MasterKey. El cliente envía esa subclave en cada
+//! operación de sincronización (`X-Pact-Sync-Key`) y el servidor solo descifra
+//! la contraseña en tránsito, nunca en reposo.
 
-fn derive_sync_key(machine_id: &str) -> Zeroizing<Vec<u8>> {
-    if let Ok(env_key) = std::env::var("PACT_SYNC_KEY") {
-        let key = hex::decode(&env_key).unwrap_or_else(|_| {
-            let mut hasher = Blake2b512::new();
-            hasher.update(env_key.as_bytes());
-            hasher.finalize()[..32].to_vec()
-        });
-        return Zeroizing::new(if key.len() >= 32 { key[..32].to_vec() } else { key });
-    }
-
-    let mut hasher = Blake2b512::new();
-    hasher.update(b"pact_sync_v1_encryption_key");
-    hasher.update(machine_id.as_bytes());
-    let result = hasher.finalize();
-    Zeroizing::new(result[..32].to_vec())
+/// Cifra un texto plano con AES-256-GCM en el formato JSON `{nonce,tag,ciphertext}`.
+pub fn encrypt_with_key(plaintext: &str, key: &[u8]) -> Result<String, String> {
+    pact_core::crypto::sellar_dato_json(plaintext.as_bytes(), key)
+        .map_err(|e| format!("{e:?}"))
 }
 
-pub struct SyncCrypto {
-    key: Zeroizing<Vec<u8>>,
+/// Descifra un blob producido por `encrypt_with_key` (o por el cliente con el
+/// mismo formato). Devuelve `Ok(String::new())` si el blob está vacío.
+pub fn decrypt_with_key(encrypted: &str, key: &[u8]) -> Result<String, String> {
+    if encrypted.is_empty() {
+        return Ok(String::new());
+    }
+
+    let bytes = if encrypted.starts_with('{') {
+        pact_core::crypto::abrir_dato_json(encrypted, key).map_err(|e| format!("{e:?}"))?
+    } else {
+        let raw = hex::decode(encrypted).map_err(|e| e.to_string())?;
+        pact_core::crypto::abrir_dato(&raw, key).map_err(|e| format!("{e:?}"))?
+    };
+
+    String::from_utf8(bytes).map_err(|e| e.to_string())
 }
 
-impl SyncCrypto {
-    pub fn new(machine_id: &str) -> Self {
-        let key = derive_sync_key(machine_id);
-        Self { key }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_roundtrip() {
+        let key = [7u8; 32];
+        let blob = encrypt_with_key("super-secret", &key).unwrap();
+        assert!(blob.contains("\"nonce\""));
+        assert_eq!(decrypt_with_key(&blob, &key).unwrap(), "super-secret");
     }
 
-    pub fn encrypt(&self, plaintext: &str) -> String {
-        match pact_core::crypto::sellar_dato(plaintext.as_bytes(), &self.key) {
-            Ok(raw) => {
-                let len = raw.len();
-                let blob = pact_core::crypto::EncryptedBlob {
-                    nonce: hex::encode(&raw[..12]),
-                    tag: hex::encode(&raw[len - 16..]),
-                    ciphertext: hex::encode(&raw[12..len - 16]),
-                };
-                serde_json::to_string(&blob).unwrap_or_else(|_| hex::encode(&raw))
-            }
-            Err(_) => String::new(),
-        }
+    #[test]
+    fn wrong_key_fails() {
+        let blob = encrypt_with_key("x", &[1u8; 32]).unwrap();
+        assert!(decrypt_with_key(&blob, &[2u8; 32]).is_err());
     }
 
-    pub fn decrypt(&self, encrypted: &str) -> String {
-        if encrypted.is_empty() {
-            return String::new();
-        }
-
-        if encrypted.starts_with('{') {
-            match pact_core::crypto::abrir_dato_json(encrypted, &self.key) {
-                Ok(bytes) => String::from_utf8(bytes).unwrap_or_default(),
-                Err(_) => String::new(),
-            }
-        } else {
-            match hex::decode(encrypted) {
-                Ok(raw) => match pact_core::crypto::abrir_dato(&raw, &self.key) {
-                    Ok(bytes) => String::from_utf8(bytes).unwrap_or_default(),
-                    Err(_) => String::new(),
-                },
-                Err(_) => String::new(),
-            }
-        }
+    #[test]
+    fn empty_is_empty() {
+        assert_eq!(decrypt_with_key("", &[0u8; 32]).unwrap(), "");
     }
 }

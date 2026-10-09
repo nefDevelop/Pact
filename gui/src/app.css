@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens semánticos de borde y elevación (estilo mixto, intensidad sutil).
+   theme.js los recalcula con el hue de la semilla; aquí van los fallbacks. */
+@theme {
+  --color-border: var(--md-border);
+  --color-border-window: var(--md-border-window);
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+}
 /* Fuentes Locales */
 @font-face {
   font-family: 'Mukta';
@@ -32,9 +42,62 @@
   --font-ui: 'Outfit', sans-serif;
   
   /* Fallbacks por si no hay paleta generada aún */
-  --md-background: #f6f8fb;
+  --md-background: #e4e2e8;
+  --md-on-background: #1c1b1f;
   --md-surface: #ffffff;
+  --md-on-surface: #1c1b1f;
+  --md-surface-1: #fcfbfd;
+  --md-surface-2: #faf9fb;
+  --md-surface-3: #f5f4f6;
+  --md-surface-variant: #e0dee4;
+  --md-on-surface-variant: #49454f;
+  --md-outline: #8a8590;
+  --md-outline-variant: #c8c5cc;
   --md-primary: #6750A4;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #eaddff;
+  --md-on-primary-container: #21005d;
+  --md-border: rgba(0, 0, 0, 0.16);
+  --md-border-window: rgba(0, 0, 0, 0.14);
+
+  /* Elevación (se recalcula en theme.js por tema) */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elev-2: 0 3px 8px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --elev-3: 0 10px 26px rgba(0, 0, 0, 0.10), 0 3px 6px rgba(0, 0, 0, 0.05);
+
+  color-scheme: light;
+}
+
+/* Fallbacks del modo oscuro.
+   El script inline de index.html pone la clase `dark` en <html> antes de pintar,
+   pero la paleta con el hue del usuario la aplica `applyM3Palette` después. Sin
+   estos valores habría un instante con fondo oscuro y texto casi negro (el
+   fallback de `--md-on-background` de arriba), legible solo en modo claro.
+   Aquí se fija `color-scheme` para que el webview use tema nativo oscuro. */
+:root.dark {
+  --md-background: #141318;
+  --md-on-background: #e4e1e6;
+  --md-surface: #1f1e24;
+  --md-on-surface: #e4e1e6;
+  --md-surface-1: #24222a;
+  --md-surface-2: #2a2830;
+  --md-surface-3: #302e37;
+  --md-surface-variant: #3a3742;
+  --md-on-surface-variant: #cac4d0;
+  --md-outline: #8b8590;
+  --md-outline-variant: #514c59;
+  --md-primary: #cfbcff;
+  --md-on-primary: #371e73;
+  --md-primary-container: #4f378b;
+  --md-on-primary-container: #eaddff;
+  --md-border: rgba(255, 255, 255, 0.14);
+  --md-border-window: rgba(255, 255, 255, 0.20);
+
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 3px 10px rgba(0, 0, 0, 0.40);
+  --elev-3: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 10px 26px rgba(0, 0, 0, 0.50);
+
+  color-scheme: dark;
 }
 
 /* Base Tonal */
@@ -69,6 +132,21 @@ body {
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05); border-radius: 10px; }
   .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); }
+
+  /* Filete interior de las superficies flotantes.
+     Un `border` de 1px sobre radios grandes (48px, rounded-full) se dibuja por
+     tramos: los rectos a cobertura completa y la curva antialiasada, así que el
+     anillo se ve más brillante en los laterales que en las esquinas. Dibujarlo
+     como pseudo-elemento interior lo traza como un único contorno uniforme.
+     No fijamos `position`: el elemento debe aportarlo (relative/fixed). */
+  .ring-window::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid var(--md-border-window);
+    pointer-events: none;
+  }
 }
 
 /* Animaciones */

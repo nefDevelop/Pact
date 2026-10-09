@@ -7,7 +7,7 @@
     success: { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-500/10' },
     error: { icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
     warning: { icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    info: { icon: Info, color: 'text-[#6750A4]', bg: 'bg-[#6750A4]/10' }
+    info: { icon: Info, color: 'text-[var(--md-primary)]', bg: 'bg-[var(--md-primary)]/10' }
   };
 </script>
 
@@ -18,7 +18,7 @@
     <div 
       in:fly={{ y: 40, duration: 600, opacity: 0 }} 
       out:fade={{ duration: 300 }}
-      class="pointer-events-auto bg-white/95 dark:bg-[#1f1e24]/95 backdrop-blur-2xl border border-black/[0.05] dark:border-white/[0.05] rounded-[28px] p-4 pr-6 shadow-2xl shadow-black/10 flex items-center gap-4 relative overflow-hidden group hover:scale-[1.02] transition-transform w-full"
+      class="pointer-events-auto bg-[var(--md-surface-2)] backdrop-blur-2xl ring-window rounded-[28px] p-4 pr-6 shadow-elev-3 flex items-center gap-4 relative overflow-hidden group hover:scale-[1.02] transition-transform w-full"
     >
       <!-- Icono Dinámico (Izquierda) -->
       <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 {IconData.bg}">

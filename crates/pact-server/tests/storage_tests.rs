@@ -1,9 +1,8 @@
 use std::fs::File;
 use std::io::{Write, Read};
-use std::path::PathBuf;
 use tempfile::tempdir;
 use pact_server::storage::StorageManager;
-use zip::{ZipArchive, ZipWriter, write::FileOptions};
+use zip::{ZipWriter, write::FileOptions};
 
 #[test]
 fn test_vault_initialization_and_validation() {
@@ -149,4 +148,41 @@ fn test_storage_concurrency_stress() {
 
     let final_users = storage.list_users().unwrap();
     assert_eq!(final_users.len(), 10);
+}
+
+/// La bóveda guarda las credenciales: no puede quedar legible por cualquiera.
+/// `File::create` respeta el umask y la dejaba en 644.
+#[cfg(unix)]
+#[test]
+fn test_init_vault_deja_permisos_600() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempdir().unwrap();
+    let vault_path = dir.path().join("permisos.pcty");
+    let storage = StorageManager::new(None);
+    storage.init_vault(&vault_path).unwrap();
+
+    let mode = std::fs::metadata(&vault_path).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o600, "la bóveda debe ser 600, no {:o}", mode & 0o777);
+}
+
+/// La ruta elegida debe sobrevivir al reinicio: es lo que hace que al reabrir
+/// se cargue la bóveda de siempre en lugar de tratar el arranque como el primero.
+#[test]
+fn test_recuerda_y_olvida_la_boveda_elegida() {
+    let dir = tempdir().unwrap();
+    let data_dir = dir.path();
+    let vault = data_dir.join("mia.pcty");
+
+    assert_eq!(pact_server::storage::read_remembered_vault_path(data_dir), None);
+
+    pact_server::storage::remember_vault_path(data_dir, Some(&vault)).unwrap();
+    assert_eq!(pact_server::storage::read_remembered_vault_path(data_dir), Some(vault.to_string_lossy().to_string()));
+
+    // Desvincular la bóveda olvida la elección.
+    pact_server::storage::remember_vault_path(data_dir, None).unwrap();
+    assert_eq!(pact_server::storage::read_remembered_vault_path(data_dir), None);
+
+    // Olvidar dos veces no es un error.
+    pact_server::storage::remember_vault_path(data_dir, None).unwrap();
 }

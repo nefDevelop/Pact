@@ -1,15 +1,16 @@
 <script>
-  import { LogOut, Search, Plus, Folder, Settings, Bell, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
+  import { LogOut, Search, Plus, Folder, Settings, Star, Shield, ArrowLeft, ChevronDown, Trash2, Ghost, Gamepad2, Tv, Music, Coffee, Heart, ShoppingBag, Luggage, Wallet, Umbrella, X } from 'lucide-svelte';
   import { onMount } from 'svelte';
   
   import Sidebar from './vault/Sidebar.svelte';
   import AccountCard from './vault/AccountCard.svelte';
   import { globalState } from './state.svelte.js';
-  import { api } from './api.js';
-  import { decryptE2E } from './crypto_utils.js';
+  import { api, apiAssetUrl } from './api.js';
+  import { decryptE2E, encryptE2E, generateTOTP } from './crypto_utils.js';
+  import { i18n } from './i18n.svelte.js';
   import brandWhitelist from './brand_whitelist.json';
 
-  let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onDatabaseChange, showManager = $bindable() } = $props();
+  let { user, folders, onLock, onOpenSettings, onOpenNewEntry, onOpenNewFolder, onEditEntry, onDatabaseChange, showManager = $bindable() } = $props();
   
   // Mapa de iconos para renderizado dinámico
   const iconMap = {
@@ -34,16 +35,6 @@
   let isLoading = $state(true);
   let activeFilter = $state('all'); 
   let loadedIcons = $state({});
-  let isInboxOpen = $state(false);
-
-  // --- LÓGICA DE NOTIFICACIONES ---
-  let totalNotifications = $derived.by(() => {
-    let count = globalState.pendingCount;
-    if (globalState.trashCount > 10) count += 1;
-    const isSyncStale = Date.now() - globalState.lastSyncSuccess > 30 * 60 * 1000;
-    if (globalState.syncError || isSyncStale) count += 1;
-    return count;
-  });
 
   // --- LÓGICA DE CARGA ---
 
@@ -70,6 +61,8 @@
         const dUrl = acc.url ? await decryptE2E(acc.url, globalState.masterKey) : '';
         const dUser = acc.username_site ? await decryptE2E(acc.username_site, globalState.masterKey) : '';
         const dPass = await decryptE2E(acc.encrypted_pass, globalState.masterKey);
+        // El icono se guarda cifrado E2E; si falla, asumimos formato antiguo.
+        const dIcon = acc.icon_data ? await decryptE2E(acc.icon_data, globalState.masterKey) : null;
 
         return {
           id: acc.id,
@@ -84,7 +77,7 @@
           folder_icon: folder ? folder.icon : 'folder',
           is_favorite: acc.is_favorite,
           is_deleted: !!acc.deleted_at,
-          icon_data: acc.icon_data,
+          icon_data: dIcon || acc.icon_data,
           has_totp: acc.has_totp,
           totp: null 
         };
@@ -112,10 +105,29 @@
     }
   }
 
+  function editAccount(entry) {
+    onEditEntry?.(entry);
+  }
+
+  async function deleteAccount(id) {
+    if (!confirm('¿Mover esta cuenta a la papelera?')) return;
+    try {
+      await api.delete(`/vault/accounts/${id}`);
+      globalState.notify('Papelera', 'Cuenta movida a la papelera', 'success');
+      expandedCardId = null;
+      await loadAccounts();
+      globalState.refreshTrashCount();
+      onDatabaseChange?.();
+    } catch (e) {
+      if (e.message !== 'Unauthorized') console.warn('Error al eliminar cuenta:', e);
+    }
+  }
+
   async function restoreAccount(id) {
     try {
       await api.post(`/vault/accounts/${id}/restore`);
       globalState.notify('Papelera', 'Cuenta restaurada', 'success');
+      // nota: mensajes internos se mantienen en español salvo los de UI principal
       loadAccounts();
       onDatabaseChange?.();
     } catch (e) {
@@ -124,7 +136,7 @@
   }
 
   async function handleEmptyTrash() {
-    if (!confirm('¿Seguro que quieres vaciar la papelera?')) return;
+    if (!confirm(i18n.t('sidebar.emptyTrashConfirm'))) return;
     try {
       const data = await api.delete('/vault/accounts/trash/empty');
       globalState.notify('Papelera', `Se han borrado ${data.deleted_count} cuentas.`, 'success');
@@ -142,9 +154,15 @@
 
   async function fetchTOTP(accountId) {
     try {
+      // El servidor devuelve el seed cifrado; lo desciframos y generamos el
+      // código en local (Zero-Knowledge).
       const data = await api.get(`/vault/totp/${accountId}`, { silent: true });
-      items = items.map(item => item.id === accountId ? {...item, totp: data.code} : item);
-    } catch (e) {}
+      if (!data?.seed || !globalState.masterKey) return;
+      const seed = await decryptE2E(data.seed, globalState.masterKey);
+      if (!seed) return;
+      const code = await generateTOTP(String(seed).trim());
+      items = items.map(item => item.id === accountId ? {...item, totp: code} : item);
+    } catch (e) { /* seed ilegible o TOTP inválido */ }
   }
 
   async function updateAllTOTP() {
@@ -169,59 +187,70 @@
   // --- ICONOS ---
   const brandSet = new Set(brandWhitelist);
 
-  function getIconUrl(item, attempt = 0) {
-    if (!item || item.website === 'none') return null;
-    let domain = '';
+  function getDomain(item) {
+    if (!item) return null;
     const website = (item.website || '').trim();
     const title = (item.title || '').trim();
+    let domain = '';
 
-    if (website && website.length > 2) {
+    if (website && website.length > 2 && website !== 'none') {
       try {
         const urlStr = website.startsWith('http') ? website : `https://${website}`;
-        const url = new URL(urlStr);
-        domain = url.hostname.replace('www.', '').toLowerCase();
-      } catch (e) { domain = website.replace('www.', '').split('/')[0].toLowerCase(); }
+        domain = new URL(urlStr).hostname.replace('www.', '').toLowerCase();
+      } catch (e) {
+        domain = website.replace('www.', '').split('/')[0].toLowerCase();
+      }
     } else {
       if (!title || title.includes(' ') || title.length > 25 || title.length < 2) return null;
       const titleClean = title.toLowerCase();
       const possibleDomains = [`${titleClean}.com`, `${titleClean}.org`, `${titleClean}.io`, titleClean];
-      domain = possibleDomains.find(d => brandSet.has(d));
-      if (!domain) return null;
+      domain = possibleDomains.find(d => brandSet.has(d)) || '';
     }
 
     if (!domain || domain.length < 4 || !domain.includes('.') || domain.includes(' ')) return null;
-    if (attempt === 0) return `https://unavatar.io/${domain}?fallback=false`;
-    if (attempt === 1) return `https://logo.hunter.io/${domain}`;
-    if (attempt === 2) return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-    return null;
+    return domain;
   }
 
-  async function saveIconToDB(id, url) {
+  // El icono se sirve a través del backend (allowlist de proveedores); el
+  // webview nunca contacta directamente con terceros.
+  function getIconUrl(item) {
+    const domain = getDomain(item);
+    return domain ? apiAssetUrl(`/vault/icon?domain=${encodeURIComponent(domain)}`) : null;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function saveIconToDB(id, domain) {
     try {
-      const data = await api.get(`/vault/proxy-icon?url=${encodeURIComponent(url)}`, { silent: true });
-      if (!data.base64) return;
-      await api.patch(`/vault/accounts/${id}/icon`, { icon_data: data.base64 });
-      items = items.map(it => it.id === id ? {...it, icon_data: data.base64} : it);
+      if (!globalState.masterKey) return;
+      const res = await fetch(apiAssetUrl(`/vault/icon?domain=${encodeURIComponent(domain)}`));
+      if (!res.ok) return;
+      const dataUrl = await blobToDataUrl(await res.blob());
+      if (!dataUrl || !dataUrl.startsWith('data:image')) return;
+      // El icono se cifra E2E antes de persistirlo (no debe revelar el servicio).
+      const encryptedIcon = await encryptE2E(dataUrl, globalState.masterKey);
+      await api.patch(`/vault/accounts/${id}/icon`, { icon_data: encryptedIcon });
+      items = items.map(it => it.id === id ? {...it, icon_data: dataUrl} : it);
     } catch (e) {}
   }
 
-  function handleIconLoad(id, url, e) {
+  function handleIconLoad(item, e) {
     e.target.classList.remove('opacity-0');
-    loadedIcons[id] = true;
-    const item = items.find(it => it.id === id);
-    if (item && !item.icon_data && url.startsWith('http')) {
-      saveIconToDB(id, url);
+    loadedIcons[item.id] = true;
+    const domain = getDomain(item);
+    if (!item.icon_data && domain) {
+      saveIconToDB(item.id, domain);
     }
   }
 
-  let iconAttempts = $state({});
   function handleIconError(item, e) {
-    const currentAttempt = (iconAttempts[item.id] !== undefined) ? iconAttempts[item.id] : 0;
-    if (currentAttempt < 2) {
-      iconAttempts[item.id] = currentAttempt + 1;
-      const nextUrl = getIconUrl(item, currentAttempt + 1);
-      if (nextUrl) { e.currentTarget.src = nextUrl; return; }
-    }
     e.currentTarget.style.display = 'none';
     loadedIcons[item.id] = false;
   }
@@ -268,33 +297,33 @@
   {#if !showManager}
     <!-- VISTA 1: ACCESO RÁPIDO -->
     <div class="w-full h-full flex flex-col items-center justify-start pt-12 px-6">
-      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-black/[0.1] dark:border-white/[0.15] mb-8 w-full max-w-2xl">
+      <div class="bg-[var(--md-surface)] h-20 rounded-full px-3 flex items-center border border-border shadow-elev-1 mb-8 w-full max-w-2xl">
         <div class="w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 p-0.5 ml-1" style="border-color: {user.color}66">
-          <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-black/5 dark:bg-white/[0.1]" />
+          <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-full bg-[var(--md-surface-variant)]" />
         </div>
         <div class="ml-4 flex flex-col flex-1 min-w-0 pr-4">
           <span class="text-sm font-bold truncate text-[var(--md-on-background)]">{user.name}</span>
           <div class="flex items-center gap-1.5 mt-0.5">
             <div class="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
-            <span class="text-[9px] font-black uppercase tracking-widest opacity-30 text-[var(--md-on-background)]">Sesión Activa</span>
+            <span class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">{i18n.t('vault.quickAccess')}</span>
           </div>
         </div>
         <div class="flex items-center gap-1 mr-2">
-          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title="Agregar Credencial"><Plus size={18}/></button>
-          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title="Bloquear"><LogOut size={18}/></button>
+          <button onclick={onOpenNewEntry} class="p-3 rounded-full opacity-40 hover:opacity-100 transition-opacity hover:bg-black/5" style="color: {user.color}" title={i18n.t('vault.addCredential')} aria-label={i18n.t('vault.addCredential')}><Plus size={18}/></button>
+          <button onclick={onLock} class="p-3 rounded-full hover:bg-red-500/10 text-red-500 opacity-40 hover:opacity-100 transition-opacity" title={i18n.t('vault.lock')} aria-label={i18n.t('vault.lock')}><LogOut size={18}/></button>
         </div>
       </div>
 
       <div class="w-full max-w-2xl relative mb-12">
-        <Search class="absolute left-6 top-1/2 -translate-y-1/2 opacity-20 text-[var(--md-on-background)]" size={24} />
+        <Search class="absolute left-6 top-1/2 -translate-y-1/2 opacity-40 text-[var(--md-on-background)]" size={24} />
         <input 
           type="text" 
           bind:value={searchQuery} 
-          placeholder="¿Qué necesitas buscar ahora?" 
-          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-black/[0.1] dark:border-white/[0.15] outline-none text-[var(--md-on-background)] transition-all" 
+          placeholder={i18n.t('vault.searchQuick')} 
+          class="w-full h-20 bg-[var(--md-surface)] rounded-[32px] pl-16 pr-16 text-lg font-medium border border-border shadow-elev-1 outline-none text-[var(--md-on-background)] transition-all" 
         />
         {#if searchQuery.length > 0}
-          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity"><X size={18} /></button>
+          <button onclick={() => searchQuery = ''} class="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 opacity-40 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.clearSearch')}><X size={18} /></button>
         {/if}
       </div>
 
@@ -302,16 +331,16 @@
         {#if isLoading}
           <div class="space-y-4 px-4">
             {#each [1,2,3,4] as _}
-              <div class="h-20 bg-[var(--md-surface-variant)] rounded-2xl animate-pulse opacity-50" />
+              <div class="h-20 bg-[var(--md-surface-variant)] rounded-2xl animate-pulse opacity-50"></div>
             {/each}
           </div>
         {:else if activeFilter !== 'all' && searchQuery.length === 0}
           <div class="flex items-center justify-between mb-6 px-4">
             <div class="flex items-center gap-3">
               <div class="w-1.5 h-1.5 rounded-full bg-[var(--md-primary)]"></div>
-              <span class="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Mostrando: {activeFilter}</span>
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--md-on-surface-variant)]">Mostrando: {activeFilter}</span>
             </div>
-            <button onclick={() => activeFilter = 'all'} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#6750A4]">Ver todo</button>
+            <button onclick={() => activeFilter = 'all'} class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[var(--md-primary)]">Ver todo</button>
           </div>
         {/if}
 
@@ -329,6 +358,8 @@
               onToggleFavorite={toggleFavorite}
               onTogglePassword={togglePassword}
               onRestore={restoreAccount}
+              onEdit={editAccount}
+              onDelete={deleteAccount}
               isVisible={visiblePasswords.has(item.id)}
               {iconMap}
               {loadedIcons}
@@ -341,35 +372,35 @@
       </div>
 
       <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        <span class="text-[8px] font-black uppercase tracking-[0.3em] opacity-20">Gestión Avanzada</span>
-        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-black/[0.1] dark:border-white/[0.1] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}">
+        <span class="text-[8px] font-black uppercase tracking-[0.3em] text-[var(--md-on-surface-variant)]">Gestión Avanzada</span>
+        <button onclick={() => showManager = true} class="w-14 h-14 bg-[var(--md-surface)] rounded-full border border-border flex items-center justify-center hover:scale-110 active:scale-95 transition-all group" style="color: {user.color}" aria-label={i18n.t('vault.openManager')}>
           <ChevronDown size={24} class="group-hover:translate-y-0.5 transition-transform" />
         </button>
       </div>
     </div>
   {:else}
     <!-- VISTA 2: GESTOR COMPLETO -->
-    <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-black/[0.1] dark:border-white/[0.15] flex flex-col overflow-hidden transition-all duration-500">
+    <!-- Envoltorio con aire vertical: sin él el panel redondeado se pegaba al
+         borde superior. El problema es de alto disponible, no de ancho, así que
+         el padding se aplica a todos los tamaños (antes se anulaba en `md`). -->
+    <div class="w-full h-full py-4">
+      <div class="w-full h-full bg-[var(--md-surface)] rounded-[40px] border border-border flex flex-col overflow-hidden transition-all duration-500">
       
-      <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-black/[0.05] dark:border-white/[0.15] flex justify-between items-center shrink-0">
+      <header class="w-full h-20 md:h-24 px-4 md:px-8 border-b border-border flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
-          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2"><ArrowLeft size={20} /></button>
+          <button onclick={() => showManager = false} class="p-2 rounded-xl hover:bg-black/5 opacity-40 hover:opacity-100 mr-2" aria-label={i18n.t('vault.back')}><ArrowLeft size={20} /></button>
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 rounded-2xl overflow-hidden border-2 p-0.5 flex-shrink-0" style="border-color: {user.color}66">
-              <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-black/5 dark:bg-white/[0.1]" />
+              <img src={user.avatar} alt="avatar" class="w-full h-full object-cover rounded-xl bg-[var(--md-surface-variant)]" />
             </div>
             <div class="flex flex-col">
               <h2 class="text-base font-bold leading-none text-[var(--md-on-background)]">{user.name}</h2>
-              <span class="text-[8px] font-black uppercase tracking-widest opacity-20 mt-1.5 text-[var(--md-on-background)]">Gestor de Bóveda</span>
+              <span class="text-[8px] font-black uppercase tracking-widest mt-1.5 text-[var(--md-on-surface-variant)]">{i18n.t('vault.manager')}</span>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button onclick={() => isInboxOpen = true} class="p-3 rounded-xl hover:bg-black/5 {totalNotifications > 0 ? 'text-[var(--md-primary)]' : 'opacity-20'} relative">
-            <Bell size={20} strokeWidth={1.5} />
-            {#if totalNotifications > 0}<span class="absolute top-2 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[7px] font-black rounded-full border-2 border-[var(--md-surface)] flex items-center justify-center animate-in zoom-in">{totalNotifications}</span>{/if}
-          </button>
-          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity"><Settings size={20} strokeWidth={1.5} /></button>
+          <button onclick={onOpenSettings} class="p-3 rounded-xl hover:bg-black/5 opacity-20 hover:opacity-100 transition-opacity" aria-label={i18n.t('vault.settings')}><Settings size={20} strokeWidth={1.5} /></button>
         </div>
       </header>
 
@@ -384,15 +415,15 @@
           {iconMap}
         />
 
-        <section class="flex-1 md:border-r border-black/[0.05] dark:border-white/[0.15] flex flex-col bg-[var(--md-surface)] overflow-hidden">
-          <div class="p-4 md:p-6 border-b border-black/[0.05] dark:border-white/[0.15]">
+        <section class="flex-1 md:border-r border-border flex flex-col bg-[var(--md-surface)] overflow-hidden">
+          <div class="p-4 md:p-6 border-b border-border">
             <div class="relative">
-              <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-20" size={16} />
+              <Search class="absolute left-5 top-1/2 -translate-y-1/2 opacity-40" size={16} />
               <input 
                 type="text" 
                 bind:value={searchQuery} 
-                placeholder="Filtrar credenciales..." 
-                class="h-14 bg-black/5 dark:bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-black/5" 
+                placeholder={i18n.t('vault.filterPlaceholder')} 
+                class="h-14 bg-[var(--md-surface-variant)] rounded-2xl pl-12 pr-4 text-xs font-medium outline-none w-full border border-transparent focus:border-border" 
               />
             </div>
           </div>
@@ -414,7 +445,7 @@
                       src={getIconUrl(item)} 
                       alt="" 
                       class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity"
-                      onload={(e) => handleIconLoad(item.id, getIconUrl(item), e)}
+                      onload={(e) => handleIconLoad(item, e)}
                       onerror={(e) => handleIconError(item, e)}
                     />
                   {/if}
@@ -422,7 +453,7 @@
                 </div>
                 <div class="flex flex-col flex-1 min-w-0">
                   <span class="text-xs font-bold truncate text-[var(--md-on-background)]">{item.title}</span>
-                  <span class="text-[10px] opacity-30 truncate text-[var(--md-on-background)]">{item.username}</span>
+                  <span class="text-[10px] truncate text-[var(--md-on-surface-variant)]">{item.username}</span>
                 </div>
                 {#if item.is_favorite}
                   <Star size={12} fill="currentColor" class="text-yellow-500 shrink-0" />
@@ -449,6 +480,8 @@
                   onToggleFavorite={toggleFavorite}
                   onTogglePassword={togglePassword}
                   onRestore={restoreAccount}
+                  onEdit={editAccount}
+                  onDelete={deleteAccount}
                   isVisible={visiblePasswords.has(sel.id)}
                   {iconMap}
                   {loadedIcons}
@@ -459,7 +492,7 @@
             </aside>
             <!-- MOBILE OVERLAY PARA DETALLE -->
             <div class="xl:hidden absolute inset-0 z-50 bg-[var(--md-surface)] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-300">
-              <div class="p-4 border-b border-black/[0.05] dark:border-white/[0.15] shrink-0">
+              <div class="p-4 border-b border-border shrink-0">
                 <button onclick={() => expandedCardId = null} class="p-2 rounded-xl hover:bg-black/5 opacity-60 hover:opacity-100 flex items-center gap-2 transition-all">
                   <ArrowLeft size={20} /> <span class="font-bold text-xs uppercase tracking-widest">Volver</span>
                 </button>
@@ -477,6 +510,8 @@
                   onToggleFavorite={toggleFavorite}
                   onTogglePassword={togglePassword}
                   onRestore={restoreAccount}
+                  onEdit={editAccount}
+                  onDelete={deleteAccount}
                   isVisible={visiblePasswords.has(sel.id)}
                   {iconMap}
                   {loadedIcons}
@@ -489,6 +524,7 @@
           {/if}
         {/if}
       </div>
+    </div>
     </div>
   {/if}
 </div>

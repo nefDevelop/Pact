@@ -11,7 +11,8 @@ vi.mock('@tauri-apps/api/core', () => ({
       const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
       return {
         master_key: hex,
-        auth_key: hex
+        auth_key: hex,
+        sync_key: hex
       };
     }
   })
@@ -119,5 +120,21 @@ describe('Crypto Utils: Cifrado E2E (PBKDF2 + AES-GCM)', () => {
     const brokenBlob = JSON.stringify({ nonce: 'ff', ciphertext: '00', tag: '11' });
     const res2 = await decryptE2E(brokenBlob, masterKey);
     expect(res2).toBeNull();
+  });
+});
+
+describe('Crypto Utils: TOTP en cliente (Zero-Knowledge)', () => {
+  it('genera el código correcto según RFC 6238 (SHA-1, 6 dígitos)', async () => {
+    const { generateTOTP } = await import('./crypto_utils.js');
+    const seed = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'; // "12345678901234567890"
+    expect(await generateTOTP(seed, { timestamp: 59000 })).toBe('287082');
+    expect(await generateTOTP(seed, { timestamp: 1111111109000 })).toBe('081804');
+  });
+
+  it('extrae el secret de un URI otpauth o de un seed plano', async () => {
+    const { extractTOTPSeed } = await import('./crypto_utils.js');
+    expect(extractTOTPSeed('otpauth://totp/Test:me?secret=JBSWY3DPEHPK3PXP&issuer=Test'))
+      .toBe('JBSWY3DPEHPK3PXP');
+    expect(extractTOTPSeed('  JBSWY3DPEHPK3PXP  ')).toBe('JBSWY3DPEHPK3PXP');
   });
 });

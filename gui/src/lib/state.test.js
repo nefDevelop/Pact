@@ -51,7 +51,7 @@ describe('Global State: Svelte 5 Store', () => {
     expect(globalState.selectedUser).toBeNull();
     expect(globalState.masterKey).toBeNull();
     expect(globalState.authToken).toBeNull();
-    expect(globalState.pendingCount).toBe(0);
+    expect(globalState.hasConflicts).toBe(false);
   });
 
   it('debería gestionar el temporizador de inactividad', () => {

@@ -39,6 +39,8 @@ pub trait Database: Send + Sync {
 
     // TOTP
     async fn create_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error>;
+    async fn set_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error>;
+    async fn delete_totp_setting_by_account(&self, account_id: i32) -> Result<(), Error>;
     async fn get_totp_setting_by_account(&self, account_id: i32) -> Result<Option<TOTPSetting>, Error>;
 
     // Sistema
@@ -53,6 +55,7 @@ macro_rules! impl_database {
         $result_ty:ty,
         timestamp: $timestamp:expr,
         upsert_clause: $upsert:expr,
+        totp_upsert: $totp_upsert:expr,
         count_ty: $count_ty:ty,
     ) => {
         #[async_trait]
@@ -219,7 +222,9 @@ macro_rules! impl_database {
             }
 
             async fn delete_account(&self, id: i32) -> Result<(), Error> {
-                let sql = format!("UPDATE accounts SET deleted_at = {} WHERE id = ?", $timestamp);
+                // Se incrementa la versión para que el borrado (tombstone) gane
+                // en la reconciliación Last-Write-Wins del motor de sync.
+                let sql = format!("UPDATE accounts SET deleted_at = {}, version = version + 1, updated_at = {} WHERE id = ?", $timestamp, $timestamp);
                 sqlx::query(&sql)
                     .bind(id)
                     .execute(&self.pool)
@@ -228,7 +233,8 @@ macro_rules! impl_database {
             }
 
             async fn restore_account(&self, id: i32) -> Result<(), Error> {
-                sqlx::query("UPDATE accounts SET deleted_at = NULL WHERE id = ?")
+                let sql = format!("UPDATE accounts SET deleted_at = NULL, version = version + 1, updated_at = {} WHERE id = ?", $timestamp);
+                sqlx::query(&sql)
                     .bind(id)
                     .execute(&self.pool)
                     .await?;
@@ -302,6 +308,28 @@ macro_rules! impl_database {
                 Ok(())
             }
 
+            async fn set_totp_setting(&self, account_id: i32, encrypted_seed: &str, issuer: Option<&str>) -> Result<(), Error> {
+                let sql = format!(
+                    "INSERT INTO totp_settings (account_id, encrypted_seed, issuer) VALUES (?, ?, ?) {}",
+                    $totp_upsert
+                );
+                sqlx::query(&sql)
+                    .bind(account_id)
+                    .bind(encrypted_seed)
+                    .bind(issuer)
+                    .execute(&self.pool)
+                    .await?;
+                Ok(())
+            }
+
+            async fn delete_totp_setting_by_account(&self, account_id: i32) -> Result<(), Error> {
+                sqlx::query("DELETE FROM totp_settings WHERE account_id = ?")
+                    .bind(account_id)
+                    .execute(&self.pool)
+                    .await?;
+                Ok(())
+            }
+
             async fn get_totp_setting_by_account(&self, account_id: i32) -> Result<Option<TOTPSetting>, Error> {
                 sqlx::query_as::<_, TOTPSetting>("SELECT * FROM totp_settings WHERE account_id = ?")
                     .bind(account_id)
@@ -335,6 +363,7 @@ impl_database!(
     sqlx::sqlite::SqliteQueryResult,
     timestamp: "CURRENT_TIMESTAMP",
     upsert_clause: "ON CONFLICT(user_id) DO UPDATE SET remote_host = excluded.remote_host, remote_port = excluded.remote_port, remote_user = excluded.remote_user, remote_pass = excluded.remote_pass, remote_name = excluded.remote_name, preferred_mode = excluded.preferred_mode",
+    totp_upsert: "ON CONFLICT(account_id) DO UPDATE SET encrypted_seed = excluded.encrypted_seed, issuer = excluded.issuer",
     count_ty: i32,
 );
 
@@ -345,7 +374,83 @@ pub struct MysqlDatabase {
 impl MysqlDatabase {
     pub async fn new(url: &str) -> Result<Self, Error> {
         let pool = MySqlPool::connect(url).await?;
-        Ok(Self { pool })
+        let db = Self { pool };
+        // El esquema remoto se crea de forma idempotente; las migraciones de
+        // `migrations/` son SQLite y no aplican a MariaDB/MySQL.
+        db.ensure_schema().await?;
+        Ok(db)
+    }
+
+    /// Crea las tablas necesarias en la base remota si no existen.
+    pub async fn ensure_schema(&self) -> Result<(), Error> {
+        let statements = [
+            "CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                master_hash VARCHAR(255) NOT NULL,
+                salt VARCHAR(255) NOT NULL,
+                color VARCHAR(20) DEFAULT '#6750A4',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS folders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                uid VARCHAR(36) NOT NULL UNIQUE,
+                user_id INT NOT NULL,
+                name VARCHAR(2048) NOT NULL,
+                color VARCHAR(20) DEFAULT '#000000',
+                icon VARCHAR(50) DEFAULT 'folder',
+                version INT DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS accounts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                uid VARCHAR(36) NOT NULL UNIQUE,
+                user_id INT NOT NULL,
+                folder_id INT,
+                is_favorite BOOLEAN DEFAULT 0,
+                title VARCHAR(512) NOT NULL,
+                url VARCHAR(1024),
+                username_site VARCHAR(512),
+                encrypted_pass VARCHAR(1024) NOT NULL,
+                icon_data MEDIUMTEXT,
+                version INT DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                deleted_at DATETIME,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS totp_settings (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                account_id INT NOT NULL UNIQUE,
+                encrypted_seed VARCHAR(1024) NOT NULL,
+                issuer VARCHAR(100),
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS pending_accounts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                data_blob MEDIUMTEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS sync_configs (
+                user_id INT PRIMARY KEY,
+                remote_host VARCHAR(255) NOT NULL,
+                remote_port INT NOT NULL DEFAULT 3306,
+                remote_user VARCHAR(100) NOT NULL,
+                remote_pass VARCHAR(1024) NOT NULL,
+                remote_name VARCHAR(100) NOT NULL,
+                preferred_mode VARCHAR(20) DEFAULT 'local',
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ];
+
+        for stmt in statements {
+            sqlx::query(stmt).execute(&self.pool).await?;
+        }
+        Ok(())
     }
 }
 
@@ -356,5 +461,6 @@ impl_database!(
     sqlx::mysql::MySqlQueryResult,
     timestamp: "NOW()",
     upsert_clause: "ON DUPLICATE KEY UPDATE remote_host = VALUES(remote_host), remote_port = VALUES(remote_port), remote_user = VALUES(remote_user), remote_pass = VALUES(remote_pass), remote_name = VALUES(remote_name), preferred_mode = VALUES(preferred_mode)",
+    totp_upsert: "ON DUPLICATE KEY UPDATE encrypted_seed = VALUES(encrypted_seed), issuer = VALUES(issuer)",
     count_ty: i64,
 );

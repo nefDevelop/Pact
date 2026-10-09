@@ -34,8 +34,15 @@ impl IntoResponse for AppError {
         let (status, error_message) = match self {
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             AppError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
-            AppError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error en la base de datos".to_string()),
-            AppError::Internal(ref e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Error interno: {}", e)),
+            AppError::DatabaseError(ref e) => {
+                tracing::error!("Error de base de datos: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Error en la base de datos".to_string())
+            }
+            AppError::Internal(ref e) => {
+                // El detalle se registra pero no se expone al cliente.
+                tracing::error!("Error interno: {}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, "Error interno del servidor".to_string())
+            }
             AppError::BadRequest(ref s) => (StatusCode::BAD_REQUEST, s.clone()),
         };
 

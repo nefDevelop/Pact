@@ -1,7 +1,8 @@
 <script>
   import { Loader2, Sun, Moon, ArrowRightLeft, HardDrive, Cloud } from 'lucide-svelte';
   import { globalState } from './state.svelte.js';
-  import { onMount } from 'svelte';
+  import { setTheme } from './themeMode.js';
+  import { i18n } from './i18n.svelte.js';
   import { fade, fly } from 'svelte/transition';
   import { cubicInOut } from 'svelte/easing';
 
@@ -14,23 +15,11 @@
   
   const CurrentIcon = $derived(modeIcon());
 
+  // La decisión inicial del tema y la paleta se aplican en `main.js` (antes de
+  // montar); aquí solo se cambia cuando el usuario pulsa el conmutador.
   function toggleTheme() {
-    globalState.isDark = !globalState.isDark;
+    setTheme(!globalState.isDark);
   }
-
-  $effect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', globalState.isDark);
-      globalState.updateTonalPalette();
-    }
-  });
-
-  onMount(() => {
-    if (typeof document !== 'undefined') {
-      globalState.isDark = document.documentElement.classList.contains('dark') || 
-                           window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-  });
 
   async function sync_all() {
     await globalState.performSync(true);
@@ -42,7 +31,7 @@
   <div class="flex items-center gap-8">
     <!-- LOGO DE PACT (Altura igualada al bloque de texto) -->
     <div class="flex items-center gap-3 py-1.5">
-      <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg shadow-[#6750A4]/10 overflow-hidden p-2 transition-colors duration-500" 
+      <div class="w-10 h-10 rounded-2xl flex items-center justify-center shadow-elev-2  overflow-hidden p-2 transition-colors duration-500" 
            style="background-color: var(--md-primary); color: {globalState.isDark ? '#000000' : '#ffffff'};">
         <svg
           width="100%"
@@ -92,7 +81,8 @@
       onclick={sync_all}
       disabled={globalState.isSyncing}
       class="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95 disabled:opacity-50 relative group"
-      title="Estado de sincronización"
+      title={i18n.t('footer.syncNow')}
+      aria-label={i18n.t('footer.syncNow')}
     >
       <div class="relative flex items-center justify-center w-8 h-8">
         <!-- Anillo de Tiempo Restante (SVG) -->
@@ -122,17 +112,17 @@
         {:else}
           <CurrentIcon size={16} class={globalState.hasConflicts ? 'text-amber-500' : 'opacity-30'} />
           {#if globalState.hasConflicts}
-            <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-white dark:border-[#1c1b1f]"></span>
+            <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full border border-[var(--md-surface)]"></span>
           {/if}
         {/if}
       </div>
 
       <div class="flex flex-col items-start leading-none min-w-[70px]">
         {#if globalState.isSyncing}
-          <span in:fly={{ y: 5, duration: 300 }} class="text-[8px] font-black uppercase tracking-widest text-[var(--md-primary)]">Sincronizando...</span>
+          <span in:fly={{ y: 5, duration: 300 }} class="text-[8px] font-black uppercase tracking-widest text-[var(--md-primary)]">{i18n.t('footer.syncing')}</span>
         {:else}
-          <span in:fade class="text-[9px] font-black uppercase tracking-widest opacity-40">
-            {globalState.dbMode === 'hybrid' ? 'Híbrido' : (globalState.dbMode === 'remote' ? 'Online' : 'Local')}
+          <span in:fade class="text-[9px] font-black uppercase tracking-widest text-[var(--md-on-surface-variant)]">
+            {globalState.dbMode === 'hybrid' ? i18n.t('footer.hybrid') : (globalState.dbMode === 'remote' ? i18n.t('footer.online') : i18n.t('footer.local'))}
           </span>
         {/if}
       </div>
@@ -142,7 +132,8 @@
     <button 
       onclick={toggleTheme}
       class="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-500 ease-in-out active:scale-95"
-      title="Cambiar tema"
+      title={i18n.t('footer.theme')}
+      aria-label={i18n.t('footer.theme')}
     >
       <div class="relative w-4 h-4 shrink-0">
         {#if globalState.isDark}
@@ -158,9 +149,9 @@
       
       <div class="overflow-hidden flex flex-col h-3 relative min-w-[45px] text-center">
         {#if globalState.isDark}
-          <span in:fly={{ y: 10, duration: 400 }} out:fly={{ y: -10, duration: 400 }} class="absolute inset-0 text-[9px] font-ui font-medium uppercase tracking-widest opacity-50">Oscuro</span>
+          <span in:fly={{ y: 10, duration: 400 }} out:fly={{ y: -10, duration: 400 }} class="absolute inset-0 text-[9px] font-ui font-medium uppercase tracking-widest opacity-50">{i18n.t('footer.dark')}</span>
         {:else}
-          <span in:fly={{ y: 10, duration: 400 }} out:fly={{ y: -10, duration: 400 }} class="absolute inset-0 text-[9px] font-ui font-medium uppercase tracking-widest opacity-50">Claro</span>
+          <span in:fly={{ y: 10, duration: 400 }} out:fly={{ y: -10, duration: 400 }} class="absolute inset-0 text-[9px] font-ui font-medium uppercase tracking-widest opacity-50">{i18n.t('footer.light')}</span>
         {/if}
       </div>
     </button>

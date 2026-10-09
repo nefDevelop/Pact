@@ -55,3 +55,9 @@ pub type SharedRateLimiter = Arc<RateLimiter>;
 pub fn auth_rate_limiter() -> SharedRateLimiter {
     Arc::new(RateLimiter::new(5, 60))
 }
+
+/// Limiter para endpoints pre-login menos sensibles (salt, listado de usuarios).
+/// Más permisivo que el de autenticación para no romper la carga normal de la UI.
+pub fn public_rate_limiter() -> SharedRateLimiter {
+    Arc::new(RateLimiter::new(60, 60))
+}

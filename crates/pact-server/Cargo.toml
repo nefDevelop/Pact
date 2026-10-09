@@ -4,6 +4,10 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+# El crate tiene dos binarios: el servidor y el seed de demo. Sin esto,
+# `cargo run -p pact-server` deja de saber cuál arrancar y fallan `make dev` y
+# `make run-server`.
+default-run = "pact-server"
 
 [dependencies]
 pact-core = { path = "../pact-core" }
@@ -31,3 +35,7 @@ reqwest = { workspace = true }
 totp-rs = { workspace = true }
 base64 = { workspace = true }
 url = { workspace = true }
+
+[dev-dependencies]
+# `multipart` solo se necesita en los tests (subir un .pcty), no en el binario.
+reqwest = { workspace = true, features = ["multipart"] }

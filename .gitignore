@@ -3,17 +3,14 @@ target/
 target-container/
 **/target-container/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock se versiona: es una aplicación (binaria), no una librería.
 
 # --- NODE / JS ---
 node_modules/
 **/node_modules/
 dist/
-**/dist/
 .svelte-kit/
-**/ .svelte-kit/
 .vercel/
-**/ .vercel/
 .npm/
 .eslintcache
 
@@ -27,7 +24,13 @@ Thumbs.db
 *.sublime-workspace
 .env
 .env.*
-! .env.example
+!.env.example
+
+# --- TAURI SIDECAR ---
+crates/pact-desktop/binaries/
+
+# --- WASM (generado por `make build-wasm`) ---
+gui/src/wasm/
 
 # --- PACT SPECIFIC ---
 *.db
@@ -47,3 +50,8 @@ __pycache__/
 
 # Generados por Tauri al compilar (no versionar: se regeneran solos)
 crates/pact-desktop/gen/
+
+# --- MODO DEMO (make seed-demo) ---
+# Bóveda y base de datos de ejemplo con credenciales conocidas. Se regeneran en
+# un segundo; nunca deben acabar en un commit.
+data/

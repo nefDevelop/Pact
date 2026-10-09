@@ -1,5 +1,9 @@
 import { safeStorage } from './crypto_utils.js';
 import { applyM3Palette } from './theme.js';
+// `api.js` solo usa `globalState` dentro de sus métodos, nunca al cargar el
+// módulo, así que el ciclo con este import estático es seguro y evita el
+// import dinámico que impedía separar el chunk.
+import { api } from './api.js';
 
 /**
  * @typedef {Object} User
@@ -29,7 +33,6 @@ export const globalState = $state({
   dbMode: 'local', // 'local' o 'remote'
   vaultPath: '',
   machineId: null,
-  pendingCount: 0,
   trashCount: 0,
   lastSyncSuccess: Date.now(),
   syncError: false,
@@ -40,6 +43,10 @@ export const globalState = $state({
   selectedUser: null,
   /** @type {CryptoKey|null} */
   masterKey: null, // Llave E2E (Solo en RAM)
+  /** @type {CryptoKey|null} */
+  syncKey: null, // Subclave para envolver la config remota (Solo en RAM)
+  /** @type {string|null} */
+  syncKeyHex: null, // Misma subclave en hex, para enviarla al servidor en sync
   /** @type {string|null} */
   authToken: null, // Token de sesión Bearer
 
@@ -53,7 +60,7 @@ export const globalState = $state({
   /** @type {any} */
   syncInterval: null,
   /** @type {any} */
-  pendingInterval: null,
+  _activityHandler: null,
 
   // --- ACTIONS ---
 
@@ -113,6 +120,37 @@ export const globalState = $state({
     safeStorage.setItem('pact_autoLockMinutes', String(this.autoLockMinutes));
   },
 
+  // Arranca la vigilancia de actividad del usuario. Cualquier interacción
+  // reinicia el temporizador de auto-bloqueo (con throttling de 1s para no
+  // recrear timers en cada evento de ratón).
+  startInactivityWatch() {
+    if (typeof window === 'undefined') return;
+    this.stopInactivityWatch();
+
+    let lastReset = 0;
+    this._activityHandler = () => {
+      const now = Date.now();
+      if (now - lastReset < 1000) return;
+      lastReset = now;
+      this.resetInactivityTimer();
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'visibilitychange'];
+    events.forEach(ev => window.addEventListener(ev, this._activityHandler, { passive: true }));
+    this.resetInactivityTimer();
+  },
+
+  stopInactivityWatch() {
+    if (typeof window !== 'undefined' && this._activityHandler) {
+      const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'visibilitychange'];
+      events.forEach(ev => window.removeEventListener(ev, this._activityHandler));
+    }
+    this._activityHandler = null;
+
+    if (this.inactivityTimer) { clearTimeout(this.inactivityTimer); this.inactivityTimer = null; }
+    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+  },
+
   updateDesktopStatus() {
     if (typeof window === 'undefined') return;
     const hasPyWebView = window.pywebview !== undefined || 
@@ -124,51 +162,48 @@ export const globalState = $state({
     this.isDesktop = hasPyWebView || hasTauri;
   },
 
-  async refreshPendingCount() {
-    const { api } = await import('./api.js');
-    const u = this.selectedUser;
-    if (!u || !u.username) {
-      this.pendingCount = 0;
-      return;
-    }
-    
-    try {
-      const data = await api.get(`/vault/pending-count/${u.username}`, { silent: true });
-      this.pendingCount = data.count || 0;
-    } catch (e) {
-      console.warn("Fallo al refrescar pendientes:", e);
-    }
-  },
-
   async performSync(showNotify = false) {
     if (this.isSyncing) return;
     if (!this.authToken) return; // Evitar llamadas si no hay sesión
+    if (this.dbMode !== 'remote' && this.dbMode !== 'hybrid') {
+      if (showNotify) this.notify('Sincronización', 'No hay sincronización remota configurada.', 'info');
+      return;
+    }
     this.isSyncing = true;
     
-    const { api } = await import('./api.js');
     
     try {
-      const plan = await api.post('/sync/run', { silent: true });
+      // `/sync/run` calcula el plan (no lo aplica). Enviamos un cuerpo vacío.
+      const plan = await api.post('/sync/run', undefined, { silent: true });
       this.lastSyncSuccess = Date.now();
       this.syncError = false;
-      
-      if (plan.conflicts && plan.conflicts.length > 0) {
+
+      const conflicts = [
+        ...(plan.conflict_folders || []),
+        ...(plan.conflict_accounts || [])
+      ];
+      if (conflicts.length > 0) {
         this.hasConflicts = true;
-        this.notify("Conflicto de Datos", "Se han detectado versiones distintas. Haz clic en el icono de BD para resolver.", "warning", 0);
+        this.notify("Conflicto de Datos", "Se han detectado versiones distintas. Revísalo antes de continuar.", "warning", 0);
         return;
       }
 
       this.hasConflicts = false;
 
-      if (plan.to_push.length > 0 || plan.to_pull.length > 0 || plan.to_push_folders.length > 0 || plan.to_pull_folders.length > 0) {
-        await api.post('/sync/apply', plan);
-        
+      const pushes = (plan.to_push_folders?.length || 0) + (plan.to_push_accounts?.length || 0);
+      const pulls = (plan.to_pull_folders?.length || 0) + (plan.to_pull_accounts?.length || 0);
+
+      if (pushes > 0 || pulls > 0) {
+        await api.post('/sync/apply', plan, { silent: true });
+
         if (showNotify || this.dbMode === 'hybrid') {
           let msg = "Los datos están al día.";
-          if (plan.to_push.length > 0 || plan.to_push_folders.length > 0) msg = "Cambios subidos a la nube.";
-          if (plan.to_pull.length > 0 || plan.to_pull_folders.length > 0) msg = "Nuevos datos descargados.";
+          if (pushes > 0) msg = "Cambios subidos a la nube.";
+          if (pulls > 0) msg = "Nuevos datos descargados.";
           this.notify("Sincronización Éxito", msg, "success");
         }
+      } else if (showNotify) {
+        this.notify("Sincronización", "Los datos ya están al día.", "success");
       }
     } catch (e) {
       if (e.message !== "Unauthorized") {
@@ -180,8 +215,24 @@ export const globalState = $state({
     }
   },
 
+  // Carga la configuración remota guardada y ajusta el modo de BD.
+  // Si no existe configuración, se permanece en modo local.
+  async refreshSyncConfig() {
+    if (!this.authToken) return;
+    try {
+      // El machine-id ahora requiere sesión; lo obtenemos al autenticar.
+      if (!this.machineId) {
+        const mid = await api.get('/system/machine-id', { silent: true });
+        this.machineId = mid.machine_id;
+      }
+      const data = await api.get('/sync/config', { silent: true });
+      if (data?.preferred_mode) this.dbMode = data.preferred_mode;
+    } catch (e) {
+      this.dbMode = 'local';
+    }
+  },
+
   async refreshTrashCount() {
-    const { api } = await import('./api.js');
     try {
       const items = await api.get('/vault/accounts?include_deleted=true', { silent: true });
       this.trashCount = items.filter(i => !!i.deleted_at).length;
@@ -191,12 +242,13 @@ export const globalState = $state({
   },
 
   startAutoSync() {
+    // Sin configuración remota/híbrida no hay nada que sincronizar.
+    if (this.dbMode !== 'remote' && this.dbMode !== 'hybrid') return;
     this.performSync();
     if (this.syncInterval) clearInterval(this.syncInterval);
     
     this.syncInterval = setInterval(async () => {
-      const { api } = await import('./api.js');
-      try {
+        try {
         const data = await api.get('/sync/check', { silent: true });
         if (data.has_changes) {
           this.performSync(true);
@@ -207,19 +259,6 @@ export const globalState = $state({
     }, 30000);
   },
 
-  startPendingPolling() {
-    this.stopPendingPolling();
-    this.refreshPendingCount();
-    this.pendingInterval = setInterval(() => this.refreshPendingCount(), 5000);
-  },
-
-  stopPendingPolling() {
-    if (this.pendingInterval) {
-      clearInterval(this.pendingInterval);
-      this.pendingInterval = null;
-    }
-  },
-
   stopAutoSync() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
@@ -228,13 +267,15 @@ export const globalState = $state({
   },
 
   resetSessionState() {
-    this.pendingCount = 0;
     this.lastSaveError = false;
+    this.hasConflicts = false;
     this.selectedUser = null;
     this.masterKey = null;
+    this.syncKey = null;
+    this.syncKeyHex = null;
     this.authToken = null;
-    this.stopPendingPolling();
     this.stopAutoSync();
+    this.stopInactivityWatch();
   },
 
   async initialize() {
@@ -243,35 +284,18 @@ export const globalState = $state({
     // Re-comprobación por si se inyecta tarde
     setTimeout(() => this.updateDesktopStatus(), 1500);
 
-    const { api } = await import('./api.js');
 
     try {
-      // 1. Machine ID
-      const midData = await api.get('/system/machine-id', { silent: true });
-      this.machineId = midData.machine_id;
-
-      // 2. Solo intentamos cargar/enviar config de sync si tenemos token
+      // Machine-id y config de sync requieren sesión; en el arranque no hay
+      // token, así que se cargan tras autenticar (refreshSyncConfig).
       if (this.authToken) {
-        const { decryptWithHardware } = await import('./crypto_utils.js');
-        const encryptedConfig = safeStorage.getItem('pact_remote_v1');
-        const savedConfig = await decryptWithHardware(encryptedConfig);
+        const midData = await api.get('/system/machine-id', { silent: true });
+        this.machineId = midData.machine_id;
 
-        if (savedConfig?.host) {
-          this.dbMode = savedConfig.preferred_mode || 'remote';
-          await api.post('/sync/config', {
-            preferred_mode: savedConfig.preferred_mode || 'remote',
-            host: savedConfig.host,
-            user: savedConfig.user,
-            password: savedConfig.password,
-            db_name: savedConfig.db_name || 'pact_db'
-          });
-        }
-
-        // 3. Sync Config
+        // `null` significa "sin configuración remota guardada": no es un error.
         const data = await api.get('/sync/config', { silent: true });
-        if (data.preferred_mode) this.dbMode = data.preferred_mode;
+        if (data?.preferred_mode) this.dbMode = data.preferred_mode;
       }
-
     } catch (e) {
       if (e.message !== "Unauthorized") {
         console.error("Error inicializando estado global:", e);

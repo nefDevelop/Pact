@@ -51,7 +51,7 @@ async fn test_sync_folder_creation_local_to_remote() {
     let remote_folders = remote_db.get_folders_by_user(user_id).await.unwrap();
     assert_eq!(remote_folders.len(), 1);
     assert_eq!(remote_folders[0].name, folder_name);
-    assert!(remote_folders[0].uid.len() > 0);
+    assert!(!remote_folders[0].uid.is_empty());
 }
 
 #[tokio::test]
@@ -143,19 +143,36 @@ async fn test_sync_deletion_propagation() {
     remote_db.create_account(&create_a).await.unwrap();
 
     let engine = SyncEngine::new(local_db.as_ref(), remote_db.as_ref(), user_id);
-    let plan = engine.generate_plan().await.unwrap();
 
+    // 1. Estado idéntico en ambos lados: no hay nada que sincronizar.
+    let plan = engine.generate_plan().await.unwrap();
     assert!(plan.to_push_folders.is_empty());
     assert!(plan.to_pull_folders.is_empty());
     assert!(plan.to_push_accounts.is_empty());
     assert!(plan.to_pull_accounts.is_empty());
 
-    let local_accounts = local_db.get_accounts_by_user(user_id).await.unwrap();
+    // 2. Borrado local -> debe propagarse al remoto (tombstone con versión mayor).
+    let local_account = local_db.get_accounts_by_user(user_id).await.unwrap().remove(0);
+    local_db.delete_account(local_account.id).await.unwrap();
+
+    let plan = engine.generate_plan().await.unwrap();
+    assert!(plan.to_push_accounts.contains(&acc_uid));
+
+    engine.apply_plan(&plan).await.unwrap();
     let remote_accounts = remote_db.get_accounts_by_user(user_id).await.unwrap();
-    assert_eq!(local_accounts.len(), 1);
     assert_eq!(remote_accounts.len(), 1);
-    assert_eq!(local_accounts[0].uid, acc_uid);
-    assert_eq!(remote_accounts[0].uid, acc_uid);
+    assert!(remote_accounts[0].deleted_at.is_some());
+
+    // 3. Restauración local -> debe restaurarse también en el remoto.
+    let local_account = local_db.get_accounts_by_user(user_id).await.unwrap().remove(0);
+    local_db.restore_account(local_account.id).await.unwrap();
+
+    let plan = engine.generate_plan().await.unwrap();
+    assert!(plan.to_push_accounts.contains(&acc_uid));
+
+    engine.apply_plan(&plan).await.unwrap();
+    let remote_accounts = remote_db.get_accounts_by_user(user_id).await.unwrap();
+    assert!(remote_accounts[0].deleted_at.is_none());
 }
 
 #[tokio::test]

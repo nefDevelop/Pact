@@ -94,6 +94,14 @@ pub struct FolderCreate {
 // --- ACCOUNTS ---
 
 #[derive(Debug, Deserialize)]
+pub struct AccountQuery {
+    #[serde(default)]
+    pub include_deleted: bool,
+    pub is_favorite: Option<bool>,
+    pub folder_id: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AccountCreate {
     pub folder_id: Option<i32>,
     pub title: String,

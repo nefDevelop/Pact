@@ -5,16 +5,40 @@ use std::path::{Path, PathBuf};
 use zip::{ZipArchive, ZipWriter, write::FileOptions};
 use tempfile::NamedTempFile;
 
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 pub struct StorageManager {
     pcty_path: Mutex<Option<PathBuf>>,
     pending_saves: Mutex<HashSet<String>>,
+    /// Ruta real del SQLite local. Antes el guardado diferido usaba
+    /// `Path::new("pact.db")`, o sea el directorio de trabajo: con un
+    /// `DATABASE_URL` de otra ruta fallaba el flush y se podía colar en el
+    /// `.pcty` una base que no era la del usuario.
+    ///
+    /// Se resuelve de forma diferida para no obligar a todos los constructores
+    /// a conocerla; `main` la fija con `set_db_path` al arrancar.
+    db_path: OnceLock<PathBuf>,
 }
 
 impl StorageManager {
     pub fn new(path: Option<PathBuf>) -> Self {
-        Self { pcty_path: Mutex::new(path), pending_saves: Mutex::new(HashSet::new()) }
+        Self {
+            pcty_path: Mutex::new(path),
+            pending_saves: Mutex::new(HashSet::new()),
+            db_path: OnceLock::new(),
+        }
+    }
+
+    /// Fija la ruta del SQLite local (la que usa el servidor). Si ya estaba
+    /// resuelta, no hace nada: quien llama es el arranque, que siempre va antes
+    /// que cualquier flush.
+    pub fn set_db_path(&self, path: PathBuf) {
+        let _ = self.db_path.set(path);
+    }
+
+    /// Ruta del SQLite local que se guarda dentro del `.pcty`.
+    pub fn db_path(&self) -> &Path {
+        self.db_path.get_or_init(|| crate::paths::resolve_db_path(&crate::paths::data_dir_or_cwd()))
     }
 
     pub fn set_path(&self, path: Option<PathBuf>) {
@@ -33,14 +57,23 @@ impl StorageManager {
         tracing::info!("Inicializando nueva bóveda en {:?}", path);
         let file = File::create(path)?;
         let mut zip = ZipWriter::new(file);
-        
+
         let options = FileOptions::<()>::default()
             .compression_method(zip::CompressionMethod::Stored);
-        
+
         zip.start_file("pact.sig", options)?;
         zip.write_all(b"Pact Vault v1.0")?;
         zip.finish()?;
-        
+
+        // `File::create` respeta el umask (normalmente 022), así que la bóveda
+        // quedaba en 644 y era legible por cualquier usuario del sistema. La
+        // bóveda guarda las credenciales, así que se restringe a 600.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        }
+
         Ok(())
     }
 
@@ -104,9 +137,74 @@ impl StorageManager {
         }
 
         // Reemplazar el original con el temporal
-        temp_pcty.persist(pcty_path).map_err(io::Error::other)?;
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
         
         tracing::debug!("save_db (Zip I/O) completado en {:?}", t_total.elapsed());
+        Ok(())
+    }
+
+    /// Elimina la base de datos de un usuario del contenedor .pcty.
+    pub fn delete_user_db(&self, username: &str) -> io::Result<()> {
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
+        let pcty_path = path_lock.as_ref()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+
+        let db_name = format!("{}.db", username).to_lowercase();
+        let parent_dir = pcty_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        let temp_pcty = NamedTempFile::new_in(parent_dir)?;
+
+        {
+            let mut zin = ZipArchive::new(File::open(pcty_path)?)?;
+            let mut zout = ZipWriter::new(&temp_pcty);
+            for i in 0..zin.len() {
+                let file = zin.by_index(i)?;
+                if file.name().to_lowercase() == db_name {
+                    continue; // Omitimos la DB del usuario eliminado
+                }
+                zout.raw_copy_file(file)?;
+            }
+        }
+
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Renombra la base de datos de un usuario dentro del contenedor .pcty.
+    pub fn rename_user_db(&self, old_username: &str, new_username: &str) -> io::Result<()> {
+        let path_lock = self.pcty_path.lock()
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
+        let pcty_path = path_lock.as_ref()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+
+        let old_name = format!("{}.db", old_username).to_lowercase();
+        let new_entry = format!("{}.db", new_username);
+        let new_name_lc = new_entry.to_lowercase();
+        let parent_dir = pcty_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        let temp_pcty = NamedTempFile::new_in(parent_dir)?;
+
+        {
+            let mut zin = ZipArchive::new(File::open(pcty_path)?)?;
+            let mut zout = ZipWriter::new(&temp_pcty);
+            let options = FileOptions::<()>::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+
+            for i in 0..zin.len() {
+                let mut file = zin.by_index(i)?;
+                let name_lc = file.name().to_lowercase();
+
+                if name_lc == old_name {
+                    zout.start_file(new_entry.as_str(), options)?;
+                    io::copy(&mut file, &mut zout)?;
+                } else if name_lc == new_name_lc {
+                    continue; // Se reescribe con el contenido del usuario renombrado
+                } else {
+                    zout.raw_copy_file(file)?;
+                }
+            }
+        }
+
+        temp_pcty.persist(pcty_path).map_err(|e| io::Error::other(e.to_string()))?;
         Ok(())
     }
 
@@ -135,7 +233,7 @@ impl StorageManager {
 
         let mut saved = 0;
         for username in &dirty_users {
-            match self.save_db(username, std::path::Path::new("pact.db")) {
+            match self.save_db(username, self.db_path()) {
                 Ok(_) => {
                     tracing::debug!("Guardado diferido completado para {}", username);
                     saved += 1;
