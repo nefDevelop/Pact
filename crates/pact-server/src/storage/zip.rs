@@ -72,9 +72,9 @@ impl StorageManager {
     pub fn save_db(&self, username: &str, db_path: &Path) -> io::Result<()> {
         let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+            .ok_or_else(|| io::Error::other("No vault linked"))?;
 
         tracing::debug!("Guardando base de datos de {} en {:?}", username, pcty_path);
 
@@ -104,7 +104,7 @@ impl StorageManager {
         }
 
         // Reemplazar el original con el temporal
-        temp_pcty.persist(pcty_path).map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        temp_pcty.persist(pcty_path).map_err(io::Error::other)?;
         
         tracing::debug!("save_db (Zip I/O) completado en {:?}", t_total.elapsed());
         Ok(())
@@ -157,9 +157,9 @@ impl StorageManager {
     pub fn extract_db(&self, username: &str, dest_path: &Path) -> io::Result<bool> {
         let t_total = std::time::Instant::now();
         let path_lock = self.pcty_path.lock()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+            .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+            .ok_or_else(|| io::Error::other("No vault linked"))?;
 
         tracing::info!("Extrayendo base de datos de {} desde {:?}", username, pcty_path);
 
@@ -191,7 +191,7 @@ impl StorageManager {
     pub fn list_users(&self) -> io::Result<Vec<String>> {
         let pcty_path = {
             let path_lock = self.pcty_path.lock()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Mutex poisoned: {}", e)))?;
+                .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
             path_lock.clone()
         };
 

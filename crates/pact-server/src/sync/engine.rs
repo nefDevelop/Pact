@@ -54,7 +54,7 @@ impl<'a> SyncEngine<'a> {
             }
         }
 
-        for (uid, _) in &remote_map {
+        for uid in remote_map.keys() {
             if !local_map.contains_key(uid) {
                 plan.to_pull_folders.push(uid.clone());
             }
@@ -88,7 +88,7 @@ impl<'a> SyncEngine<'a> {
             }
         }
 
-        for (uid, _) in &remote_acc_map {
+        for uid in remote_acc_map.keys() {
             if !local_acc_map.contains_key(uid) {
                 plan.to_pull_accounts.push(uid.clone());
             }

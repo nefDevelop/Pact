@@ -17,7 +17,6 @@ vi.mock('@tauri-apps/api/core', () => ({
   })
 }));
 
-import { generateHardwareFingerprint, encryptWithHardware, decryptWithHardware } from './crypto_utils';
 
 // Inyectar WebCrypto en el entorno de JSDOM para los tests
 beforeAll(() => {
@@ -52,7 +51,7 @@ describe('Crypto Utils: Cifrado E2E (PBKDF2 + AES-GCM)', () => {
 
   it('debería derivar llaves consistentes de forma determinista', async () => {
     const { masterKey: m1, authKey: a1 } = await import('./crypto_utils.js').then(m => m.deriveKeys(password, salt));
-    const { masterKey: m2, authKey: a2 } = await import('./crypto_utils.js').then(m => m.deriveKeys(password, salt));
+    const { authKey: a2 } = await import('./crypto_utils.js').then(m => m.deriveKeys(password, salt));
 
     // Las AuthKeys (Strings Hex) deben ser idénticas
     expect(a1).toBe(a2);

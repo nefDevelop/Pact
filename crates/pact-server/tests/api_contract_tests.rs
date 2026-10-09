@@ -348,11 +348,16 @@ async fn test_get_users_returns_list() {
         }))
         .send().await.unwrap();
 
+    // /auth/users lista usuarios de la bóveda local vinculada; sin bóveda
+    // devuelve lista vacía con su forma (vincular resetea la DB del servidor,
+    // así que no se puede registrar y listar en el mismo test).
     let resp = client.get(format!("{}/auth/users", base))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
     let body: Value = resp.json().await.unwrap();
-    assert!(body["users"].as_array().unwrap().len() > 0);
+    let users = body["users"].as_array().unwrap();
+    assert!(users.is_empty());
+    assert_eq!(body["vault_status"], "empty");
 }
 
 #[tokio::test]

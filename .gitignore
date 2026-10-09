@@ -44,3 +44,6 @@ build/
 .tmp/
 __pycache__/
 *.pyc
+
+# Generados por Tauri al compilar (no versionar: se regeneran solos)
+crates/pact-desktop/gen/

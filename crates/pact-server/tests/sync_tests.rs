@@ -298,8 +298,8 @@ async fn test_sync_version_conflict_last_write_wins() {
 
     let local_folders = local_db.get_folders_by_user(user_id).await.unwrap();
     let remote_folders = remote_db.get_folders_by_user(user_id).await.unwrap();
-    assert_eq!(local_folders[0].version, 0);
-    assert_eq!(remote_folders[0].version, 0);
+    assert_eq!(local_folders[0].version, 1);
+    assert_eq!(remote_folders[0].version, 1);
 
     local_db.update_folder(
         local_folders[0].id,

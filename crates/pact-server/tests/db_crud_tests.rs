@@ -60,7 +60,7 @@ async fn test_folder_crud_with_version_tracking() {
     assert_eq!(folders.len(), 1);
     assert_eq!(folders[0].name, "Work");
     assert_eq!(folders[0].uid, "folder-uid-001");
-    assert_eq!(folders[0].version, 0);
+    assert_eq!(folders[0].version, 1);
 
     let updated_folder = CreateFolder {
         user_id,

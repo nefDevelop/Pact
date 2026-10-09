@@ -36,7 +36,7 @@ export const applyM3Palette = (hex, isDark) => {
     
     const hsl = hexToHsl(hex);
     if (!hsl || hsl.length < 3) return;
-    const [h, s, l] = hsl;
+    const [h, s] = hsl;
     
     const root = document.documentElement;
     const targetS = isDark ? Math.min(s, 40) : s;

@@ -50,7 +50,7 @@ pub async fn set_vault_path(
     
     storage.set_path(path.clone());
 
-    if let Some(p) = path {
+    if path.is_some() {
         tracing::info!("[VAULT] Paso 1: Ruta fijada, reseteando DB local");
         db.reset().await.map_err(|e| AppError::Internal(e.into()))?;
 

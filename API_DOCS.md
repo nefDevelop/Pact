@@ -116,8 +116,9 @@ Terminate the current session.
 ### List Users
 `GET /auth/users`
 
-List all users registered in the local instance.
-- **Response**: `200 OK` with `UsersResponse`.
+List users of the linked local vault (used by the desktop vault picker).
+Without a linked vault it returns an empty list with `vault_status: "empty"`.
+- **Response**: `200 OK` with `UsersResponse` (`users`, `source`, `vault_path`, `vault_status`).
 
 ### Update User
 `POST /auth/update`
