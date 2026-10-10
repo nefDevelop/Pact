@@ -18,12 +18,6 @@ pub struct SessionManager {
     session_timeout: Duration,
 }
 
-impl Default for SessionManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SessionManager {
     pub fn new() -> Self {
         Self::new_with_timeout(Duration::hours(1))
@@ -106,6 +100,12 @@ impl SessionManager {
         self.sessions.retain(|_, session| {
             now.signed_duration_since(session.last_activity) <= self.session_timeout
         });
+    }
+}
+
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

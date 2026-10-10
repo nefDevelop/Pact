@@ -100,12 +100,6 @@ pub async fn set_vault_path(
     
     storage.set_path(path.clone());
 
-    // Recordar la elección entre reinicios: sin esto, al reabrir la app el
-    // servidor volvía a arrancar sin bóveda y trataba cada sesión como la
-    // primera, perdiendo la que el usuario ya había elegido.
-    if let Err(e) = crate::storage::remember_vault_path(&app.data_dir, path.as_deref()) {
-        tracing::warn!("No se pudo recordar la bóveda elegida: {}", e);
-    }
 
     if path.is_some() {
         tracing::info!("[VAULT] Paso 1: Ruta fijada, reseteando DB local");

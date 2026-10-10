@@ -348,6 +348,9 @@ async fn test_get_users_returns_list() {
         }))
         .send().await.unwrap();
 
+    // /auth/users lista usuarios de la bóveda local vinculada; sin bóveda
+    // devuelve lista vacía con su forma (vincular resetea la DB del servidor,
+    // así que no se puede registrar y listar en el mismo test).
     let resp = client.get(format!("{}/auth/users", base))
         .send().await.unwrap();
     assert_eq!(resp.status(), 200);
@@ -440,8 +443,7 @@ async fn test_get_users_con_boveda_recordada_ausente_reporta_configured() {
     assert_eq!(body["vault_status"], "configured");
     assert_eq!(body["vault_path"], "ausente.pcty");
 
-    let _ = std::fs::remove_dir_all(&data_dir);
-}
+    let _ = std::fs::remove_dir_all(&data_dir);}
 
 #[tokio::test]
 async fn test_vault_endpoints_return_401_without_token() {

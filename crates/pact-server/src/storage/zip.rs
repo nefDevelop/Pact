@@ -107,7 +107,7 @@ impl StorageManager {
         let path_lock = self.pcty_path.lock()
             .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+            .ok_or_else(|| io::Error::other("No vault linked"))?;
 
         tracing::debug!("Guardando base de datos de {} en {:?}", username, pcty_path);
 
@@ -257,7 +257,7 @@ impl StorageManager {
         let path_lock = self.pcty_path.lock()
             .map_err(|e| io::Error::other(format!("Mutex poisoned: {}", e)))?;
         let pcty_path = path_lock.as_ref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No vault linked"))?;
+            .ok_or_else(|| io::Error::other("No vault linked"))?;
 
         tracing::info!("Extrayendo base de datos de {} desde {:?}", username, pcty_path);
 
