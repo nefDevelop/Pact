@@ -153,6 +153,8 @@ jobs:
 
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -168,7 +170,9 @@ jobs:
         run: cargo install cargo-tarpaulin --locked
 
       - name: Generate coverage
-        run: cargo tarpaulin -p pact-core -p pact-server --out Xml --output-dir coverage --fail-under 80
+        # Motor llvm en vez de ptrace: los tests de axum multihilo
+        # (api_contract_tests) hacen segfault bajo ptrace.
+        run: cargo tarpaulin -p pact-core -p pact-server --engine llvm --out Xml --output-dir coverage --fail-under 80
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
