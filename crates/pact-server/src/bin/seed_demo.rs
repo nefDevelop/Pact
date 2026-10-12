@@ -191,11 +191,11 @@ async fn insert_user(
     .execute(pool)
     .await
     .map_err(|e| format!("insertando el usuario: {}", e))?;
-    Ok(sqlx::query_scalar::<_, i64>("SELECT id FROM users WHERE username = ?1")
+    sqlx::query_scalar::<_, i64>("SELECT id FROM users WHERE username = ?1")
         .bind(username)
         .fetch_one(pool)
         .await
-        .map_err(|e| format!("leyendo el id del usuario: {}", e))?)
+        .map_err(|e| format!("leyendo el id del usuario: {}", e))
 }
 
 /// Cifra el texto con la master key.

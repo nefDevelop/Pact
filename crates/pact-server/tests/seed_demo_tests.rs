@@ -7,7 +7,7 @@
 //! de entradas ilegibles, y eso solo se detecta descifrando.
 
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
 
 use pact_core::crypto::{abrir_dato_json, derivar_claves_dual, derivar_masterkey};
@@ -25,7 +25,7 @@ fn salt_cruda() -> Vec<u8> {
 }
 
 /// Ejecuta el binario del seed contra un directorio temporal.
-fn seed(data_dir: &PathBuf) {
+fn seed(data_dir: &Path) {
     let salida = Command::new(env!("CARGO_BIN_EXE_seed_demo"))
         .args(["--data-dir", data_dir.to_str().unwrap(), "--force"])
         .output()
@@ -37,7 +37,7 @@ fn seed(data_dir: &PathBuf) {
     );
 }
 
-async fn pool(data_dir: &PathBuf) -> sqlx::SqlitePool {
+async fn pool(data_dir: &Path) -> sqlx::SqlitePool {
     let ruta = data_dir.join("pact.db").canonicalize().unwrap();
     // sqlx solo abre; el archivo lo crea el seed.
     assert!(ruta.exists(), "el seed no creó {}", ruta.display());
