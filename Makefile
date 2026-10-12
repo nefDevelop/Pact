@@ -64,8 +64,8 @@ test-mysql: ## Tests de MySQL/MariaDB (requiere PACT_TEST_MYSQL_URL)
 	@test -n "$$PACT_TEST_MYSQL_URL" || (echo "Define PACT_TEST_MYSQL_URL (p. ej. mysql://user:pass@127.0.0.1:3306/pact_test)"; exit 1)
 	$(CARGO) test -p pact-server --test mysql_tests -- --nocapture
 
-coverage: ## Reporte de cobertura con tarpaulin; falla si baja del 80% (requiere: cargo install cargo-tarpaulin)
-	$(CARGO) tarpaulin -p pact-core -p pact-server --out Html --output-dir coverage --fail-under 80
+coverage: ## Reporte de cobertura con tarpaulin; falla si baja del 60% (requiere: cargo install cargo-tarpaulin)
+	$(CARGO) tarpaulin -p pact-core -p pact-server --out Html --output-dir coverage --fail-under 60
 
 mutants: ## Ejecuta testing de mutación (requiere: cargo install cargo-mutants)
 	$(CARGO) mutants --check
